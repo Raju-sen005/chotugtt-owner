@@ -7,9 +7,10 @@ import {
   Edit2,
   Trash2,
   IndianRupee,
-  Image,
+  Image as ImageIcon,
   Layers,
   Sparkles,
+  Upload,
 } from "lucide-react";
 import Input from "../../components/ui/Input";
 import Modal from "../../components/ui/Modal";
@@ -22,18 +23,22 @@ export default function MenuCatalog() {
   const [activeCategoryFilter, setActiveCategoryFilter] = useState("ALL");
   const [formMode, setFormMode] = useState("DISH");
   const [selectedItems, setSelectedItems] = useState([]);
+  
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("");
-  const [image, setImage] = useState("");
+  
+  // 🔑 File state and image preview state
+  const [imageFile, setImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
 
   const { data: menuItems = { items: [], combos: [] }, isLoading } = useQuery({
     queryKey: ["menu-items"],
     queryFn: async () => {
       const [itemsRes, combosRes] = await Promise.all([
-        axios.get(`${import.meta.env.VITE_APP_API_BASE}/menu/admin/items`),
-        axios.get(`${import.meta.env.VITE_APP_API_BASE}/menu/admin/combos`),
+        axios.get(`${import.meta.env.VITE_APP_API_BASE}/menu/admin/items`, { withCredentials: true }),
+        axios.get(`${import.meta.env.VITE_APP_API_BASE}/menu/admin/combos`, { withCredentials: true }),
       ]);
       return {
         items: itemsRes.data.data || [],
@@ -83,17 +88,41 @@ export default function MenuCatalog() {
       .reduce((sum, item) => sum + (Number(item.price) || 0), 0);
   }, [menuItems.items, selectedItems]);
 
+  // Helper to build FormData payload
+  const createFormData = () => {
+    const formData = new FormData();
+    formData.append("name", name);
+    formData.append("description", description);
+    formData.append("price", formMode === "COMBO" ? comboCalculatedPrice : price);
+    
+    if (formMode === "DISH") {
+      formData.append("category", category);
+    }
+    
+    if (formMode === "COMBO") {
+      selectedItems.forEach((itemId) => formData.append("items[]", itemId));
+    }
+
+    if (imageFile) {
+      formData.append("image", imageFile);
+    }
+    return formData;
+  };
+
   const upsertMutation = useMutation({
-    mutationFn: async (payload) => {
+    mutationFn: async (formData) => {
+      const config = { withCredentials: true, headers: { "Content-Type": "multipart/form-data" } };
       if (editingItem) {
         return await axios.patch(
           `${import.meta.env.VITE_APP_API_BASE}/menu/admin/items/${editingItem._id}`,
-          payload,
+          formData,
+          config
         );
       }
       return await axios.post(
         `${import.meta.env.VITE_APP_API_BASE}/menu/admin/items`,
-        payload,
+        formData,
+        config
       );
     },
     onSuccess: () => {
@@ -101,35 +130,28 @@ export default function MenuCatalog() {
       closeAndResetModal();
     },
     onError: (err) => {
-      alert(
-        err.response?.data?.message ||
-          "Error processing cloud catalog asset pipeline loop.",
-      );
+      alert(err.response?.data?.message || "Error processing asset request.");
     },
   });
 
   const deleteMutation = useMutation({
     mutationFn: async (itemId) =>
-      await axios.delete(
-        `${import.meta.env.VITE_APP_API_BASE}/menu/admin/items/${itemId}`,
-      ),
+      await axios.delete(`${import.meta.env.VITE_APP_API_BASE}/menu/admin/items/${itemId}`, { withCredentials: true }),
     onSuccess: () => queryClient.invalidateQueries(["menu-items"]),
   });
 
   const deleteComboMutation = useMutation({
     mutationFn: async (comboId) =>
-      await axios.delete(
-        `${import.meta.env.VITE_APP_API_BASE}/menu/admin/combos/${comboId}`,
-      ),
+      await axios.delete(`${import.meta.env.VITE_APP_API_BASE}/menu/admin/combos/${comboId}`, { withCredentials: true }),
     onSuccess: () => queryClient.invalidateQueries(["menu-items"]),
   });
 
   const comboMutation = useMutation({
-    mutationFn: (data) =>
-      axios.post(
-        `${import.meta.env.VITE_APP_API_BASE}/menu/admin/combos`,
-        data,
-      ),
+    mutationFn: async (formData) =>
+      await axios.post(`${import.meta.env.VITE_APP_API_BASE}/menu/admin/combos`, formData, {
+        withCredentials: true,
+        headers: { "Content-Type": "multipart/form-data" },
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries(["menu-items"]);
       closeAndResetModal();
@@ -137,11 +159,11 @@ export default function MenuCatalog() {
   });
 
   const updateComboMutation = useMutation({
-    mutationFn: async ({ id, data }) =>
-      await axios.patch(
-        `${import.meta.env.VITE_APP_API_BASE}/menu/admin/combos/${id}`,
-        data,
-      ),
+    mutationFn: async ({ id, formData }) =>
+      await axios.patch(`${import.meta.env.VITE_APP_API_BASE}/menu/admin/combos/${id}`, formData, {
+        withCredentials: true,
+        headers: { "Content-Type": "multipart/form-data" },
+      }),
     onSuccess: () => {
       queryClient.invalidateQueries(["menu-items"]);
       closeAndResetModal();
@@ -159,7 +181,8 @@ export default function MenuCatalog() {
     setDescription(item.description || "");
     setPrice(item.price);
     setCategory(item.category || "");
-    setImage(item.image || "");
+    setImagePreview(item.image || "");
+    setImageFile(null);
 
     if (item.isCombo) {
       setFormMode("COMBO");
@@ -178,48 +201,43 @@ export default function MenuCatalog() {
     setDescription("");
     setPrice("");
     setCategory("");
-    setImage("");
+    setImageFile(null);
+    setImagePreview("");
     setSelectedItems([]);
     setFormMode("DISH");
   }, []);
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setImageFile(file);
+      setImagePreview(URL.createObjectURL(file));
+    }
+  };
+
   const handleSubmit = useCallback(
     (e) => {
       e.preventDefault();
-
-      const payload = {
-        name,
-        description,
-        price: formMode === "COMBO" ? comboCalculatedPrice : price,
-        image,
-        ...(formMode === "DISH" && { category }),
-        ...(formMode === "COMBO" && { items: selectedItems }),
-      };
+      const formData = createFormData();
 
       if (editingItem) {
         if (formMode === "COMBO") {
-          updateComboMutation.mutate({ id: editingItem._id, data: payload });
+          updateComboMutation.mutate({ id: editingItem._id, formData });
         } else {
-          upsertMutation.mutate(payload);
+          upsertMutation.mutate(formData);
         }
       } else {
         if (formMode === "DISH") {
-          upsertMutation.mutate(payload);
+          upsertMutation.mutate(formData);
         } else {
-          comboMutation.mutate(payload);
+          comboMutation.mutate(formData);
         }
       }
     },
     [
-      name,
-      description,
-      price,
-      image,
-      category,
       formMode,
-      selectedItems,
       editingItem,
-      comboCalculatedPrice,
+      createFormData,
       updateComboMutation,
       upsertMutation,
       comboMutation,
@@ -335,12 +353,18 @@ export default function MenuCatalog() {
                 <div className="w-20 h-20 rounded-2xl bg-slate-50 border border-slate-100 shrink-0 overflow-hidden relative flex items-center justify-center text-slate-300">
                   {item.image ? (
                     <img
-                      src={item.image}
-                      alt={item.name}
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
+  src={
+    item.image
+      ? item.image.startsWith("http")
+        ? item.image
+        : `${import.meta.env.VITE_APP_API_BASE.replace('/api', '')}${item.image}`
+      : null
+  }
+  alt={item.name}
+  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+/>
                   ) : (
-                    <Image size={24} />
+                    <ImageIcon size={24} />
                   )}
                 </div>
 
@@ -352,19 +376,14 @@ export default function MenuCatalog() {
                     {item.name}
                   </h3>
                   <p className="text-xs text-slate-500 font-medium line-clamp-2 leading-relaxed">
-                    {item.description ||
-                      "No direct kitchen culinary preparations logs specified."}
+                    {item.description || "No direct kitchen culinary preparations logs specified."}
                   </p>
                 </div>
               </div>
 
               <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex justify-between items-center">
                 <span className="text-base font-black text-slate-900 flex items-center tracking-tight">
-                  <IndianRupee
-                    size={15}
-                    strokeWidth={2.5}
-                    className="mt-0.5 text-slate-700"
-                  />
+                  <IndianRupee size={15} strokeWidth={2.5} className="mt-0.5 text-slate-700" />
                   {item.price?.toLocaleString("en-IN")}
                 </span>
 
@@ -427,15 +446,11 @@ export default function MenuCatalog() {
                   <input
                     type="checkbox"
                     checked={selectedItems.includes(item._id)}
-                    onChange={(e) =>
-                      toggleSelectedItem(item._id, e.target.checked)
-                    }
+                    onChange={(e) => toggleSelectedItem(item._id, e.target.checked)}
                     className="rounded text-red-500 focus:ring-red-500/20"
                   />
                   <span className="flex-1 font-bold text-slate-800 text-xs">{item.name}</span>
-                  <span className="text-xs font-black text-slate-500">
-                    ₹{item.price}
-                  </span>
+                  <span className="text-xs font-black text-slate-500">₹{item.price}</span>
                 </label>
               ))}
             </div>
@@ -444,9 +459,7 @@ export default function MenuCatalog() {
               <span className="text-[11px] font-black uppercase tracking-wider text-red-600">
                 Combo Total Price
               </span>
-              <span className="text-base font-black text-red-700">
-                ₹{comboCalculatedPrice}
-              </span>
+              <span className="text-base font-black text-red-700">₹{comboCalculatedPrice}</span>
             </div>
           </div>
         )}
@@ -455,11 +468,7 @@ export default function MenuCatalog() {
           <Input
             label="Title"
             required
-            placeholder={
-              formMode === "DISH"
-                ? "e.g., Spicy Paneer Tikka"
-                : "e.g., Weekend Special Combo"
-            }
+            placeholder={formMode === "DISH" ? "e.g., Spicy Paneer Tikka" : "e.g., Weekend Special Combo"}
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
@@ -476,11 +485,7 @@ export default function MenuCatalog() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label={
-                formMode === "COMBO"
-                  ? "Calculated Price (INR)"
-                  : "Selling Price (INR)"
-              }
+              label={formMode === "COMBO" ? "Calculated Price (INR)" : "Selling Price (INR)"}
               type="number"
               required
               readOnly={formMode === "COMBO"}
@@ -488,14 +493,34 @@ export default function MenuCatalog() {
               value={formMode === "COMBO" ? comboCalculatedPrice : price}
               onChange={(e) => setPrice(e.target.value)}
             />
-            <Input
-              label="Image Web URL Link"
-              type="url"
-              placeholder="https://images.unsplash.com/..."
-              value={image}
-              onChange={(e) => setImage(e.target.value)}
-            />
+
+            {/* 🔑 File Input Field */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Upload Dish Image
+              </label>
+              <label className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer transition-all shadow-xs">
+                <Upload size={15} />
+                <span className="truncate">{imageFile ? imageFile.name : "Choose File..."}</span>
+                <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+              </label>
+            </div>
           </div>
+
+          {/* Image Preview */}
+          {imagePreview && (
+  <div className="relative w-20 h-20 rounded-2xl overflow-hidden border border-slate-200">
+    <img 
+      src={
+        imagePreview.startsWith("http") || imagePreview.startsWith("blob:")
+          ? imagePreview
+          : `${import.meta.env.VITE_APP_API_BASE.replace('/api', '')}${imagePreview}`
+      } 
+      alt="Preview" 
+      className="w-full h-full object-cover" 
+    />
+  </div>
+)}
 
           <div className="space-y-1.5">
             <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
