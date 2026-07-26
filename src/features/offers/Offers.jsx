@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo, memo } from "react";
 import axios from "axios";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Tag, X, Trash2 } from "lucide-react";
+import { Tag, X, Trash2, PlusCircle, Sparkles, Percent } from "lucide-react";
 
 const api = axios.create({ baseURL: `${import.meta.env.VITE_APP_API_BASE}` });
 
@@ -11,34 +11,35 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
-// 🔑 Extracted + memoized — form ke input change hone pe yeh list re-render nahi hogi
+// Offer Card Component
 const OfferCard = memo(function OfferCard({ offer, onDelete }) {
   return (
-    <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-100 hover:border-rose-200 transition flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-3">
-      <div className="flex gap-3 sm:gap-4 items-center flex-1 min-w-0">
-        <div className="p-2.5 sm:p-3 bg-rose-50 text-rose-500 rounded-xl shrink-0">
-          <Tag size={18} className="sm:w-5 sm:h-5" />
+    <div className="bg-white p-5 rounded-3xl border border-slate-200/80 hover:border-red-200 transition-all shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 group">
+      <div className="flex gap-4 items-center flex-1 min-w-0">
+        <div className="p-3 bg-red-50 text-red-500 rounded-2xl shrink-0 group-hover:bg-red-500 group-hover:text-white transition-colors">
+          <Tag size={20} />
         </div>
-        <div className="min-w-0">
-          <h3 className="font-black text-slate-800 text-sm sm:text-base truncate">{offer.title}</h3>
-          <p className="text-xs text-slate-500 truncate">{offer.description}</p>
+        <div className="min-w-0 space-y-0.5">
+          <h3 className="font-black text-slate-900 text-sm sm:text-base truncate">{offer.title}</h3>
+          <p className="text-xs text-slate-500 truncate font-medium">{offer.description || "No description provided."}</p>
         </div>
       </div>
 
-      <div className="flex items-center justify-between sm:justify-end gap-4 sm:gap-6 shrink-0">
+      <div className="flex items-center justify-between sm:justify-end gap-6 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100">
         <div className="text-left sm:text-right">
           <div className="text-emerald-600 font-black text-base sm:text-lg">
             {offer.discountValue}% OFF
           </div>
-          <p className="text-[10px] text-slate-400 font-bold uppercase whitespace-nowrap">
-            {offer.targetItems?.length || 0} Items
+          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider whitespace-nowrap">
+            {offer.targetItems?.length || 0} Target Items
           </p>
         </div>
         <button
           onClick={() => onDelete(offer._id)}
-          className="text-slate-300 hover:text-red-500 transition p-2 shrink-0"
+          className="p-2.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all cursor-pointer"
+          title="Delete Offer"
         >
-          <Trash2 size={20} />
+          <Trash2 size={18} />
         </button>
       </div>
     </div>
@@ -69,8 +70,7 @@ export default function Offers() {
   });
 
   const { data: menuItemsRaw, isLoading: itemsLoading, isError: itemsError } = useQuery({
-    queryKey: ["menu-items-list"], // Note: agar MenuCatalog mein "menu-items" key items+combos dono rakhta h,
-    // yeh alag key rakhna better h taaki dono queries conflict na karein
+    queryKey: ["menu-items-list"],
     queryFn: () => api.get("/menu/admin/items").then((r) => r.data.data),
     staleTime: 60_000,
   });
@@ -78,7 +78,6 @@ export default function Offers() {
   const offers = useMemo(() => (Array.isArray(offersRaw) ? offersRaw : []), [offersRaw]);
   const menuItems = useMemo(() => (Array.isArray(menuItemsRaw) ? menuItemsRaw : []), [menuItemsRaw]);
 
-  // 🔑 lookup map — O(1) find instead of .find() (O(n)) har chip render pe
   const menuItemsById = useMemo(() => {
     const map = {};
     menuItems.forEach((item) => {
@@ -125,58 +124,91 @@ export default function Offers() {
   );
 
   const handleLaunchOffer = useCallback(() => {
+    if (!formData.title || !formData.discountValue) {
+      alert("Please enter title and discount value.");
+      return;
+    }
     addMutation.mutate(formData);
   }, [addMutation, formData]);
 
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6 sm:space-y-8">
-      <div className="flex justify-between items-center">
-        <h2 className="text-lg sm:text-xl font-black text-slate-800">🔥 Restaurant Offers</h2>
+    <div className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-10 space-y-8 font-sans bg-[#F8F9FA] min-h-screen">
+      
+      {/* Header Section */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-red-50 text-red-600 rounded-2xl border border-red-100">
+            <Sparkles size={28} />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-slate-900 tracking-tight">Restaurant Offers & Discounts</h2>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Customers ke liye special promotional campaigns launch karein.</p>
+          </div>
+        </div>
       </div>
 
-      <div className="bg-white p-4 sm:p-6 rounded-2xl border border-slate-100 shadow-sm">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
-          <input
-            placeholder="Offer Name (e.g. Weekend Special)"
-            className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm"
-            value={formData.title}
-            onChange={(e) => updateField("title", e.target.value)}
-          />
-          <input
-            type="number"
-            placeholder="Discount %"
-            className="p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm"
-            value={formData.discountValue}
-            onChange={(e) => updateField("discountValue", e.target.value)}
+      {/* Create Offer Form Container */}
+      <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xs space-y-5">
+        <div className="border-b border-slate-100 pb-4">
+          <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
+            <PlusCircle size={18} className="text-red-500" /> Create New Offer
+          </h3>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Offer Title</label>
+            <input
+              placeholder="e.g. Weekend Mega Special"
+              className="w-full px-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all"
+              value={formData.title}
+              onChange={(e) => updateField("title", e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Discount Value (%)</label>
+            <div className="relative">
+              <input
+                type="number"
+                placeholder="20"
+                className="w-full px-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all pr-8"
+                value={formData.discountValue}
+                onChange={(e) => updateField("discountValue", e.target.value)}
+              />
+              <Percent size={14} className="absolute right-3.5 top-3.5 text-slate-400" />
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Brief Description</label>
+          <textarea
+            placeholder="Describe the offer details..."
+            className="w-full px-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all"
+            rows={2}
+            value={formData.description}
+            onChange={(e) => updateField("description", e.target.value)}
           />
         </div>
 
-        <textarea
-          placeholder="Brief description..."
-          className="w-full mt-4 p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm"
-          rows={2}
-          value={formData.description}
-          onChange={(e) => updateField("description", e.target.value)}
-        />
-
-        <div className="mt-4">
-          <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-            Apply to specific items:
+        <div>
+          <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+            Apply to Specific Menu Items
           </label>
 
           {itemsLoading && <p className="text-xs text-slate-400 mt-1">Loading items...</p>}
           {itemsError && (
-            <p className="text-xs text-red-500 mt-1">
-              Failed to load menu items. Check your login/token.
+            <p className="text-xs text-red-500 mt-1 font-medium">
+              Failed to load menu items. Check your authentication token.
             </p>
           )}
 
           <select
-            className="w-full mt-1 p-3 bg-slate-50 rounded-xl border border-slate-200 text-sm"
+            className="w-full mt-1 px-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs font-medium text-slate-900 focus:outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all cursor-pointer"
             value=""
             onChange={(e) => e.target.value && addTargetItem(e.target.value)}
           >
-            <option value="">Select Item to add...</option>
+            <option value="">Select menu item to target...</option>
             {menuItems.map((item) => (
               <option key={item._id} value={item._id}>
                 {item.name} - ₹{item.price}
@@ -184,18 +216,19 @@ export default function Offers() {
             ))}
           </select>
 
+          {/* Selected Item Chips */}
           <div className="flex flex-wrap gap-2 mt-3">
             {formData.targetItems.map((itemId) => {
               const item = menuItemsById[itemId];
               return (
                 <span
                   key={itemId}
-                  className="flex items-center gap-1 bg-rose-50 text-rose-600 px-3 py-1 rounded-full text-xs font-bold"
+                  className="inline-flex items-center gap-1.5 bg-red-50 text-red-600 px-3 py-1.5 rounded-full text-xs font-bold border border-red-100"
                 >
-                  {item?.name || "Unknown item"}{" "}
+                  {item?.name || "Unknown item"}
                   <X
-                    size={12}
-                    className="cursor-pointer shrink-0"
+                    size={14}
+                    className="cursor-pointer shrink-0 hover:text-red-800"
                     onClick={() => removeTargetItem(itemId)}
                   />
                 </span>
@@ -207,22 +240,35 @@ export default function Offers() {
         <button
           onClick={handleLaunchOffer}
           disabled={addMutation.isPending}
-          className="w-full mt-6 bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition disabled:opacity-50"
+          className="w-full bg-gradient-to-r from-red-500 to-rose-600 text-white py-3.5 rounded-2xl font-bold hover:opacity-95 active:scale-[0.99] transition-all shadow-md shadow-red-500/20 text-xs cursor-pointer disabled:opacity-50"
         >
-          {addMutation.isPending ? "Creating..." : "Launch Offer"}
+          {addMutation.isPending ? "Launching Campaign..." : "Launch Offer Campaign"}
         </button>
       </div>
 
-      <div className="space-y-3 sm:space-y-4">
-        {offersLoading && <p className="text-sm text-slate-400">Loading offers...</p>}
-        {offersError && <p className="text-sm text-red-500">Failed to load offers.</p>}
+      {/* Offers Listing Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between px-2">
+          <h3 className="font-black text-slate-800 text-base">Active Offers List</h3>
+          <span className="text-xs font-bold bg-white px-3 py-1 rounded-full border border-slate-200 text-slate-600 shadow-xs">
+            {offers.length} Total Offers
+          </span>
+        </div>
+
+        {offersLoading && <p className="text-sm text-slate-400 p-6 text-center bg-white rounded-3xl border border-slate-200">Loading offers...</p>}
+        {offersError && <p className="text-sm text-red-500 p-6 text-center bg-white rounded-3xl border border-slate-200">Failed to load offers.</p>}
         {!offersLoading && offers.length === 0 && (
-          <p className="text-sm text-slate-400">No offers created yet.</p>
+          <div className="text-center py-12 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-2">
+            <Tag size={36} className="mx-auto text-slate-300" />
+            <p className="text-sm text-slate-500 font-medium">No offers created yet.</p>
+          </div>
         )}
 
-        {offers.map((offer) => (
-          <OfferCard key={offer._id} offer={offer} onDelete={handleDeleteOffer} />
-        ))}
+        <div className="space-y-3">
+          {offers.map((offer) => (
+            <OfferCard key={offer._id} offer={offer} onDelete={handleDeleteOffer} />
+          ))}
+        </div>
       </div>
     </div>
   );

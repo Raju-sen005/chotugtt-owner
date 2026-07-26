@@ -1,55 +1,78 @@
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
-import { Download, TrendingUp, TrendingDown, Minus } from "lucide-react";
-import * as XLSX from "xlsx"; // CSV download ke liye
-
-// 2. Trend Logic Component (declared outside render)
-const TrendIcon = ({ totalRevenue }) => {
-  const isUp = totalRevenue > 0;
-  if (totalRevenue === 0) return <Minus className="w-4 h-4 text-slate-300" />;
-  return isUp ? <TrendingUp className="w-4 h-4 text-emerald-500" /> : <TrendingDown className="w-4 h-4 text-rose-500" />;
-};
+import { Download, Minus, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import * as XLSX from "xlsx";
 
 export default function Payment() {
   const [filter, setFilter] = React.useState("today");
 
+  // 1. Current Period Bills Fetch Karein
   const { data: bills, isLoading } = useQuery({
     queryKey: ["bills", filter],
-    queryFn: () => axios.get(`/orders/billing?filter=${filter}`).then((res) => res.data.data),
+    queryFn: () =>
+      axios
+        .get(`/orders/billing?filter=${filter}`)
+        .then((res) => res.data.data),
   });
 
-  const totalRevenue = bills?.reduce((acc, curr) => acc + (curr.total || 0), 0) || 0;
+  // 2. Previous Period Bills Fetch Karein (Profit/Loss Comparison ke liye)
+  // Note: Backend par aisa endpoint hona chahiye jo pichle period ka data ya comparison return kare.
+  const { data: prevData } = useQuery({
+    queryKey: ["bills-prev", filter],
+    queryFn: () =>
+      axios
+        .get(`/orders/billing/previous?filter=${filter}`)
+        .then((res) => res.data)
+        .catch(() => ({ total: 0 })),
+  });
 
-  // 1. Download CSV Logic
+  const totalRevenue =
+    bills?.reduce((acc, curr) => acc + (curr.total || 0), 0) || 0;
+
+  // Previous revenue (Agar backend se data na mile toh fallback 0 rakhein)
+  const prevRevenue = prevData?.total || 0;
+
+  // 💡 Profit / Loss & Percentage Change Logic
+  const revenueDifference = totalRevenue - prevRevenue;
+  const isProfit = revenueDifference > 0;
+  const isLoss = revenueDifference < 0;
+
+  const percentageChange =
+    prevRevenue > 0
+      ? ((Math.abs(revenueDifference) / prevRevenue) * 100).toFixed(1)
+      : totalRevenue > 0
+        ? "100"
+        : "0";
+
+  // 1. Download Excel Logic
   const handleDownload = () => {
+    if (!bills || bills.length === 0) return;
     const formattedData = bills.map((bill) => ({
       "Order ID": bill.orderId,
-      "Customer": bill.customerName,
-      "Phone": bill.customerPhone,
+      Customer: bill.customerName,
+      Phone: bill.customerPhone,
       "Order Type": bill.orderType,
-      "Table": bill.tableNumber,
-      "Subtotal": bill.subtotal,
-      "Tax": bill.tax,
+      Table: bill.tableNumber,
+      Subtotal: bill.subtotal,
+      Tax: bill.tax,
       "Total Amount": bill.total,
-      "Status": bill.status,
-      "Date": new Date(bill.createdAt).toLocaleString(),
+      Status: bill.status,
+      Date: new Date(bill.createdAt).toLocaleString(),
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(formattedData);
-
-    // 💡 Column width set karein taaki data cut na ho
-    worksheet['!cols'] = [
-      { wch: 15 }, // Order ID
-      { wch: 20 }, // Customer
-      { wch: 15 }, // Phone
-      { wch: 12 }, // Order Type
-      { wch: 8 },  // Table
-      { wch: 10 }, // Subtotal
-      { wch: 8 },  // Tax
-      { wch: 12 }, // Total
-      { wch: 12 }, // Status
-      { wch: 25 }, // Date
+    worksheet["!cols"] = [
+      { wch: 15 },
+      { wch: 20 },
+      { wch: 15 },
+      { wch: 12 },
+      { wch: 8 },
+      { wch: 10 },
+      { wch: 8 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 25 },
     ];
 
     const workbook = XLSX.utils.book_new();
@@ -58,38 +81,35 @@ export default function Payment() {
   };
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="p-4 sm:p-6 lg:p-10 max-w-7xl mx-auto font-sans bg-[#F8F9FA] min-h-screen">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs">
         <div>
-          <h2 className="text-2xl font-black">Payment History</h2>
-          <div className="flex items-center gap-2 mt-1">
-            <TrendIcon />
-            <span className="text-xs text-slate-400 font-medium">Compared to last period</span>
-          </div>
+          <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+            Payment History
+          </h2>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            Aapke store ki revenue aur financial performance overview.
+          </p>
         </div>
 
-        <button 
+        <button
           onClick={handleDownload}
-          className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-slate-800 transition"
+          className="flex items-center gap-2 bg-gradient-to-r from-red-500 to-rose-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:opacity-95 transition shadow-sm shadow-red-500/20 cursor-pointer"
         >
           <Download className="w-4 h-4" /> Download Report
         </button>
       </div>
 
-      {/* Stats Card */}
-      <div className="bg-rose-50 p-6 rounded-2xl border border-rose-100 mb-6 w-fit">
-          <p className="text-[10px] uppercase font-bold text-rose-400 tracking-widest">Total Revenue ({filter})</p>
-          <h3 className="text-3xl font-black text-rose-600">₹{totalRevenue.toLocaleString()}</h3>
-      </div>
-
       {/* Filter Tabs */}
-      <div className="flex gap-2 mb-6">
+      <div className="flex gap-2 mb-6 overflow-x-auto pb-2">
         {["today", "week", "month", "year"].map((f) => (
           <button
             key={f}
             onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-lg font-bold capitalize transition ${
-              filter === f ? "bg-rose-500 text-white" : "bg-slate-100 hover:bg-slate-200"
+            className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition cursor-pointer ${
+              filter === f
+                ? "bg-slate-900 text-white shadow-sm"
+                : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
             }`}
           >
             {f}
@@ -97,32 +117,104 @@ export default function Payment() {
         ))}
       </div>
 
-      {/* Table */}
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-100">
-            <tr className="text-slate-400 text-left">
-              <th className="p-4">Date</th>
-              <th className="p-4">Table</th>
-              <th className="p-4 text-right">Amount</th>
-            </tr>
-          </thead>
-          <tbody>
-            {isLoading ? (
-              <tr><td colSpan="3" className="p-8 text-center text-slate-400">Loading...</td></tr>
-            ) : bills?.length > 0 ? (
-              bills.map((bill) => (
-                <tr key={bill._id} className="border-b last:border-0 hover:bg-slate-50">
-                  <td className="p-4">{new Date(bill.createdAt).toLocaleDateString()}</td>
-                  <td className="p-4 font-semibold">Table {bill.tableNumber}</td>
-                  <td className="p-4 text-right font-black">₹{bill.total}</td>
-                </tr>
-              ))
+      {/* Stats Card with Profit / Loss Indicator */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-xs space-y-3">
+          <p className="text-[10px] uppercase font-black text-slate-400 tracking-widest">
+            Total Revenue ({filter})
+          </p>
+          <div className="flex items-baseline justify-between">
+            <h3 className="text-3xl font-black text-slate-900">
+              ₹{totalRevenue.toLocaleString()}
+            </h3>
+
+            {/* Profit / Loss Badge */}
+            {revenueDifference !== 0 ? (
+              <span
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${
+                  isProfit
+                    ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
+                    : "bg-rose-50 text-rose-600 border border-rose-100"
+                }`}
+              >
+                {isProfit ? (
+                  <ArrowUpRight size={12} />
+                ) : (
+                  <ArrowDownRight size={12} />
+                )}
+                {percentageChange}% {isProfit ? "Profit" : "Loss"}
+              </span>
             ) : (
-              <tr><td colSpan="3" className="p-8 text-center text-slate-400 italic">No records</td></tr>
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase bg-slate-100 text-slate-500">
+                <Minus size={12} /> No Change
+              </span>
             )}
-          </tbody>
-        </table>
+          </div>
+          <p className="text-xs text-slate-400">
+            Compared to previous {filter}:{" "}
+            <span className="font-bold text-slate-600">
+              ₹{prevRevenue.toLocaleString()}
+            </span>
+          </p>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
+        <div className="p-5 border-b border-slate-100">
+          <h3 className="font-black text-slate-800 text-sm">
+            Transaction Logs
+          </h3>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs sm:text-sm">
+            <thead className="bg-slate-50 border-b border-slate-100">
+              <tr className="text-slate-400 text-left uppercase text-[10px] font-black tracking-wider">
+                <th className="p-4 sm:p-5">Date & Time</th>
+                <th className="p-4 sm:p-5">Table / Type</th>
+                <th className="p-4 sm:p-5 text-right">Amount</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {isLoading ? (
+                <tr>
+                  <td colSpan="3" className="p-8 text-center text-slate-400">
+                    Loading transactions...
+                  </td>
+                </tr>
+              ) : bills?.length > 0 ? (
+                bills.map((bill) => (
+                  <tr
+                    key={bill._id}
+                    className="hover:bg-slate-50 transition-colors"
+                  >
+                    <td className="p-4 sm:p-5 text-slate-600">
+                      {new Date(bill.createdAt).toLocaleString()}
+                    </td>
+                    <td className="p-4 sm:p-5 font-bold text-slate-800">
+                      Table {bill.tableNumber}{" "}
+                      <span className="text-xs font-normal text-slate-400">
+                        ({bill.orderType || "Dine-in"})
+                      </span>
+                    </td>
+                    <td className="p-4 sm:p-5 text-right font-black text-slate-900">
+                      ₹{bill.total}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td
+                    colSpan="3"
+                    className="p-8 text-center text-slate-400 italic"
+                  >
+                    No payment records found
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

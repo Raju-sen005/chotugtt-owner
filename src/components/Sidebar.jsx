@@ -11,6 +11,7 @@ import {
   DollarSign,
 } from "lucide-react";
 import logo from "../assets/cho.png";
+
 const NAV_ITEMS = [
   { to: "/", icon: LayoutDashboard, label: "Overview" },
   { to: "/orders", icon: ShoppingBag, label: "Live Orders" },
@@ -29,33 +30,54 @@ export default function Sidebar({ closeMobileSidebar }) {
   );
 
   return (
-    <aside className="w-64 bg-slate-900 text-white h-full min-h-screen flex flex-col">
-      <div className="p-6 border-b border-slate-800 h-30">
+    <aside className="w-64 bg-slate-900 text-white h-full min-h-screen flex flex-col border-r border-slate-800 font-sans select-none">
+      {/* Brand Logo Header */}
+      <div className="p-0 border-b border-slate-800/80 flex items-center justify-center min-h-[90px] overflow-hidden">
         <img
           src={logo}
           alt="Chotu"
-          style={{ position: "relative", top: "-67px" }}
+          className="max-h-30 w-auto object-contain"
         />
       </div>
-      <nav className="flex-1 p-4 space-y-2">
+
+      {/* Navigation Links */}
+      <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto scrollbar-none">
         {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             onClick={handleNavClick}
             className={({ isActive }) =>
-              `flex items-center gap-4 px-4 py-3 rounded-lg transition-all text-sm font-medium ${
+              `flex items-center gap-3.5 px-4 py-3 rounded-2xl transition-all duration-200 text-xs sm:text-sm font-bold tracking-tight ${
                 isActive
-                  ? "bg-red-500 text-white shadow-md"
-                  : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                  ? "bg-rose-600 text-white shadow-md shadow-rose-900/40"
+                  : "text-slate-400 hover:bg-slate-800/80 hover:text-white"
               }`
             }
           >
-            <Icon size={20} />
-            {label}
+            {({ isActive }) => (
+              <>
+                <Icon
+                  size={18}
+                  className={
+                    isActive
+                      ? "text-white"
+                      : "text-slate-400 group-hover:text-white"
+                  }
+                />
+                <span>{label}</span>
+              </>
+            )}
           </NavLink>
         ))}
       </nav>
+
+      {/* Footer / Version Info (Optional polish) */}
+      <div className="p-4 border-t border-slate-800/80 mx-4 mb-2 text-center">
+        <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest">
+          Store Operations v1.0
+        </p>
+      </div>
     </aside>
   );
 }

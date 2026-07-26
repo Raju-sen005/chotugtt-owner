@@ -21,111 +21,144 @@ export default function DashboardOverview() {
         accepted: todayOrders.filter(o => o.status === 'ACCEPTED').length,
       };
     },
-    staleTime: 30_000,        // 30 sec tak "fresh" maana jayega, refetch nahi hoga baar baar
-    refetchOnWindowFocus: false, // tab switch karke wapas aane pe refetch spam nahi
-    refetchInterval: 60_000,  // background poll every 1 min — dashboard ke liye kaafi
+    staleTime: 30_000,
+    refetchOnWindowFocus: false,
+    refetchInterval: 60_000,
   });
 
-  // stats array sirf tab recompute hoga jab metrics change ho, har render pe nahi
   const stats = useMemo(() => [
     {
       title: "Today's Revenue",
       value: `₹${metrics?.revenue?.toLocaleString('en-IN') || 0}`,
       icon: <DollarSign size={20} className="text-emerald-600" />,
-      bg: "bg-emerald-50 border-emerald-100/60"
+      bg: "bg-emerald-50/80 border-emerald-100",
+      badgeColor: "text-emerald-600 bg-emerald-50"
     },
     {
       title: "Today's Total Orders",
       value: metrics?.totalOrdersToday || 0,
       icon: <ShoppingBag size={20} className="text-rose-600" />,
-      bg: "bg-rose-50 border-rose-100/60"
+      bg: "bg-rose-50/80 border-rose-100",
+      badgeColor: "text-rose-600 bg-rose-50"
     },
     {
       title: "Preparing in Kitchen",
       value: metrics?.accepted || 0,
       icon: <CheckCircle2 size={20} className="text-amber-600" />,
-      bg: "bg-amber-50 border-amber-100/60"
+      bg: "bg-amber-50/80 border-amber-100",
+      badgeColor: "text-amber-600 bg-amber-50"
     },
     {
-      title: "New/Unattended",
+      title: "New / Unattended",
       value: metrics?.pending || 0,
       icon: <AlertTriangle size={20} className="text-indigo-600" />,
-      bg: "bg-indigo-50 border-indigo-100/60"
+      bg: "bg-indigo-50/80 border-indigo-100",
+      badgeColor: "text-indigo-600 bg-indigo-50"
     },
   ], [metrics]);
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center p-16 space-y-4">
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
         <div className="w-8 h-8 border-4 border-rose-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm font-bold text-slate-500 tracking-tight">Syncing Live Today's Metrics...</p>
+        <p className="text-xs font-bold text-slate-400 tracking-wider uppercase">Syncing Live Metrics Database...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 font-sans">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-6 rounded-2xl border border-slate-200/60 shadow-xs">
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-10 space-y-8 font-sans bg-[#F8F9FA] min-h-screen">
+      
+      {/* Top Banner / Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">Operational Insights</h1>
-          <p className="text-xs md:text-sm text-slate-500 font-medium mt-0.5">Real-time store unit telemetry parameters summary (Today)</p>
+          <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
+            Operational Insights
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            Real-time store unit telemetry parameters summary for today.
+          </p>
         </div>
-        <div className="flex items-center gap-2 self-start md:self-center bg-rose-50 border border-rose-100 px-3 py-1.5 rounded-xl">
+        <div className="flex items-center gap-2.5 bg-rose-50/80 border border-rose-100 px-4 py-2 rounded-2xl self-start sm:self-center shadow-2xs">
           <span className="w-2 h-2 bg-rose-500 rounded-full animate-ping" />
-          <span className="text-[11px] font-black tracking-wider uppercase text-rose-600">Today's Tracker Active</span>
+          <span className="text-[11px] font-black tracking-wider uppercase text-rose-600">
+            Today's Tracker Active
+          </span>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, idx) => (
           <div
             key={idx}
-            className="bg-white p-6 rounded-2xl border border-slate-200/60 shadow-xs flex items-center justify-between hover:shadow-md transition-all duration-200 group cursor-pointer"
+            className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs hover:border-slate-300 transition-all duration-300 flex flex-col justify-between group cursor-pointer relative overflow-hidden"
           >
-            <div className="space-y-1">
-              <p className="text-[10px] md:text-xs font-bold text-slate-400 uppercase tracking-wider">{stat.title}</p>
-              <p className="text-2xl md:text-3xl font-black text-slate-900 tracking-tight group-hover:text-rose-600 transition-colors">{stat.value}</p>
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                {stat.title}
+              </span>
+              <div className={`p-3 rounded-2xl border ${stat.bg} shadow-2xs transition-transform group-hover:scale-105 duration-300`}>
+                {stat.icon}
+              </div>
             </div>
-            <div className={`p-3 rounded-xl border ${stat.bg} shadow-xs transition-transform group-hover:scale-105 duration-200`}>
-              {stat.icon}
+            
+            <div className="flex items-baseline justify-between">
+              <p className="text-3xl font-black text-slate-900 tracking-tight group-hover:text-rose-600 transition-colors">
+                {stat.value}
+              </p>
             </div>
           </div>
         ))}
       </div>
 
-      <div className="bg-white rounded-2xl border border-slate-200/60 shadow-xs overflow-hidden">
-        <div className="p-6 border-b border-slate-100 flex items-center gap-3 bg-slate-50/50">
-          <div className="p-2 bg-slate-900 text-white rounded-xl shadow-xs">
-            <Activity size={16} />
+      {/* System Infrastructure Pulse Section */}
+      <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div className="p-6 sm:p-8 border-b border-slate-100 flex items-center gap-4 bg-slate-50/50">
+          <div className="p-3 bg-slate-900 text-white rounded-2xl shadow-xs">
+            <Activity size={20} />
           </div>
           <div>
-            <h3 className="font-black text-sm md:text-base text-slate-900 tracking-tight">System Infrastructure Pulse</h3>
-            <p className="text-[11px] md:text-xs text-slate-400 font-medium">Telemetry sync heartbeats loop diagnostic metrics</p>
+            <h3 className="font-black text-base text-slate-900 tracking-tight">
+              System Infrastructure Pulse
+            </h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Telemetry sync heartbeats loop diagnostic metrics.
+            </p>
           </div>
         </div>
 
-        <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="flex items-center justify-between p-4 bg-slate-50/60 border border-slate-100 rounded-xl">
-            <div className="flex items-center gap-2.5">
-              <ShieldCheck size={16} className="text-emerald-600" />
-              <span className="text-xs md:text-sm font-semibold text-slate-600">Multi-tenant Data Guard:</span>
+        <div className="p-6 sm:p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="flex items-center justify-between p-5 bg-slate-50/60 border border-slate-200/60 rounded-2xl">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
+                <ShieldCheck size={18} />
+              </div>
+              <span className="text-xs sm:text-sm font-bold text-slate-700">
+                Multi-tenant Data Guard
+              </span>
             </div>
-            <span className="text-[11px] font-black tracking-wider uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-md">
+            <span className="text-[10px] sm:text-[11px] font-black tracking-wider uppercase bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-3 py-1.5 rounded-xl">
               Enforced Secure
             </span>
           </div>
 
-          <div className="flex items-center justify-between p-4 bg-slate-50/60 border border-slate-100 rounded-xl">
-            <div className="flex items-center gap-2.5">
-              <Radio size={16} className="text-emerald-600 animate-pulse" />
-              <span className="text-xs md:text-sm font-semibold text-slate-600">Socket.io KeepAlive Pipeline:</span>
+          <div className="flex items-center justify-between p-5 bg-slate-50/60 border border-slate-200/60 rounded-2xl">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
+                <Radio size={18} className="animate-pulse" />
+              </div>
+              <span className="text-xs sm:text-sm font-bold text-slate-700">
+                Socket.io KeepAlive Pipeline
+              </span>
             </div>
-            <span className="text-[11px] font-black tracking-wider uppercase bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-md">
+            <span className="text-[10px] sm:text-[11px] font-black tracking-wider uppercase bg-emerald-50 text-emerald-700 border border-emerald-200/60 px-3 py-1.5 rounded-xl">
               Online Streaming
             </span>
           </div>
         </div>
       </div>
+
     </div>
   );
 }

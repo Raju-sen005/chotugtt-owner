@@ -3,61 +3,123 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { useSocket } from "../../context/SocketContext";
 import { useNotificationSound } from "../../hooks/useNotificationSound";
-import { Eye, Check, X } from "lucide-react";
+import { Eye, Check, X, Users, Radio, ArrowLeft, ArrowRight } from "lucide-react";
 import OrderDetailsModal from "../../components/OrderDetailsModal";
 
-// 🔑 Row extracted + memoized: sirf tab re-render hogi jab uske apne props change ho,
-// poori table re-render nahi hogi kisi ek row ke status change ya page switch pe
 const OrderRow = memo(function OrderRow({ order, onStatusChange, onView }) {
+  const hasMergedTables = order.mergedTables && order.mergedTables.length > 0;
+
   return (
-    <tr className="hover:bg-slate-50 transition-colors">
-      <td className="p-3 sm:p-4 font-mono font-bold text-rose-600 text-xs sm:text-sm whitespace-nowrap">
+    <tr className="hover:bg-slate-50/80 transition-all duration-150">
+      <td className="px-6 py-4 font-mono font-bold text-rose-600 text-xs sm:text-sm whitespace-nowrap">
         {order.orderId}
       </td>
-      <td className="p-3 sm:p-4 font-bold text-slate-700 text-xs sm:text-sm whitespace-nowrap">
-        {order.tableNumber}
+      <td className="px-6 py-4 font-bold text-slate-800 text-xs sm:text-sm whitespace-nowrap">
+        <span className="inline-flex items-center gap-2">
+          Table {order.tableNumber}
+          {hasMergedTables && (
+            <span
+              title={`Merged with Table ${order.mergedTables.join(", ")}`}
+              className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200/60 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider"
+            >
+              <Users size={10} /> +{order.mergedTables.join(", ")}
+            </span>
+          )}
+        </span>
       </td>
-      <td className="p-3 sm:p-4 text-xs sm:text-sm font-semibold whitespace-nowrap">
+      <td className="px-6 py-4 text-xs sm:text-sm font-semibold text-slate-700 whitespace-nowrap">
         {order.customerName}
       </td>
-      <td className="p-3 sm:p-4 text-xs text-slate-500 max-w-[160px] truncate">
+      <td className="px-6 py-4 text-xs text-slate-500 font-medium max-w-[200px] truncate">
         {order.items.slice(0, 2).map((i) => i.name).join(", ")}
         {order.items.length > 2 && "..."}
       </td>
-      <td className="p-3 sm:p-4 text-right font-black text-xs sm:text-sm whitespace-nowrap">
-        ₹{order.total}
+      <td className="px-6 py-4 text-right font-black text-slate-900 text-xs sm:text-sm whitespace-nowrap">
+        ₹{order.total?.toLocaleString('en-IN')}
       </td>
-      <td className="p-3 sm:p-4">
-        <div className="flex justify-center gap-1.5 sm:gap-2">
+      <td className="px-6 py-4">
+        <div className="flex items-center justify-center gap-2">
           {order.status === "PENDING" ? (
             <>
               <button
                 onClick={() => onStatusChange(order._id, "ACCEPTED")}
-                className="p-1.5 sm:p-2 bg-emerald-100 text-emerald-600 rounded-lg hover:bg-emerald-200"
+                className="p-2 bg-emerald-50 text-emerald-600 border border-emerald-200/80 rounded-xl hover:bg-emerald-100 transition shadow-2xs cursor-pointer"
+                title="Accept Order"
               >
-                <Check size={16} />
+                <Check size={15} strokeWidth={2.5} />
               </button>
               <button
                 onClick={() => onStatusChange(order._id, "REJECTED")}
-                className="p-1.5 sm:p-2 bg-rose-100 text-rose-600 rounded-lg hover:bg-rose-200"
+                className="p-2 bg-rose-50 text-rose-600 border border-rose-200/80 rounded-xl hover:bg-rose-100 transition shadow-2xs cursor-pointer"
+                title="Reject Order"
               >
-                <X size={16} />
+                <X size={15} strokeWidth={2.5} />
               </button>
             </>
           ) : (
-            <span className="text-[9px] sm:text-[10px] font-black uppercase text-slate-400 flex items-center whitespace-nowrap">
+            <span className="text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-200/60 px-3 py-1.5 rounded-xl">
               {order.status}
             </span>
           )}
           <button
             onClick={() => onView(order)}
-            className="p-1.5 sm:p-2 border border-slate-200 rounded-lg hover:bg-slate-100"
+            className="p-2 bg-white text-slate-600 border border-slate-200/80 rounded-xl hover:bg-slate-50 transition shadow-2xs cursor-pointer"
+            title="View Order Details"
           >
-            <Eye size={16} />
+            <Eye size={15} strokeWidth={2.5} />
           </button>
         </div>
       </td>
     </tr>
+  );
+});
+
+const TableStatusStrip = memo(function TableStatusStrip({ tables, isLoading }) {
+  if (isLoading) {
+    return (
+      <div className="flex gap-3 overflow-x-auto scrollbar-none py-1 animate-pulse">
+        {[0, 1, 2, 3, 4, 5].map((i) => (
+          <div key={i} className="h-14 w-20 bg-slate-100 rounded-2xl shrink-0" />
+        ))}
+      </div>
+    );
+  }
+
+  if (!tables || tables.length === 0) {
+    return (
+      <p className="text-xs text-slate-400 font-medium py-2">
+        No tables configured yet — add tables from Store Settings.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex gap-3 overflow-x-auto scrollbar-none pb-1">
+      {tables.map((t) => (
+        <div
+          key={t.tableNumber}
+          title={
+            t.isOccupied
+              ? `${t.occupiedBy?.customerName || "Occupied"} · ${t.occupiedBy?.orderId || ""}${
+                  t.occupiedBy?.mergedWith?.length
+                    ? ` · merged with Table ${t.occupiedBy.mergedWith.join(", ")}`
+                    : ""
+                }`
+              : "Free"
+          }
+          className={`shrink-0 min-w-[76px] text-center rounded-2xl border px-3.5 py-2.5 transition-all cursor-default ${
+            t.isOccupied
+              ? "bg-rose-50/80 border-rose-200 text-rose-700 shadow-2xs"
+              : "bg-emerald-50/80 border-emerald-200 text-emerald-700 shadow-2xs"
+          }`}
+        >
+          <p className="text-xs font-black tracking-tight">T{t.tableNumber}</p>
+          <p className="text-[9px] font-black uppercase tracking-wider mt-0.5 opacity-90">
+            {t.isOccupied ? "Occupied" : "Free"}
+          </p>
+        </div>
+      ))}
+    </div>
   );
 });
 
@@ -71,6 +133,18 @@ export default function LiveOrderMonitor() {
     queryKey: ["live-orders"],
     queryFn: async () => {
       const res = await axios.get(`${import.meta.env.VITE_APP_API_BASE}/orders/live`, {
+        withCredentials: true,
+      });
+      return res.data.data || [];
+    },
+    staleTime: 15_000,
+    refetchOnWindowFocus: false,
+  });
+
+  const { data: tableStatus = [], isLoading: isLoadingTableStatus } = useQuery({
+    queryKey: ["table-status"],
+    queryFn: async () => {
+      const res = await axios.get(`${import.meta.env.VITE_APP_API_BASE}/tables/status`, {
         withCredentials: true,
       });
       return res.data.data || [];
@@ -96,14 +170,14 @@ export default function LiveOrderMonitor() {
         newOrder,
         ...(oldOrders || []),
       ]);
-      setCurrentPage(1); // naya order aane pe pehle page pe le jao, warna user ko dikhega hi nahi
+      queryClient.invalidateQueries({ queryKey: ["table-status"] });
+      setCurrentPage(1);
     };
 
     socket.on("NEW_ORDER_RECEIVED", handleNewOrder);
     return () => socket.off("NEW_ORDER_RECEIVED", handleNewOrder);
   }, [socket, queryClient, playAlert]);
 
-  // useCallback: function reference stable — OrderRow ka memo() effective rehta h
   const handleStatusTransition = useCallback(async (orderId, targetStatus) => {
     let rejectReason = "";
 
@@ -139,6 +213,7 @@ export default function LiveOrderMonitor() {
             : order,
         ),
       );
+      queryClient.invalidateQueries({ queryKey: ["table-status"] });
     } catch (err) {
       console.error("Error transitioning state context pipeline:", err);
     }
@@ -149,9 +224,9 @@ export default function LiveOrderMonitor() {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 sm:p-20 space-y-4">
-        <div className="w-9 h-9 border-4 border-rose-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-sm font-bold text-slate-500 tracking-tight text-center px-4">
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <div className="w-8 h-8 border-4 border-rose-500 border-t-transparent rounded-full animate-spin" />
+        <p className="text-xs font-bold text-slate-400 tracking-wider uppercase">
           Connecting to Live Kitchen Stream...
         </p>
       </div>
@@ -159,31 +234,60 @@ export default function LiveOrderMonitor() {
   }
 
   return (
-    <div className="space-y-6 font-sans p-4 sm:p-6">
-      <h1 className="text-xl sm:text-2xl font-black text-slate-900">
-        Live Kitchen Monitor
-      </h1>
+    <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-10 space-y-8 font-sans bg-[#F8F9FA] min-h-screen">
+      
+      {/* Header Banner */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs">
+        <div>
+          <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
+            Live Kitchen Monitor
+          </h1>
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            Manage incoming orders, table occupancy statuses, and kitchen execution queue.
+          </p>
+        </div>
+        <div className="flex items-center gap-2.5 bg-rose-50/80 border border-rose-100 px-4 py-2 rounded-2xl self-start sm:self-center shadow-2xs">
+          <Radio size={16} className="text-rose-600 animate-pulse" />
+          <span className="text-[11px] font-black tracking-wider uppercase text-rose-600">
+            Stream Active
+          </span>
+        </div>
+      </div>
 
+      {/* Table Occupancy Strip */}
+      <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-xs space-y-3">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+            Table Live Status Grid
+          </p>
+        </div>
+        <TableStatusStrip tables={tableStatus} isLoading={isLoadingTableStatus} />
+      </div>
+
+      {/* Orders Section */}
       {orders.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center">
-          <p className="text-sm font-semibold text-slate-400">No live orders right now.</p>
+        <div className="bg-white rounded-3xl border border-slate-200/80 p-16 text-center shadow-xs flex flex-col items-center justify-center max-w-xl mx-auto space-y-3">
+          <p className="text-sm font-bold text-slate-800">No live orders right now</p>
+          <p className="text-xs text-slate-500 font-medium">
+            New customer incoming orders will appear here automatically in real-time stream loop.
+          </p>
         </div>
       ) : (
-        <div className="rounded-2xl border-slate-200 shadow-sm overflow-hidden">
-          <p className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider px-4 pt-3">
-            ← Swipe to see more →
-          </p>
+        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
+          <div className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider px-6 pt-4">
+            ← Swipe horizontally to see table details →
+          </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[640px]">
+            <table className="w-full text-left border-collapse min-w-[680px]">
               <thead>
-                <tr className="bg-slate-50 border-b border-slate-200 text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider">
-                  <th className="p-3 sm:p-4 whitespace-nowrap">Order ID</th>
-                  <th className="p-3 sm:p-4 whitespace-nowrap">Table</th>
-                  <th className="p-3 sm:p-4 whitespace-nowrap">Customer</th>
-                  <th className="p-3 sm:p-4 whitespace-nowrap">Items</th>
-                  <th className="p-3 sm:p-4 text-right whitespace-nowrap">Total</th>
-                  <th className="p-3 sm:p-4 text-center whitespace-nowrap">Actions</th>
+                <tr className="bg-slate-50/70 border-b border-slate-200/80 text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider">
+                  <th className="px-6 py-4 whitespace-nowrap">Order ID</th>
+                  <th className="px-6 py-4 whitespace-nowrap">Table</th>
+                  <th className="px-6 py-4 whitespace-nowrap">Customer</th>
+                  <th className="px-6 py-4 whitespace-nowrap">Items Summary</th>
+                  <th className="px-6 py-4 text-right whitespace-nowrap">Total</th>
+                  <th className="px-6 py-4 text-center whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -198,31 +302,32 @@ export default function LiveOrderMonitor() {
               </tbody>
             </table>
           </div>
-        </div>
-      )}
 
-      {totalPages > 1 && (
-        <div className="flex flex-col sm:flex-row gap-3 sm:gap-0 justify-between items-center py-4 px-2">
-          <p className="text-xs text-slate-500 font-medium text-center sm:text-left">
-            Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-            {Math.min(indexOfLastOrder, orders.length)} of {orders.length} orders
-          </p>
-          <div className="flex gap-2">
-            <button
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage((p) => p - 1)}
-              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold disabled:opacity-50"
-            >
-              Previous
-            </button>
-            <button
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage((p) => p + 1)}
-              className="px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs font-bold disabled:opacity-50"
-            >
-              Next
-            </button>
-          </div>
+          {/* Pagination Footer inside card container */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center px-6 py-4 bg-slate-50/50 border-t border-slate-100">
+              <p className="text-xs text-slate-500 font-medium">
+                Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
+                {Math.min(indexOfLastOrder, orders.length)} of {orders.length} orders
+              </p>
+              <div className="flex gap-2">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => setCurrentPage((p) => p - 1)}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 disabled:opacity-40 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
+                >
+                  <ArrowLeft size={14} /> Previous
+                </button>
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => setCurrentPage((p) => p + 1)}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 disabled:opacity-40 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
+                >
+                  Next <ArrowRight size={14} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 

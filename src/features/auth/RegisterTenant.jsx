@@ -22,6 +22,12 @@ export default function RegisterTenant({ onSwitchToLogin }) {
     e.preventDefault();
     try {
       setError('');
+      // 💡 10-Digit Mobile Number Validation Check
+      const phoneRegex = /^[0-9]{10}$/;
+      if (!phoneRegex.test(phone)) {
+        setError('Mobile number exactly 10 digits ka hona chahiye.');
+        return;
+      }
       const payload = { restaurantName, slug: generatedSlug, name, email, password, phone };
       const response = await registerTenant(payload);
       
@@ -151,7 +157,7 @@ export default function RegisterTenant({ onSwitchToLogin }) {
                   required
                   placeholder="9876543210"
                   value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
+                  onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
                   className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs font-medium placeholder:text-slate-400 focus:outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all"
                 />
               </div>
