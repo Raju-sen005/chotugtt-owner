@@ -161,11 +161,16 @@ export default function LiveOrderMonitor() {
   const currentOrders = orders.slice(indexOfFirstOrder, indexOfLastOrder);
   const totalPages = Math.ceil(orders.length / itemsPerPage);
 
-  useEffect(() => {
+useEffect(() => {
     if (!socket) return;
 
     const handleNewOrder = (newOrder) => {
-      playAlert();
+      try {
+        playAlert();
+      } catch (e) {
+        console.log("Audio play error:", e);
+      }
+
       queryClient.setQueryData(["live-orders"], (oldOrders) => [
         newOrder,
         ...(oldOrders || []),
@@ -174,8 +179,33 @@ export default function LiveOrderMonitor() {
       setCurrentPage(1);
     };
 
+    // 🚀 Running order mein items add hone par sound bajane aur list update karne ke liye
+    const handleOrderUpdated = (updatedOrder) => {
+      queryClient.setQueryData(["live-orders"], (oldOrders) =>
+        (oldOrders || []).map((order) =>
+          order._id === updatedOrder._id ? updatedOrder : order
+        )
+      );
+      queryClient.invalidateQueries({ queryKey: ["table-status"] });
+    };
+
+    const handlePlaySoundOnly = () => {
+      try {
+        playAlert();
+      } catch (e) {
+        console.log("Audio play error:", e);
+      }
+    };
+
     socket.on("NEW_ORDER_RECEIVED", handleNewOrder);
-    return () => socket.off("NEW_ORDER_RECEIVED", handleNewOrder);
+    socket.on("ORDER_STATUS_UPDATED", handleOrderUpdated);
+    socket.on("PLAY_NOTIFICATION_SOUND", handlePlaySoundOnly);
+
+    return () => {
+      socket.off("NEW_ORDER_RECEIVED", handleNewOrder);
+      socket.off("ORDER_STATUS_UPDATED", handleOrderUpdated);
+      socket.off("PLAY_NOTIFICATION_SOUND", handlePlaySoundOnly);
+    };
   }, [socket, queryClient, playAlert]);
 
   const handleStatusTransition = useCallback(async (orderId, targetStatus) => {
