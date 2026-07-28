@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import logo from '../../assets/cho.png';
+import { ImagePlus } from 'lucide-react';
+import logoImage from '../../assets/cho.png';
 
 export default function RegisterTenant({ onSwitchToLogin }) {
   const { registerTenant } = useAuth();
@@ -11,6 +12,8 @@ export default function RegisterTenant({ onSwitchToLogin }) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
+  const [logoFile, setLogoFile] = useState(null);
+  const [logoPreview, setLogoPreview] = useState(null);
   
   const [error, setError] = useState('');
   const [successData, setSuccessData] = useState(null);
@@ -18,18 +21,39 @@ export default function RegisterTenant({ onSwitchToLogin }) {
   // Automatic unique URL generator logic
   const generatedSlug = restaurantName.trim().toLowerCase().replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-');
 
+  // Handle Logo Selection & Preview
+  const handleLogoChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setLogoFile(file);
+      setLogoPreview(URL.createObjectURL(file));
+    }
+  };
+
   const handleRegister = async (e) => {
     e.preventDefault();
     try {
       setError('');
-      // 💡 10-Digit Mobile Number Validation Check
+      
       const phoneRegex = /^[0-9]{10}$/;
       if (!phoneRegex.test(phone)) {
         setError('Mobile number exactly 10 digits ka hona chahiye.');
         return;
       }
-      const payload = { restaurantName, slug: generatedSlug, name, email, password, phone };
-      const response = await registerTenant(payload);
+
+      // 🚀 FormData ka use karein kyunki file upload ho rahi hai
+      const formData = new FormData();
+      formData.append('restaurantName', restaurantName);
+      formData.append('slug', generatedSlug);
+      formData.append('name', name);
+      formData.append('email', email);
+      formData.append('password', password);
+      formData.append('phone', phone);
+      if (logoFile) {
+        formData.append('logo', logoFile);
+      }
+
+      const response = await registerTenant(formData);
       
       if (response && response.success) {
         const liveMenuUrl = `${import.meta.env.VITE_APP_API_BASE || window.location.origin}/?store=${generatedSlug}`;
@@ -40,8 +64,6 @@ export default function RegisterTenant({ onSwitchToLogin }) {
           qr: qrCodeApiUrl,
           slug: generatedSlug
         });
-
-        
       }
     } catch (err) {
       setError(err.response?.data?.message || 'Registration failed. Try again.');
@@ -69,10 +91,6 @@ export default function RegisterTenant({ onSwitchToLogin }) {
             </a>
           </div>
 
-          <p className="text-xs text-slate-500 font-medium bg-amber-50 p-3 rounded-xl border border-amber-100 text-left">
-            💡 <b>Next Step:</b> Ab aap sign in karke apna dashboard access kar sakte hain.
-          </p>
-
           <button 
             onClick={onSwitchToLogin} 
             className="w-full bg-gradient-to-r from-red-500 to-rose-600 text-white py-3.5 rounded-xl font-bold hover:opacity-95 active:scale-[0.99] transition-all shadow-md shadow-red-500/20 text-sm cursor-pointer"
@@ -86,24 +104,14 @@ export default function RegisterTenant({ onSwitchToLogin }) {
 
   return (
     <div className="h-screen w-screen grid lg:grid-cols-12 bg-[#F8F9FA] font-sans overflow-hidden">
-      {/* Left Banner Column - Unified UI */}
       <div className="hidden lg:flex lg:col-span-5 bg-gradient-to-br from-rose-500 via-red-500 to-amber-500 p-8 xl:p-12 flex-col justify-between relative overflow-hidden h-full">
         <div className="absolute inset-0 bg-black/10 backdrop-blur-[2px]" />
         <div className="relative z-10 text-center">
-          <img src={logo} alt="Chotu" className="h-44 xl:h-52 m-auto object-contain brightness-0 invert" />
+          <img src={logoImage} alt="Chotu" className="h-44 xl:h-52 m-auto object-contain brightness-0 invert" />
           <p className="text-white/80 font-medium text-sm mt-1">Partner Network Management</p>
-        </div>
-        <div className="relative z-10 text-white space-y-2">
-          <h2 className="text-xl xl:text-2xl font-bold leading-tight">
-            Manage orders, update menus, and analyze growth instantly.
-          </h2>
-          <p className="text-white/70 text-xs">
-            Empowering 10,000+ cloud kitchens and premium outlets across India.
-          </p>
         </div>
       </div>
 
-      {/* Right Form Column */}
       <div className="col-span-12 lg:col-span-7 flex items-center justify-center p-6 lg:p-8 h-full overflow-y-auto">
         <div className="max-w-xl w-full space-y-4 my-auto">
           <div className="space-y-0.5">
@@ -112,12 +120,33 @@ export default function RegisterTenant({ onSwitchToLogin }) {
           </div>
 
           {error && (
-            <div className="bg-rose-50/80 backdrop-blur-xs text-rose-600 p-3 rounded-xl text-xs font-semibold border border-rose-100 flex items-center gap-2">
+            <div className="bg-rose-50/80 text-rose-600 p-3 rounded-xl text-xs font-semibold border border-rose-100 flex items-center gap-2">
               ❌ {error}
             </div>
           )}
 
           <form onSubmit={handleRegister} className="space-y-3">
+            
+            {/* 🖼️ Restaurant Logo Upload Section */}
+            <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-200">
+              <div className="relative h-14 w-14 rounded-xl bg-white border border-slate-200 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
+                {logoPreview ? (
+                  <img src={logoPreview} alt="Logo preview" className="h-full w-full object-cover" />
+                ) : (
+                  <ImagePlus className="text-slate-400" size={24} />
+                )}
+              </div>
+              <div className="flex-1">
+                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Restaurant Logo</label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleLogoChange}
+                  className="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-red-50 file:text-red-600 hover:file:bg-red-100 cursor-pointer"
+                />
+              </div>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Restaurant Name</label>
@@ -127,7 +156,7 @@ export default function RegisterTenant({ onSwitchToLogin }) {
                   placeholder="e.g. Haveli Foods"
                   value={restaurantName}
                   onChange={(e) => setRestaurantName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs font-medium placeholder:text-slate-400 focus:outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs font-medium focus:outline-none focus:border-red-500"
                 />
               </div>
               <div>
@@ -147,7 +176,7 @@ export default function RegisterTenant({ onSwitchToLogin }) {
                   placeholder="Raju Sen"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs font-medium placeholder:text-slate-400 focus:outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs font-medium focus:outline-none focus:border-red-500"
                 />
               </div>
               <div>
@@ -158,7 +187,7 @@ export default function RegisterTenant({ onSwitchToLogin }) {
                   placeholder="9876543210"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs font-medium placeholder:text-slate-400 focus:outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs font-medium focus:outline-none focus:border-red-500"
                 />
               </div>
             </div>
@@ -171,7 +200,7 @@ export default function RegisterTenant({ onSwitchToLogin }) {
                 placeholder="owner@haveli.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs font-medium placeholder:text-slate-400 focus:outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs font-medium focus:outline-none focus:border-red-500"
               />
             </div>
 
@@ -183,7 +212,7 @@ export default function RegisterTenant({ onSwitchToLogin }) {
                 placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs font-medium placeholder:text-slate-400 focus:outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all"
+                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs font-medium focus:outline-none focus:border-red-500"
               />
             </div>
 

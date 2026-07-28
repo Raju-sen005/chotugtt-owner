@@ -20,7 +20,7 @@ import {
   Leaf,
   Flame,
   Users,
-  Bell,
+  // Bell,
   RefreshCw,
   Share2,
   Globe,
@@ -57,21 +57,22 @@ const translations = {
     noDishes: "No dishes found",
     dineIn: "Dine-in order — served directly to your table",
     mergeTable: "Merge with another table",
-    mergeTableDesc: "Sitting with friends on another table? Combine both orders into one bill.",
+    mergeTableDesc:
+      "Sitting with friends on another table? Combine both orders into one bill.",
     mergeTableInput: "Enter table number",
     mergeTableApply: "Apply",
     mergeTableActive: "Merging with Table",
-    callWaiter: "Call Waiter",
+    // callWaiter: "Call Waiter",
     waiterNotified: "Waiter has been notified!",
     suggestions: "You might also like",
     reorderTitle: "Order this again?",
     reorderDesc: "Add all items from your last order in one tap.",
     reorderCta: "Reorder",
-    addNotes: "Add cooking notes (optional)",
+    // addNotes: "Add cooking notes (optional)",
     notesPlaceholder: "e.g. less spicy, no onions...",
     orderConfirmedTitle: "Order Confirmed!",
-    shareWhatsapp: "Share via WhatsApp",
-    rateExperience: "How was your ordering experience?",
+    // shareWhatsapp: "Share via WhatsApp",
+    // rateExperience: "How was your ordering experience?",
     thanksFeedback: "Thanks for your feedback!",
     orderMore: "Order More",
     prepTime: "Est. preparation time",
@@ -99,7 +100,8 @@ const translations = {
     noDishes: "कोई डिश नहीं मिली",
     dineIn: "डाइन-इन ऑर्डर — सीधे आपकी टेबल पर परोसा जाएगा",
     mergeTable: "दूसरी टेबल के साथ जोड़ें",
-    mergeTableDesc: "दोस्तों के साथ दूसरी टेबल पर बैठे हैं? दोनों ऑर्डर एक बिल में जोड़ें।",
+    mergeTableDesc:
+      "दोस्तों के साथ दूसरी टेबल पर बैठे हैं? दोनों ऑर्डर एक बिल में जोड़ें।",
     mergeTableInput: "टेबल नंबर डालें",
     mergeTableApply: "लागू करें",
     mergeTableActive: "टेबल के साथ जोड़ा जा रहा है",
@@ -109,11 +111,11 @@ const translations = {
     reorderTitle: "फिर से वही ऑर्डर करें?",
     reorderDesc: "पिछले ऑर्डर की सभी चीज़ें एक टैप में जोड़ें।",
     reorderCta: "दोबारा ऑर्डर करें",
-    addNotes: "पकाने के निर्देश जोड़ें (वैकल्पिक)",
+    // addNotes: "पकाने के निर्देश जोड़ें (वैकल्पिक)",
     notesPlaceholder: "जैसे कम तीखा, बिना प्याज़...",
     orderConfirmedTitle: "ऑर्डर कन्फर्म हो गया!",
-    shareWhatsapp: "WhatsApp पर शेयर करें",
-    rateExperience: "आपका ऑर्डर अनुभव कैसा रहा?",
+    // shareWhatsapp: "WhatsApp पर शेयर करें",
+    // rateExperience: "आपका ऑर्डर अनुभव कैसा रहा?",
     thanksFeedback: "आपकी प्रतिक्रिया के लिए धन्यवाद!",
     orderMore: "और ऑर्डर करें",
     prepTime: "अनुमानित तैयारी समय",
@@ -153,7 +155,9 @@ const QuantityController = memo(function QuantityController({
     );
   }
   return (
-    <div className={`flex items-center bg-rose-600 text-white rounded-xl overflow-hidden shadow-sm ${isSm ? "h-[28px]" : "h-[34px]"}`}>
+    <div
+      className={`flex items-center bg-rose-600 text-white rounded-xl overflow-hidden shadow-sm ${isSm ? "h-[28px]" : "h-[34px]"}`}
+    >
       <button
         type="button"
         onClick={(e) => {
@@ -197,13 +201,19 @@ const MenuSkeleton = memo(function MenuSkeleton() {
         <div className="h-11 w-full bg-slate-100 rounded-xl" />
         <div className="flex gap-2">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-7 w-20 bg-slate-100 rounded-xl shrink-0" />
+            <div
+              key={i}
+              className="h-7 w-20 bg-slate-100 rounded-xl shrink-0"
+            />
           ))}
         </div>
       </div>
       <div className="p-4 sm:p-6 max-w-md sm:max-w-2xl lg:max-w-5xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {[0, 1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="bg-white p-4 rounded-2xl border border-slate-100 flex gap-4">
+          <div
+            key={i}
+            className="bg-white p-4 rounded-2xl border border-slate-100 flex gap-4"
+          >
             <div className="w-16 h-16 bg-slate-100 rounded-xl shrink-0" />
             <div className="flex-1 space-y-2 py-1">
               <div className="h-3.5 w-3/4 bg-slate-100 rounded" />
@@ -217,7 +227,13 @@ const MenuSkeleton = memo(function MenuSkeleton() {
   );
 });
 
-const ItemCard = memo(function ItemCard({ item, quantity, onAdd, onRemove, onOpenDetail }) {
+const ItemCard = memo(function ItemCard({
+  item,
+  quantity,
+  onAdd,
+  onRemove,
+  onOpenDetail,
+}) {
   return (
     <div
       onClick={() => onOpenDetail(item)}
@@ -231,7 +247,13 @@ const ItemCard = memo(function ItemCard({ item, quantity, onAdd, onRemove, onOpe
       <div className="flex gap-3 items-center flex-1 min-w-0">
         {item.image ? (
           <img
-            src={item.image}
+            src={
+              item.image
+                ? item.image.startsWith("http")
+                  ? item.image
+                  : `${import.meta.env.VITE_APP_API_BASE.replace("/api", "")}${item.image}`
+                : null
+            }
             alt={item.name}
             className="w-16 h-16 object-cover rounded-xl border border-slate-100 bg-slate-50 shrink-0"
           />
@@ -250,7 +272,9 @@ const ItemCard = memo(function ItemCard({ item, quantity, onAdd, onRemove, onOpe
           <p className="text-xs text-slate-400 font-medium line-clamp-2 leading-relaxed pr-2">
             {item.description}
           </p>
-          <p className="text-sm font-black text-slate-900 pt-0.5">₹{item.price}</p>
+          <p className="text-sm font-black text-slate-900 pt-0.5">
+            ₹{item.price}
+          </p>
         </div>
       </div>
       <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
@@ -289,7 +313,10 @@ export default function PublicMenu() {
   const tableToken = searchParams.get("t");
 
   const [language, setLanguage] = useState("EN");
-  const t = useCallback((key) => translations[language]?.[key] || translations.EN[key] || key, [language]);
+  const t = useCallback(
+    (key) => translations[language]?.[key] || translations.EN[key] || key,
+    [language],
+  );
 
   const [cart, setCart] = useState({});
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -300,7 +327,7 @@ export default function PublicMenu() {
   const [customerName, setCustomerName] = useState("");
   const [customerPhone, setCustomerPhone] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState("UPI");
+  // const [paymentMethod, setPaymentMethod] = useState("UPI");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [touched, setTouched] = useState({ name: false, phone: false });
 
@@ -310,10 +337,10 @@ export default function PublicMenu() {
   const [mergeTableNumber, setMergeTableNumber] = useState("");
   const [appliedMergeTable, setAppliedMergeTable] = useState(null);
   const [waiterToast, setWaiterToast] = useState(false);
-  const [isCallingWaiter, setIsCallingWaiter] = useState(false);
+  // const [isCallingWaiter, setIsCallingWaiter] = useState(false);
   const [confirmedOrder, setConfirmedOrder] = useState(null); // { orderId, total }
-  const [feedbackRating, setFeedbackRating] = useState(0);
-  const [feedbackSent, setFeedbackSent] = useState(false);
+  // const [feedbackRating, setFeedbackRating] = useState(0);
+  // const [feedbackSent, setFeedbackSent] = useState(false);
   const [lastOrderSnapshot, setLastOrderSnapshot] = useState(null);
 
   const isValidName = /^[A-Za-z ]{3,50}$/.test(customerName.trim());
@@ -333,8 +360,8 @@ export default function PublicMenu() {
     data: catalog,
     isLoading,
     error,
-    refetch,
-    isFetching,
+    // refetch,
+    // isFetching,
   } = useQuery({
     queryKey: ["public-catalog", restaurantId],
     queryFn: async () => {
@@ -390,7 +417,11 @@ export default function PublicMenu() {
   const selectableTables = useMemo(() => {
     if (!availableTablesRaw) return [];
     return availableTablesRaw
-      .map((tbl) => (typeof tbl === "string" || typeof tbl === "number" ? tbl : tbl.tableNumber))
+      .map((tbl) =>
+        typeof tbl === "string" || typeof tbl === "number"
+          ? tbl
+          : tbl.tableNumber,
+      )
       .filter((num) => String(num) !== String(currentTableNumber));
   }, [availableTablesRaw, currentTableNumber]);
 
@@ -437,13 +468,13 @@ export default function PublicMenu() {
     });
   }, []);
 
-  const updateItemNotes = useCallback((id, notes) => {
-    setCart((prevCart) => {
-      const existing = prevCart[id];
-      if (!existing) return prevCart;
-      return { ...prevCart, [id]: { ...existing, notes } };
-    });
-  }, []);
+  // const updateItemNotes = useCallback((id, notes) => {
+  //   setCart((prevCart) => {
+  //     const existing = prevCart[id];
+  //     if (!existing) return prevCart;
+  //     return { ...prevCart, [id]: { ...existing, notes } };
+  //   });
+  // }, []);
 
   const totalCartAmount = useMemo(
     () =>
@@ -463,7 +494,8 @@ export default function PublicMenu() {
 
       // Is item ke liye sabhi applicable offers dhoondo
       const applicableOffers = catalog.offers.filter((offer) => {
-        const hasTargetItems = offer.targetItems && offer.targetItems.length > 0;
+        const hasTargetItems =
+          offer.targetItems && offer.targetItems.length > 0;
         // Specific (targeted) offer sirf tab applicable jab item us list mein ho
         if (hasTargetItems) return offer.targetItems.includes(itemId);
         // Blanket/global offer (no targetItems) — sabhi items ke liye
@@ -478,7 +510,8 @@ export default function PublicMenu() {
       const targetedOffers = applicableOffers.filter(
         (o) => o.targetItems && o.targetItems.length > 0,
       );
-      const relevantOffers = targetedOffers.length > 0 ? targetedOffers : applicableOffers;
+      const relevantOffers =
+        targetedOffers.length > 0 ? targetedOffers : applicableOffers;
 
       // Multiple applicable offers mein se sirf best (highest %) hi is item pe apply hoga
       const bestOffer = relevantOffers.reduce((best, o) =>
@@ -512,7 +545,9 @@ export default function PublicMenu() {
     const result = {};
     for (const catName of Object.keys(categories)) {
       result[catName] = categories[catName].filter((i) => {
-        const matchesSearch = i.name.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesSearch = i.name
+          .toLowerCase()
+          .includes(searchQuery.toLowerCase());
         const matchesVeg = !vegOnly || i.isVeg !== false;
         return matchesSearch && matchesVeg;
       });
@@ -524,10 +559,13 @@ export default function PublicMenu() {
     const comboVisible =
       filteredCombos.length > 0 &&
       (activeCategory === "ALL" || activeCategory === "COMBOS");
-    const categoryVisible = Object.keys(filteredCategoryItems).some((catName) => {
-      if (activeCategory !== "ALL" && activeCategory !== catName) return false;
-      return (filteredCategoryItems[catName]?.length || 0) > 0;
-    });
+    const categoryVisible = Object.keys(filteredCategoryItems).some(
+      (catName) => {
+        if (activeCategory !== "ALL" && activeCategory !== catName)
+          return false;
+        return (filteredCategoryItems[catName]?.length || 0) > 0;
+      },
+    );
     return comboVisible || categoryVisible;
   }, [filteredCombos, filteredCategoryItems, activeCategory]);
 
@@ -557,21 +595,24 @@ export default function PublicMenu() {
   // 🔑 Call Waiter — backend endpoint chahiye: POST /tables/call-waiter
   // body: { restaurantId, tableToken }. Endpoint na ho to bhi UI degrade
   // gracefully karta hai (toast dikhata hai, error silently log hota hai).
-  const handleCallWaiter = useCallback(async () => {
-    setIsCallingWaiter(true);
-    try {
-      await axios.post(`${import.meta.env.VITE_APP_API_BASE}/tables/call-waiter`, {
-        restaurantId,
-        tableToken,
-      });
-    } catch (err) {
-      console.warn("Call-waiter endpoint not available yet:", err?.message);
-    } finally {
-      setIsCallingWaiter(false);
-      setWaiterToast(true);
-      setTimeout(() => setWaiterToast(false), 3000);
-    }
-  }, [restaurantId, tableToken]);
+  // const handleCallWaiter = useCallback(async () => {
+  //   setIsCallingWaiter(true);
+  //   try {
+  //     await axios.post(
+  //       `${import.meta.env.VITE_APP_API_BASE}/tables/call-waiter`,
+  //       {
+  //         restaurantId,
+  //         tableToken,
+  //       },
+  //     );
+  //   } catch (err) {
+  //     console.warn("Call-waiter endpoint not available yet:", err?.message);
+  //   } finally {
+  //     setIsCallingWaiter(false);
+  //     setWaiterToast(true);
+  //     setTimeout(() => setWaiterToast(false), 3000);
+  //   }
+  // }, [restaurantId, tableToken]);
 
   const handleApplyMergeTable = useCallback(() => {
     if (!mergeTableNumber.trim()) return;
@@ -584,7 +625,8 @@ export default function PublicMenu() {
       e.preventDefault();
       setTouched({ name: true, phone: true });
 
-      if (!isValidName || !isValidPhone || !isValidAddress || !restaurantId) return;
+      if (!isValidName || !isValidPhone || !isValidAddress || !restaurantId)
+        return;
 
       const orderPayload = {
         restaurantId,
@@ -647,8 +689,8 @@ export default function PublicMenu() {
           setTouched({ name: false, phone: false });
           setIsCartOpen(false);
           setAppliedMergeTable(null);
-          setFeedbackRating(0);
-          setFeedbackSent(false);
+          // setFeedbackRating(0);
+          // setFeedbackSent(false);
         }
       } catch (err) {
         alert(
@@ -679,31 +721,31 @@ export default function PublicMenu() {
 
   // 🔑 Feedback — backend endpoint chahiye: POST /orders/:orderId/feedback
   // body: { rating }. Abhi ke liye sirf local state confirm karta hai.
-  const submitFeedback = useCallback(
-    async (stars) => {
-      setFeedbackRating(stars);
-      setFeedbackSent(true);
-      try {
-        if (confirmedOrder?.orderId) {
-          await axios.post(
-            `${import.meta.env.VITE_APP_API_BASE}/orders/${confirmedOrder.orderId}/feedback`,
-            { rating: stars },
-          );
-        }
-      } catch (err) {
-        console.warn("Feedback endpoint not available yet:", err?.message);
-      }
-    },
-    [confirmedOrder],
-  );
+  // const submitFeedback = useCallback(
+  //   async (stars) => {
+  //     setFeedbackRating(stars);
+  //     setFeedbackSent(true);
+  //     try {
+  //       if (confirmedOrder?.orderId) {
+  //         await axios.post(
+  //           `${import.meta.env.VITE_APP_API_BASE}/orders/${confirmedOrder.orderId}/feedback`,
+  //           { rating: stars },
+  //         );
+  //       }
+  //     } catch (err) {
+  //       console.warn("Feedback endpoint not available yet:", err?.message);
+  //     }
+  //   },
+  //   [confirmedOrder],
+  // );
 
-  const whatsappShareUrl = useMemo(() => {
-    if (!confirmedOrder) return "#";
-    const text = encodeURIComponent(
-      `My order at ${restaurant?.name || "the restaurant"} is confirmed!\nOrder ID: ${confirmedOrder.orderId}\nTotal: ₹${confirmedOrder.total.toLocaleString("en-IN")}`,
-    );
-    return `https://wa.me/?text=${text}`;
-  }, [confirmedOrder, restaurant]);
+  // const whatsappShareUrl = useMemo(() => {
+  //   if (!confirmedOrder) return "#";
+  //   const text = encodeURIComponent(
+  //     `My order at ${restaurant?.name || "the restaurant"} is confirmed!\nOrder ID: ${confirmedOrder.orderId}\nTotal: ₹${confirmedOrder.total.toLocaleString("en-IN")}`,
+  //   );
+  //   return `https://wa.me/?text=${text}`;
+  // }, [confirmedOrder, restaurant]);
 
   /* ---------------- guarded / loading / error states ---------------- */
 
@@ -713,9 +755,12 @@ export default function PublicMenu() {
         <div className="p-4 bg-rose-50 text-rose-500 rounded-full mb-3">
           <LinkIcon size={28} />
         </div>
-        <h3 className="font-black text-slate-800 text-base">Invalid Menu Link</h3>
+        <h3 className="font-black text-slate-800 text-base">
+          Invalid Menu Link
+        </h3>
         <p className="text-xs text-slate-400 font-medium max-w-xs mt-1">
-          This QR code or link doesn't point to a valid restaurant. Please rescan the table QR code.
+          This QR code or link doesn't point to a valid restaurant. Please
+          rescan the table QR code.
         </p>
       </div>
     );
@@ -731,9 +776,12 @@ export default function PublicMenu() {
         <div className="p-4 bg-rose-50 text-rose-500 rounded-full mb-3">
           <X size={28} />
         </div>
-        <h3 className="font-black text-slate-800 text-base">Menu Not Available</h3>
+        <h3 className="font-black text-slate-800 text-base">
+          Menu Not Available
+        </h3>
         <p className="text-xs text-slate-400 font-medium max-w-xs mt-1">
-          We couldn't load this menu right now. Please rescan the QR code or try again shortly.
+          We couldn't load this menu right now. Please rescan the QR code or try
+          again shortly.
         </p>
       </div>
     );
@@ -750,7 +798,11 @@ export default function PublicMenu() {
           <div className="p-4 sm:p-6 flex gap-4 items-center">
             {restaurant?.logo ? (
               <img
-                src={restaurant.logo}
+                src={
+                  restaurant.logo.startsWith("http")
+                    ? restaurant.logo
+                    : `${import.meta.env.VITE_APP_API_BASE.replace("/api", "")}${restaurant.logo}`
+                }
                 alt={restaurant.name}
                 className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover bg-slate-50 border border-slate-100 shrink-0"
               />
@@ -764,9 +816,9 @@ export default function PublicMenu() {
                 <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900 truncate">
                   {restaurant?.name || "Our Restaurant"}
                 </h1>
-                <span className="flex items-center text-[10px] bg-amber-50 text-amber-700 font-extrabold px-1.5 py-0.5 rounded-md border border-amber-200/50 shrink-0">
+                {/* <span className="flex items-center text-[10px] bg-amber-50 text-amber-700 font-extrabold px-1.5 py-0.5 rounded-md border border-amber-200/50 shrink-0">
                   <Star size={10} className="fill-amber-600 mr-0.5" /> 4.2
-                </span>
+                </span> */}
               </div>
               <p className="text-[11px] sm:text-xs text-slate-400 font-semibold mt-0.5">
                 Digital Menu · Scan &amp; Order
@@ -780,14 +832,17 @@ export default function PublicMenu() {
               >
                 <Globe size={15} />
               </button>
-              <button
+              {/* <button
                 onClick={() => refetch()}
                 aria-label="Refresh menu"
                 title={t("refresh")}
                 className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
               >
-                <RefreshCw size={15} className={isFetching ? "animate-spin" : ""} />
-              </button>
+                <RefreshCw
+                  size={15}
+                  className={isFetching ? "animate-spin" : ""}
+                />
+              </button> */}
             </div>
           </div>
 
@@ -875,8 +930,12 @@ export default function PublicMenu() {
               <RotateCcw size={16} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-black text-slate-800">{t("reorderTitle")}</p>
-              <p className="text-[11px] text-slate-400 font-medium truncate">{t("reorderDesc")}</p>
+              <p className="text-xs font-black text-slate-800">
+                {t("reorderTitle")}
+              </p>
+              <p className="text-[11px] text-slate-400 font-medium truncate">
+                {t("reorderDesc")}
+              </p>
             </div>
             <button
               onClick={handleReorder}
@@ -1002,7 +1061,9 @@ export default function PublicMenu() {
               <div className="p-4 bg-slate-100 text-slate-400 rounded-full mb-3">
                 <SearchX size={24} />
               </div>
-              <h3 className="font-black text-slate-700 text-sm">{t("noDishes")}</h3>
+              <h3 className="font-black text-slate-700 text-sm">
+                {t("noDishes")}
+              </h3>
               <p className="text-xs text-slate-400 font-medium max-w-xs mt-1">
                 {searchQuery
                   ? `Nothing matches "${searchQuery}". Try a different search.`
@@ -1013,14 +1074,14 @@ export default function PublicMenu() {
         </div>
 
         {/* ---------------- Call Waiter floating button ---------------- */}
-        <button
+        {/* <button
           onClick={handleCallWaiter}
           disabled={isCallingWaiter}
           aria-label={t("callWaiter")}
           className="fixed top-1/2 -translate-y-1/2 right-3 z-30 bg-slate-900 text-white rounded-full shadow-lg p-3 flex items-center justify-center hover:bg-slate-800 active:scale-95 transition-all disabled:opacity-60 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
         >
           <Bell size={18} />
-        </button>
+        </button> */}
 
         {waiterToast && (
           <div className="fixed top-4 inset-x-4 max-w-xs mx-auto z-50 bg-slate-900 text-white text-xs font-bold px-4 py-3 rounded-xl shadow-xl text-center animate-[fadeIn_0.15s_ease-out]">
@@ -1066,7 +1127,13 @@ export default function PublicMenu() {
               <div className="relative">
                 {detailItem.image ? (
                   <img
-                    src={detailItem.image}
+                    src={
+                      detailItem.image
+                        ? detailItem.image.startsWith("http")
+                          ? detailItem.image
+                          : `${import.meta.env.VITE_APP_API_BASE.replace("/api", "")}${detailItem.image}`
+                        : null
+                    }
                     alt={detailItem.name}
                     className="w-full h-48 object-cover"
                   />
@@ -1113,7 +1180,7 @@ export default function PublicMenu() {
                   </div>
                 )}
 
-                {cart[detailItem._id] && (
+                {/* {cart[detailItem._id] && (
                   <div className="space-y-1.5">
                     <label className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400">
                       <MessageSquare size={12} /> {t("addNotes")}
@@ -1121,12 +1188,14 @@ export default function PublicMenu() {
                     <textarea
                       rows={2}
                       value={cart[detailItem._id]?.notes || ""}
-                      onChange={(e) => updateItemNotes(detailItem._id, e.target.value)}
+                      onChange={(e) =>
+                        updateItemNotes(detailItem._id, e.target.value)
+                      }
                       placeholder={t("notesPlaceholder")}
                       className="w-full px-3.5 py-2.5 text-xs rounded-xl border border-slate-200 focus:outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10 bg-slate-50/50 resize-none"
                     />
                   </div>
-                )}
+                )} */}
 
                 <div className="pt-2">
                   <QuantityController
@@ -1168,10 +1237,15 @@ export default function PublicMenu() {
                 </button>
               </div>
               <div>
-                <h3 id="merge-modal-title" className="text-base font-black text-slate-900">
+                <h3
+                  id="merge-modal-title"
+                  className="text-base font-black text-slate-900"
+                >
                   {t("mergeTable")}
                 </h3>
-                <p className="text-xs text-slate-500 mt-1">{t("mergeTableDesc")}</p>
+                <p className="text-xs text-slate-500 mt-1">
+                  {t("mergeTableDesc")}
+                </p>
               </div>
 
               {/* Loading state */}
@@ -1184,31 +1258,35 @@ export default function PublicMenu() {
               )}
 
               {/* Table chips */}
-              {!isLoadingTables && !tablesLoadError && selectableTables.length > 0 && (
-                <div className="grid grid-cols-4 gap-2">
-                  {selectableTables.map((num) => (
-                    <button
-                      key={num}
-                      type="button"
-                      onClick={() => setMergeTableNumber(String(num))}
-                      className={`h-11 rounded-xl text-sm font-black border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 ${
-                        mergeTableNumber === String(num)
-                          ? "bg-rose-600 text-white border-rose-600 shadow-sm"
-                          : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
-                      }`}
-                    >
-                      {num}
-                    </button>
-                  ))}
-                </div>
-              )}
+              {!isLoadingTables &&
+                !tablesLoadError &&
+                selectableTables.length > 0 && (
+                  <div className="grid grid-cols-4 gap-2">
+                    {selectableTables.map((num) => (
+                      <button
+                        key={num}
+                        type="button"
+                        onClick={() => setMergeTableNumber(String(num))}
+                        className={`h-11 rounded-xl text-sm font-black border transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 ${
+                          mergeTableNumber === String(num)
+                            ? "bg-rose-600 text-white border-rose-600 shadow-sm"
+                            : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                        }`}
+                      >
+                        {num}
+                      </button>
+                    ))}
+                  </div>
+                )}
 
               {/* Empty list */}
-              {!isLoadingTables && !tablesLoadError && selectableTables.length === 0 && (
-                <p className="text-xs text-slate-400 font-medium bg-slate-50 rounded-xl p-3 text-center">
-                  No other active tables right now.
-                </p>
-              )}
+              {!isLoadingTables &&
+                !tablesLoadError &&
+                selectableTables.length === 0 && (
+                  <p className="text-xs text-slate-400 font-medium bg-slate-50 rounded-xl p-3 text-center">
+                    No other active tables right now.
+                  </p>
+                )}
 
               {/* Fallback: manual entry if list fails to load */}
               {!isLoadingTables && tablesLoadError && (
@@ -1222,7 +1300,8 @@ export default function PublicMenu() {
                     className="w-full px-4 py-3 text-sm rounded-xl border border-slate-200 focus:outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-500/10"
                   />
                   <p className="text-[10px] text-slate-400">
-                    Couldn't load the table list — enter the table number manually.
+                    Couldn't load the table list — enter the table number
+                    manually.
                   </p>
                 </div>
               )}
@@ -1256,7 +1335,10 @@ export default function PublicMenu() {
           >
             <div className="bg-white w-full max-w-md sm:rounded-3xl rounded-t-3xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col animate-[slideUp_0.2s_ease-out]">
               <div className="p-4 border-b border-slate-100 flex justify-between items-center sticky top-0 bg-white z-10">
-                <h2 id="cart-drawer-title" className="text-base font-black text-slate-900 tracking-tight">
+                <h2
+                  id="cart-drawer-title"
+                  className="text-base font-black text-slate-900 tracking-tight"
+                >
                   {t("reviewOrder")}
                 </h2>
                 <button
@@ -1274,8 +1356,14 @@ export default function PublicMenu() {
                 noValidate
               >
                 <div className="flex items-center gap-2.5 bg-rose-50 border border-rose-100 rounded-xl px-3.5 py-3">
-                  <Utensils size={15} strokeWidth={2.5} className="text-rose-500 shrink-0" />
-                  <p className="text-xs font-bold text-rose-700">{t("dineIn")}</p>
+                  <Utensils
+                    size={15}
+                    strokeWidth={2.5}
+                    className="text-rose-500 shrink-0"
+                  />
+                  <p className="text-xs font-bold text-rose-700">
+                    {t("dineIn")}
+                  </p>
                 </div>
 
                 {/* Merge table */}
@@ -1283,7 +1371,8 @@ export default function PublicMenu() {
                   {appliedMergeTable ? (
                     <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-xl px-3.5 py-3">
                       <span className="text-xs font-bold text-emerald-700 flex items-center gap-1.5">
-                        <Users size={14} /> {t("mergeTableActive")} {appliedMergeTable}
+                        <Users size={14} /> {t("mergeTableActive")}{" "}
+                        {appliedMergeTable}
                       </span>
                       <button
                         type="button"
@@ -1425,14 +1514,22 @@ export default function PublicMenu() {
                   </span>
                   <div className="bg-slate-50/80 rounded-xl p-3 divide-y divide-slate-100 text-xs border border-slate-100 max-h-40 overflow-y-auto">
                     {Object.entries(cart).map(([id, details]) => (
-                      <div key={id} className="py-2.5 text-slate-700 font-medium">
+                      <div
+                        key={id}
+                        className="py-2.5 text-slate-700 font-medium"
+                      >
                         <div className="flex justify-between items-center">
                           <span>
                             {details.name}{" "}
-                            <b className="text-rose-600 ml-1">x{details.quantity}</b>
+                            <b className="text-rose-600 ml-1">
+                              x{details.quantity}
+                            </b>
                           </span>
                           <span className="font-black text-slate-900">
-                            ₹{(details.price * details.quantity).toLocaleString("en-IN")}
+                            ₹
+                            {(details.price * details.quantity).toLocaleString(
+                              "en-IN",
+                            )}
                           </span>
                         </div>
                         {details.notes && (
@@ -1457,9 +1554,13 @@ export default function PublicMenu() {
                           key={s._id}
                           className="shrink-0 w-[140px] bg-white border border-slate-200 rounded-xl p-2.5 space-y-1.5"
                         >
-                          <p className="text-[11px] font-bold text-slate-800 truncate">{s.name}</p>
+                          <p className="text-[11px] font-bold text-slate-800 truncate">
+                            {s.name}
+                          </p>
                           <div className="flex items-center justify-between">
-                            <span className="text-[11px] font-black text-slate-900">₹{s.price}</span>
+                            <span className="text-[11px] font-black text-slate-900">
+                              ₹{s.price}
+                            </span>
                             <QuantityController
                               id={s._id}
                               name={s.name}
@@ -1494,7 +1595,7 @@ export default function PublicMenu() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
+                {/* <div className="space-y-2">
                   <span className="block text-[10px] font-black uppercase tracking-wider text-slate-400">
                     {t("paymentSelection")}
                   </span>
@@ -1504,9 +1605,14 @@ export default function PublicMenu() {
                       onClick={() => setPaymentMethod("UPI")}
                       className={`p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 ${paymentMethod === "UPI" ? "border-emerald-500 bg-emerald-50/40" : "border-slate-200 bg-white hover:bg-slate-50"}`}
                     >
-                      <span className="text-xs font-bold text-slate-800">{t("upi")}</span>
+                      <span className="text-xs font-bold text-slate-800">
+                        {t("upi")}
+                      </span>
                       {paymentMethod === "UPI" && (
-                        <CheckCircle2 size={14} className="text-emerald-600 fill-emerald-100 shrink-0" />
+                        <CheckCircle2
+                          size={14}
+                          className="text-emerald-600 fill-emerald-100 shrink-0"
+                        />
                       )}
                     </button>
                     <button
@@ -1518,11 +1624,14 @@ export default function PublicMenu() {
                         {orderType === "DELIVERY" ? "COD Pay" : t("payAtDesk")}
                       </span>
                       {paymentMethod === "CASH" && (
-                        <CheckCircle2 size={14} className="text-emerald-600 fill-emerald-100 shrink-0" />
+                        <CheckCircle2
+                          size={14}
+                          className="text-emerald-600 fill-emerald-100 shrink-0"
+                        />
                       )}
                     </button>
                   </div>
-                </div>
+                </div> */}
 
                 <div className="pt-2 pb-1 sticky bottom-0 bg-white">
                   <button
@@ -1559,9 +1668,14 @@ export default function PublicMenu() {
             <div className="w-16 h-16 rounded-2xl bg-emerald-50 text-emerald-500 flex items-center justify-center mb-4">
               <CheckCircle2 size={32} />
             </div>
-            <h2 className="text-xl font-black text-slate-900">{t("orderConfirmedTitle")}</h2>
+            <h2 className="text-xl font-black text-slate-900">
+              {t("orderConfirmedTitle")}
+            </h2>
             <p className="text-xs text-slate-400 font-semibold mt-1">
-              Order ID: <span className="text-slate-700 font-black">{confirmedOrder.orderId}</span>
+              Order ID:{" "}
+              <span className="text-slate-700 font-black">
+                {confirmedOrder.orderId}
+              </span>
             </p>
             <p className="text-2xl font-black text-slate-900 mt-3">
               ₹{confirmedOrder.total.toLocaleString("en-IN")}
@@ -1570,19 +1684,21 @@ export default function PublicMenu() {
               <Clock size={13} /> {t("prepTime")}: ~20-25 mins
             </div>
 
-            <a
+            {/* <a
               href={whatsappShareUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="mt-6 flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 text-white font-black text-xs px-5 py-3 rounded-xl shadow-md transition-all active:scale-[0.98]"
             >
               <Share2 size={15} /> {t("shareWhatsapp")}
-            </a>
+            </a> */}
 
-            <div className="mt-8 w-full max-w-xs">
+            {/* <div className="mt-8 w-full max-w-xs">
               {!feedbackSent ? (
                 <>
-                  <p className="text-xs font-bold text-slate-500 mb-2">{t("rateExperience")}</p>
+                  <p className="text-xs font-bold text-slate-500 mb-2">
+                    {t("rateExperience")}
+                  </p>
                   <div className="flex justify-center gap-1">
                     {[1, 2, 3, 4, 5].map((star) => (
                       <button
@@ -1604,9 +1720,11 @@ export default function PublicMenu() {
                   </div>
                 </>
               ) : (
-                <p className="text-xs font-bold text-emerald-600">{t("thanksFeedback")}</p>
+                <p className="text-xs font-bold text-emerald-600">
+                  {t("thanksFeedback")}
+                </p>
               )}
-            </div>
+            </div> */}
 
             <button
               onClick={() => setConfirmedOrder(null)}

@@ -72,13 +72,13 @@ const TableCard = memo(function TableCard({
           {isCopied ? "Link Copied!" : "Copy Table Link"}
         </button>
 
-        <div className="grid grid-cols-2 gap-2">
-          <button
+        <div className="grid">
+          {/* <button
             onClick={() => onDownload(tableNo)}
             className="py-2.5 text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-100 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
           >
             <Download size={14} className="text-slate-500" /> Download
-          </button>
+          </button> */}
           <button
             onClick={() => onPrint(tableNo)}
             className="py-2.5 text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-100 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
