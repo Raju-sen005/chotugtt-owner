@@ -11,10 +11,12 @@ import {
   Radio,
   ArrowLeft,
   ArrowRight,
+  // Receipt,
+  IndianRupee
 } from "lucide-react";
 import OrderDetailsModal from "../../components/OrderDetailsModal";
 
-const OrderRow = memo(function OrderRow({ order, onStatusChange, onView }) {
+const OrderRow = memo(function OrderRow({ order, onStatusChange, onView, onClear }) {
   const hasMergedTables = order.mergedTables && order.mergedTables.length > 0;
 
   return (
@@ -77,6 +79,18 @@ const OrderRow = memo(function OrderRow({ order, onStatusChange, onView }) {
               {order.status}
             </span>
           )}
+          
+          {/* Generate Bill & Clear Table Button */}
+          {order.status === "ACCEPTED" && order.tableNumber !== "N/A" && (
+            <button
+              onClick={() => onClear(order)}
+              className="p-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition shadow-2xs cursor-pointer"
+              title="Generate Bill & Clear Table"
+            >
+              <IndianRupee size={15} strokeWidth={2.5} />
+            </button>
+          )}
+
           <button
             onClick={() => onView(order)}
             className="p-2 bg-white text-slate-600 border border-slate-200/80 rounded-xl hover:bg-slate-50 transition shadow-2xs cursor-pointer"
@@ -207,7 +221,6 @@ export default function LiveOrderMonitor() {
       setCurrentPage(1);
     };
 
-    // 🚀 Running order mein items add hone par sound bajane aur list update karne ke liye
     const handleOrderUpdated = (updatedOrder) => {
       queryClient.setQueryData(["live-orders"], (oldOrders) =>
         (oldOrders || []).map((order) =>
@@ -241,7 +254,6 @@ export default function LiveOrderMonitor() {
       let rejectReason = customReason;
 
       if (targetStatus === "REJECTED" && !rejectReason) {
-        // Agar reason pass nahi hua to modal open karenge dropdown ke liye
         setRejectModalOrder(orderId);
         return;
       }
@@ -268,9 +280,74 @@ export default function LiveOrderMonitor() {
           ),
         );
         queryClient.invalidateQueries({ queryKey: ["table-status"] });
-        setRejectModalOrder(null); // Modal close kar dein agar open ho toh
+        setRejectModalOrder(null);
       } catch (err) {
         console.error("Error transitioning state context pipeline:", err);
+      }
+    },
+    [queryClient],
+  );
+
+  // Bill & WhatsApp clear table handler added from TableMonitor
+  const handleBillAndWhatsApp = useCallback(
+    async (order) => {
+      const tableLabel = order.mergedTables?.length
+        ? `${order.tableNumber} & ${order.mergedTables.join(", ")}`
+        : order.tableNumber;
+
+      const confirmed = window.confirm(
+        `Send the bill to ${order.customerName} (Table ${tableLabel}) and clear the table? This can't be undone.`,
+      );
+      if (!confirmed) return;
+
+      const message = ` *PAYMENT RECEIPT*
+
+Hello *${order.customerName}*,
+
+Thank you for dining with us.
+Your payment has been successfully received.
+
+ *Table No:* ${tableLabel}
+ *Total Paid:* ₹${Number(order.total).toFixed(2)}
+
+━━━━━━━━━━━━━━━━━━
+
+We hope you enjoyed your experience.
+
+Thank you for choosing us.
+We look forward to serving you again!
+
+ Have a wonderful day.`;
+
+      let formattedPhone = String(order.customerPhone || "").replace(/\D/g, "");
+      if (formattedPhone && !formattedPhone.startsWith("91")) {
+        formattedPhone = `91${formattedPhone}`;
+      }
+
+      if (formattedPhone) {
+        window.open(
+          `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`,
+          "_blank",
+        );
+      } else {
+        console.warn("No customer phone on file — skipping WhatsApp, completing order anyway.");
+      }
+
+      try {
+        await axios.patch(
+          `${import.meta.env.VITE_APP_API_BASE}/orders/${order._id}/complete`,
+          {},
+          { withCredentials: true },
+        );
+
+        queryClient.setQueryData(["live-orders"], (prev) =>
+          (prev || []).filter((o) => o._id !== order._id),
+        );
+        queryClient.invalidateQueries({ queryKey: ["table-status"] });
+        queryClient.invalidateQueries({ queryKey: ["table-monitor-orders"] });
+      } catch (err) {
+        console.error("Failed to complete order", err);
+        queryClient.invalidateQueries({ queryKey: ["live-orders"] });
       }
     },
     [queryClient],
@@ -364,6 +441,7 @@ export default function LiveOrderMonitor() {
                     order={order}
                     onStatusChange={handleStatusTransition}
                     onView={handleView}
+                    onClear={handleBillAndWhatsApp}
                   />
                 ))}
               </tbody>

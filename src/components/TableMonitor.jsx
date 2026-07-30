@@ -1,7 +1,7 @@
 import { useEffect, useCallback, memo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
-import { Users, Receipt, ShieldCheck, Sparkles } from "lucide-react";
+import { Users, IndianRupee, ShieldCheck, Sparkles } from "lucide-react";
 import { useSocket } from "../context/SocketContext";
 
 const TableCard = memo(function TableCard({ order, onClear }) {
@@ -49,7 +49,7 @@ const TableCard = memo(function TableCard({ order, onClear }) {
           onClick={() => onClear(order)}
           className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white py-4 rounded-2xl font-bold text-xs tracking-wide transition-all shadow-xs cursor-pointer active:scale-[0.98]"
         >
-          <Receipt size={16} strokeWidth={2.5} /> Generate Bill & Clear Table
+          <IndianRupee size={16} strokeWidth={2.5} /> Generate Bill & Clear Table
         </button>
       </div>
     </div>
