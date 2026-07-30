@@ -31,15 +31,23 @@ const TableCard = memo(function TableCard({
   const isDisabled = table.isDisabled;
 
   return (
-    <div className={`bg-white p-6 rounded-3xl border transition-all space-y-5 group flex flex-col justify-between ${
-      isDisabled ? "border-amber-300 bg-amber-50/20 opacity-75" : "border-slate-200/80 shadow-xs hover:border-slate-300"
-    }`}>
+    <div
+      className={`bg-white p-6 rounded-3xl border transition-all space-y-5 group flex flex-col justify-between ${
+        isDisabled
+          ? "border-amber-300 bg-amber-50/20 opacity-75"
+          : "border-slate-200/80 shadow-xs hover:border-slate-300"
+      }`}
+    >
       <div>
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-2.5">
-            <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs ${
-              isDisabled ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-700"
-            }`}>
+            <div
+              className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs ${
+                isDisabled
+                  ? "bg-amber-100 text-amber-700"
+                  : "bg-slate-100 text-slate-700"
+              }`}
+            >
               T{tableNo}
             </div>
             <div>
@@ -53,14 +61,14 @@ const TableCard = memo(function TableCard({
               )}
             </div>
           </div>
-          
+
           <div className="flex items-center gap-1">
             {/* Toggle Enable/Disable Button */}
             <button
               onClick={() => onToggle(tableNo, !isDisabled)}
               className={`p-2 rounded-xl transition-all cursor-pointer ${
-                isDisabled 
-                  ? "text-amber-600 bg-amber-50 hover:bg-amber-100" 
+                isDisabled
+                  ? "text-amber-600 bg-amber-50 hover:bg-amber-100"
                   : "text-slate-400 hover:text-amber-600 hover:bg-amber-50"
               }`}
               title={isDisabled ? "Enable Table QR" : "Disable Table QR"}
@@ -79,9 +87,13 @@ const TableCard = memo(function TableCard({
           </div>
         </div>
 
-        <div className={`flex justify-center p-6 rounded-2xl border transition-colors ${
-          isDisabled ? "bg-amber-50/50 border-amber-100 grayscale-[30%]" : "bg-slate-50/80 border-slate-100 group-hover:bg-slate-50"
-        }`}>
+        <div
+          className={`flex justify-center p-6 rounded-2xl border transition-colors ${
+            isDisabled
+              ? "bg-amber-50/50 border-amber-100 grayscale-[30%]"
+              : "bg-slate-50/80 border-slate-100 group-hover:bg-slate-50"
+          }`}
+        >
           <QRCodeCanvas
             ref={qrRef}
             value={url}
@@ -123,13 +135,30 @@ export default function StoreSettings() {
   const [copied, setCopied] = useState(null);
   const qrRefs = useRef({});
 
+  const [storeDetails, setStoreDetails] = useState({ name: "", logo: "" });
+
+  useEffect(() => {
+    axios.get(`${import.meta.env.VITE_APP_API_BASE}/restaurant/profile`, { withCredentials: true })
+      .then(res => {
+        if (res.data?.data) {
+          setStoreDetails({
+            name: res.data.data.name || "",
+            logo: res.data.data.logo || ""
+          });
+        }
+      })
+      .catch(err => console.warn("Could not fetch restaurant profile for print:", err?.message));
+  }, []);
+
   const [tables, setTables] = useState(() => {
     const saved = localStorage.getItem(`tables_${user?.restaurantId}`);
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
         // Ensure backward compatibility if old localStorage had plain strings
-        return parsed.map(t => typeof t === 'string' ? { tableNumber: t, isDisabled: false } : t);
+        return parsed.map((t) =>
+          typeof t === "string" ? { tableNumber: t, isDisabled: false } : t,
+        );
       } catch (e) {
         return [{ tableNumber: "1", isDisabled: false }];
       }
@@ -148,15 +177,22 @@ export default function StoreSettings() {
           { withCredentials: true },
         );
         const backendTables = res.data?.data;
-        if (!cancelled && Array.isArray(backendTables) && backendTables.length > 0) {
+        if (
+          !cancelled &&
+          Array.isArray(backendTables) &&
+          backendTables.length > 0
+        ) {
           // Format ensure karna ki objects hi hon
-          const formatted = backendTables.map(t => 
-            typeof t === 'string' ? { tableNumber: t, isDisabled: false } : t
+          const formatted = backendTables.map((t) =>
+            typeof t === "string" ? { tableNumber: t, isDisabled: false } : t,
           );
           setTables(formatted);
         }
       } catch (err) {
-        console.warn("Could not sync table list from backend, using local cache:", err?.message);
+        console.warn(
+          "Could not sync table list from backend, using local cache:",
+          err?.message,
+        );
       }
     })();
     return () => {
@@ -190,103 +226,144 @@ export default function StoreSettings() {
     if (!canvas) return;
     const dataUrl = canvas.toDataURL("image/png");
 
+    // 👇 State se direct name aur logo uthayein
+    const restaurantName = storeDetails.name || "OUR RESTAURANT";
+    const restaurantLogo = storeDetails.logo || "OUR LOGO";
+
     const windowContent = `
       <html>
         <head>
-          <title>Table ${tableNo} Standee</title>
+          <title>Table ${tableNo} - ${restaurantName} Standee</title>
           <style>
-            @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Playfair+Display:ital,wght@1,600&family=Inter:wght@400;600&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
             
             body { 
-              font-family: 'Inter', sans-serif; 
+              font-family: 'Plus Jakarta Sans', sans-serif; 
               display: flex; 
               align-items: center; 
               justify-content: center; 
               height: 100vh; 
               margin: 0; 
-              background: #fff; 
+              background: #ffffff; 
               -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
             }
-            .standee { 
-              width: 320px; 
-              background-color: #F4E4BC; 
-              border: 1px solid #d4c39c;
-              border-radius: 8px; 
-              padding: 30px 20px; 
+
+            .standee-card { 
+              width: 340px; 
+              background: linear-gradient(135deg, #FAF8F5 0%, #F3EFEA 100%);
+              border: 1.5px solid #D4AF37;
+              border-radius: 16px; 
+              padding: 32px 24px; 
               text-align: center; 
-              box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+              box-shadow: 0 12px 30px rgba(0,0,0,0.08);
               box-sizing: border-box;
+              position: relative;
             }
-            .ornament-top {
+
+            .brand-container {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
               margin-bottom: 20px;
-              color: #111;
             }
-            .ornament-top svg {
-              width: 140px;
-              height: auto;
-              display: inline-block;
+
+            .logo-img {
+              width: 52px;
+              height: 52px;
+              object-fit: contain;
+              border-radius: 50%;
+              border: 1px solid #D4AF37;
+              padding: 2px;
+              background: #fff;
+              margin-bottom: 8px;
             }
+
+            .brand-name {
+              font-family: 'Cinzel', serif;
+              font-size: 13px;
+              font-weight: 700;
+              letter-spacing: 2px;
+              color: #2C2C2C;
+              text-transform: uppercase;
+              margin: 0;
+            }
+
+            .divider-gold {
+              width: 40px;
+              height: 1.5px;
+              background-color: #D4AF37;
+              margin: 10px auto 16px auto;
+            }
+
             .qr-box { 
               background: #ffffff; 
-              padding: 16px; 
-              border-radius: 4px; 
+              padding: 14px; 
+              border-radius: 12px; 
               display: inline-block; 
-              margin-bottom: 20px; 
-              box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+              border: 1px solid #E6E0D5;
+              box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+              margin-bottom: 18px; 
             }
-            img { 
-              width: 180px; 
-              height: 180px; 
+
+            img.qr-image { 
+              width: 170px; 
+              height: 170px; 
               display: block; 
             }
-            .scan-text {
-              font-size: 14px;
-              font-family: 'Inter', sans-serif;
+
+            .scan-subtitle {
+              font-size: 11px;
               font-weight: 600;
-              color: #222;
+              color: #7A756D;
+              text-transform: uppercase;
+              letter-spacing: 2px;
               margin: 0 0 4px 0;
-              letter-spacing: 0.5px;
             }
+
             .menu-title { 
               font-family: 'Cinzel', serif;
-              color: #111; 
+              color: #1A1A1A; 
               margin: 0; 
-              font-size: 32px; 
-              font-weight: 700; 
-              letter-spacing: 1px;
+              font-size: 28px; 
+              font-weight: 800; 
+              letter-spacing: 1.5px;
               line-height: 1.1;
             }
-            .divider {
-              width: 80%;
-              height: 2px;
-              background-color: #111;
-              margin: 16px auto 0 auto;
-            }
-            .table-badge {
-              margin-top: 15px;
+
+            .table-footer {
+              margin-top: 20px;
+              background: #1A1A1A;
+              color: #F3EFEA;
+              padding: 8px 16px;
+              border-radius: 30px;
+              display: inline-block;
               font-size: 11px;
               font-weight: 700;
               text-transform: uppercase;
-              letter-spacing: 1.5px;
-              color: #555;
+              letter-spacing: 2px;
+              box-shadow: 0 4px 10px rgba(0,0,0,0.15);
             }
           </style>
         </head>
         <body>
-          <div class="standee">
-            <div class="ornament-top">
-              <svg viewBox="0 0 200 30" fill="currentColor">
-                <path d="M100,0 C80,15 60,5 40,15 C20,25 10,15 0,20 L0,22 C15,18 25,28 45,18 C65,8 85,18 100,5 C115,18 135,8 155,18 C175,28 185,18 200,22 L200,20 C190,15 180,25 160,15 C140,5 120,15 100,0 Z"></path>
-                <circle cx="100" cy="12" r="3"></circle>
-              </svg>
+          <div class="standee-card">
+            <div class="brand-container">
+              ${restaurantLogo ? `<img src="${restaurantLogo}" class="logo-img" crossorigin="anonymous" />` : ''}
+              <h2 class="brand-name">${restaurantName}</h2>
+              <div class="divider-gold"></div>
             </div>
+
             <div class="qr-box">
-              <img src="${dataUrl}" />
+              <img src="${dataUrl}" class="qr-image" />
             </div>
-            <div class="scan-text">Scan to view our</div>
-            <h1 class="menu-title">MENU</h1>
-            <div class="divider"></div>
-            <div class="table-badge">Table ${tableNo}</div>
+
+            <div class="scan-subtitle">Please Scan To View</div>
+            <h1 class="menu-title">DIGITAL MENU</h1>
+
+            <div class="table-footer">
+              Table ${tableNo}
+            </div>
           </div>
         </body>
       </html>`;
@@ -300,7 +377,7 @@ export default function StoreSettings() {
       printWindow.print();
       printWindow.close();
     }, 250);
-  }, []);
+  }, [storeDetails]); // 👈 Dependencies mein storeDetails rakhein
 
   const addTable = useCallback(() => {
     setTables((prev) => {
@@ -334,7 +411,10 @@ export default function StoreSettings() {
           { withCredentials: true },
         )
         .catch((err) =>
-          console.warn("Could not sync table removal to backend:", err?.message),
+          console.warn(
+            "Could not sync table removal to backend:",
+            err?.message,
+          ),
         );
 
       return prev.filter((t) => t.tableNumber !== tableNo);
@@ -345,8 +425,8 @@ export default function StoreSettings() {
   const toggleTableStatus = useCallback((tableNo, newDisabledState) => {
     setTables((prev) =>
       prev.map((t) =>
-        t.tableNumber === tableNo ? { ...t, isDisabled: newDisabledState } : t
-      )
+        t.tableNumber === tableNo ? { ...t, isDisabled: newDisabledState } : t,
+      ),
     );
 
     axios
@@ -356,7 +436,10 @@ export default function StoreSettings() {
         { withCredentials: true },
       )
       .catch((err) => {
-        console.warn("Could not sync table toggle state to backend:", err?.message);
+        console.warn(
+          "Could not sync table toggle state to backend:",
+          err?.message,
+        );
         // Rollback on failure agar zaroorat ho
       });
   }, []);
@@ -385,7 +468,6 @@ export default function StoreSettings() {
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-10 space-y-8 font-sans bg-[#F8F9FA] min-h-screen">
-      
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs">
         <div className="flex items-center gap-4">
@@ -401,7 +483,7 @@ export default function StoreSettings() {
             </p>
           </div>
         </div>
-        
+
         <button
           onClick={addTable}
           className="w-full sm:w-auto bg-gradient-to-r from-red-500 to-rose-600 text-white px-5 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 hover:opacity-95 shadow-sm shadow-red-500/20 transition-all cursor-pointer shrink-0"

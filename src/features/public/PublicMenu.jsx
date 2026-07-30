@@ -367,6 +367,11 @@ export default function PublicMenu() {
     queryFn: async () => {
       const res = await axios.get(
         `${import.meta.env.VITE_APP_API_BASE}/menu/public/catalog/${restaurantId}`,
+        {
+          params: {
+            t: tableToken,
+          },
+        },
       );
       return res.data.data;
     },
