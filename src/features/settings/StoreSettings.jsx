@@ -8,47 +8,80 @@ import {
   Trash2,
   QrCode,
   Store,
+  Power,
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import axios from "axios";
 
-// 🔑 Extracted + memoized — sirf apne table ka copied-state change hone pe re-render hoga,
-// baaki cards untouched rahenge
+// 🔑 Extracted + memoized TableCard component
 const TableCard = memo(function TableCard({
-  tableNo,
+  table,
   url,
   isCopied,
   onCopy,
   onDownload,
   onPrint,
   onRemove,
+  onToggle,
   canRemove,
   qrRef,
 }) {
+  const tableNo = table.tableNumber;
+  const isDisabled = table.isDisabled;
+
   return (
-    <div className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs hover:border-slate-300 transition-all space-y-5 group flex flex-col justify-between">
+    <div className={`bg-white p-6 rounded-3xl border transition-all space-y-5 group flex flex-col justify-between ${
+      isDisabled ? "border-amber-300 bg-amber-50/20 opacity-75" : "border-slate-200/80 shadow-xs hover:border-slate-300"
+    }`}>
       <div>
         <div className="flex justify-between items-center mb-4">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-slate-100 flex items-center justify-center text-slate-700 font-black text-xs">
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-xs ${
+              isDisabled ? "bg-amber-100 text-amber-700" : "bg-slate-100 text-slate-700"
+            }`}>
               T{tableNo}
             </div>
-            <span className="font-black text-slate-900 text-base">
-              Table {tableNo}
-            </span>
+            <div>
+              <span className="font-black text-slate-900 text-base block">
+                Table {tableNo}
+              </span>
+              {isDisabled && (
+                <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">
+                  Disabled / Locked
+                </span>
+              )}
+            </div>
           </div>
-          <button
-            onClick={() => onRemove(tableNo)}
-            disabled={!canRemove}
-            className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent transition-all cursor-pointer"
-            title="Remove Table"
-          >
-            <Trash2 size={16} />
-          </button>
+          
+          <div className="flex items-center gap-1">
+            {/* Toggle Enable/Disable Button */}
+            <button
+              onClick={() => onToggle(tableNo, !isDisabled)}
+              className={`p-2 rounded-xl transition-all cursor-pointer ${
+                isDisabled 
+                  ? "text-amber-600 bg-amber-50 hover:bg-amber-100" 
+                  : "text-slate-400 hover:text-amber-600 hover:bg-amber-50"
+              }`}
+              title={isDisabled ? "Enable Table QR" : "Disable Table QR"}
+            >
+              <Power size={16} />
+            </button>
+
+            <button
+              onClick={() => onRemove(tableNo)}
+              disabled={!canRemove}
+              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent transition-all cursor-pointer"
+              title="Remove Table"
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
         </div>
 
-        <div className="flex justify-center p-6 bg-slate-50/80 rounded-2xl border border-slate-100 group-hover:bg-slate-50 transition-colors">
+        <div className={`flex justify-center p-6 rounded-2xl border transition-colors ${
+          isDisabled ? "bg-amber-50/50 border-amber-100 grayscale-[30%]" : "bg-slate-50/80 border-slate-100 group-hover:bg-slate-50"
+        }`}>
           <QRCodeCanvas
             ref={qrRef}
             value={url}
@@ -73,12 +106,6 @@ const TableCard = memo(function TableCard({
         </button>
 
         <div className="grid">
-          {/* <button
-            onClick={() => onDownload(tableNo)}
-            className="py-2.5 text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-100 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-          >
-            <Download size={14} className="text-slate-500" /> Download
-          </button> */}
           <button
             onClick={() => onPrint(tableNo)}
             className="py-2.5 text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-100 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
@@ -98,7 +125,16 @@ export default function StoreSettings() {
 
   const [tables, setTables] = useState(() => {
     const saved = localStorage.getItem(`tables_${user?.restaurantId}`);
-    return saved ? JSON.parse(saved) : ["1"];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Ensure backward compatibility if old localStorage had plain strings
+        return parsed.map(t => typeof t === 'string' ? { tableNumber: t, isDisabled: false } : t);
+      } catch (e) {
+        return [{ tableNumber: "1", isDisabled: false }];
+      }
+    }
+    return [{ tableNumber: "1", isDisabled: false }];
   });
 
   const targetRestaurantId = user?.restaurantId || user?._id || "default-store";
@@ -113,7 +149,11 @@ export default function StoreSettings() {
         );
         const backendTables = res.data?.data;
         if (!cancelled && Array.isArray(backendTables) && backendTables.length > 0) {
-          setTables(backendTables);
+          // Format ensure karna ki objects hi hon
+          const formatted = backendTables.map(t => 
+            typeof t === 'string' ? { tableNumber: t, isDisabled: false } : t
+          );
+          setTables(formatted);
         }
       } catch (err) {
         console.warn("Could not sync table list from backend, using local cache:", err?.message);
@@ -265,7 +305,7 @@ export default function StoreSettings() {
   const addTable = useCallback(() => {
     setTables((prev) => {
       const maxNum = prev.reduce((max, t) => {
-        const n = parseInt(t, 10);
+        const n = parseInt(t.tableNumber, 10);
         return Number.isNaN(n) ? max : Math.max(max, n);
       }, 0);
       const newTableNo = (maxNum + 1).toString();
@@ -280,7 +320,7 @@ export default function StoreSettings() {
           console.warn("Could not sync new table to backend:", err?.message),
         );
 
-      return [...prev, newTableNo];
+      return [...prev, { tableNumber: newTableNo, isDisabled: false }];
     });
   }, []);
 
@@ -297,8 +337,28 @@ export default function StoreSettings() {
           console.warn("Could not sync table removal to backend:", err?.message),
         );
 
-      return prev.filter((t) => t !== tableNo);
+      return prev.filter((t) => t.tableNumber !== tableNo);
     });
+  }, []);
+
+  // 🚀 Toggle Table Enable/Disable Handler
+  const toggleTableStatus = useCallback((tableNo, newDisabledState) => {
+    setTables((prev) =>
+      prev.map((t) =>
+        t.tableNumber === tableNo ? { ...t, isDisabled: newDisabledState } : t
+      )
+    );
+
+    axios
+      .patch(
+        `${import.meta.env.VITE_APP_API_BASE}/tables/admin/${tableNo}/toggle`,
+        { isDisabled: newDisabledState },
+        { withCredentials: true },
+      )
+      .catch((err) => {
+        console.warn("Could not sync table toggle state to backend:", err?.message);
+        // Rollback on failure agar zaroorat ho
+      });
   }, []);
 
   const generateTableUrl = useCallback(
@@ -312,7 +372,7 @@ export default function StoreSettings() {
   const tableUrls = useMemo(() => {
     const map = {};
     tables.forEach((t) => {
-      map[t] = generateTableUrl(t);
+      map[t.tableNumber] = generateTableUrl(t.tableNumber);
     });
     return map;
   }, [tables, generateTableUrl]);
@@ -360,18 +420,19 @@ export default function StoreSettings() {
 
       {/* Tables Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-        {tables.map((tableNo) => (
+        {tables.map((table) => (
           <TableCard
-            key={tableNo}
-            tableNo={tableNo}
-            url={tableUrls[tableNo]}
-            isCopied={copied === tableNo}
+            key={table.tableNumber}
+            table={table}
+            url={tableUrls[table.tableNumber]}
+            isCopied={copied === table.tableNumber}
             onCopy={handleCopyLink}
             onDownload={downloadQRCode}
             onPrint={printQRCode}
             onRemove={removeTable}
+            onToggle={toggleTableStatus}
             canRemove={tables.length > 1}
-            qrRef={(el) => (qrRefs.current[tableNo] = el)}
+            qrRef={(el) => (qrRefs.current[table.tableNumber] = el)}
           />
         ))}
       </div>
