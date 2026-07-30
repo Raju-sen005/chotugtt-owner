@@ -3,7 +3,15 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { useSocket } from "../../context/SocketContext";
 import { useNotificationSound } from "../../hooks/useNotificationSound";
-import { Eye, Check, X, Users, Radio, ArrowLeft, ArrowRight } from "lucide-react";
+import {
+  Eye,
+  Check,
+  X,
+  Users,
+  Radio,
+  ArrowLeft,
+  ArrowRight,
+} from "lucide-react";
 import OrderDetailsModal from "../../components/OrderDetailsModal";
 
 const OrderRow = memo(function OrderRow({ order, onStatusChange, onView }) {
@@ -30,12 +38,20 @@ const OrderRow = memo(function OrderRow({ order, onStatusChange, onView }) {
       <td className="px-6 py-4 text-xs sm:text-sm font-semibold text-slate-700 whitespace-nowrap">
         {order.customerName}
       </td>
-      <td className="px-6 py-4 text-xs text-slate-500 font-medium max-w-[200px] truncate">
-        {order.items.slice(0, 2).map((i) => i.name).join(", ")}
-        {order.items.length > 2 && "..."}
+      <td className="px-6 py-4 text-xs text-slate-600 font-medium">
+        <div className="flex flex-col gap-0.5 max-w-[220px]">
+          {order.items.map((i, index) => (
+            <span
+              key={index}
+              className={`truncate ${i.status === "REJECTED" ? "line-through text-rose-400 text-[11px]" : ""}`}
+            >
+              • {i.quantity}x {i.name}
+            </span>
+          ))}
+        </div>
       </td>
       <td className="px-6 py-4 text-right font-black text-slate-900 text-xs sm:text-sm whitespace-nowrap">
-        ₹{order.total?.toLocaleString('en-IN')}
+        ₹{order.total?.toLocaleString("en-IN")}
       </td>
       <td className="px-6 py-4">
         <div className="flex items-center justify-center gap-2">
@@ -79,7 +95,10 @@ const TableStatusStrip = memo(function TableStatusStrip({ tables, isLoading }) {
     return (
       <div className="flex gap-3 overflow-x-auto scrollbar-none py-1 animate-pulse">
         {[0, 1, 2, 3, 4, 5].map((i) => (
-          <div key={i} className="h-14 w-20 bg-slate-100 rounded-2xl shrink-0" />
+          <div
+            key={i}
+            className="h-14 w-20 bg-slate-100 rounded-2xl shrink-0"
+          />
         ))}
       </div>
     );
@@ -128,13 +147,19 @@ export default function LiveOrderMonitor() {
   const queryClient = useQueryClient();
   const socket = useSocket();
   const playAlert = useNotificationSound();
+  const [rejectModalOrder, setRejectModalOrder] = useState(null);
+  const [rejectReasonDropdown, setRejectReasonDropdown] =
+    useState("Item Out of Stock");
 
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["live-orders"],
     queryFn: async () => {
-      const res = await axios.get(`${import.meta.env.VITE_APP_API_BASE}/orders/live`, {
-        withCredentials: true,
-      });
+      const res = await axios.get(
+        `${import.meta.env.VITE_APP_API_BASE}/orders/live`,
+        {
+          withCredentials: true,
+        },
+      );
       return res.data.data || [];
     },
     staleTime: 15_000,
@@ -144,9 +169,12 @@ export default function LiveOrderMonitor() {
   const { data: tableStatus = [], isLoading: isLoadingTableStatus } = useQuery({
     queryKey: ["table-status"],
     queryFn: async () => {
-      const res = await axios.get(`${import.meta.env.VITE_APP_API_BASE}/tables/status`, {
-        withCredentials: true,
-      });
+      const res = await axios.get(
+        `${import.meta.env.VITE_APP_API_BASE}/tables/status`,
+        {
+          withCredentials: true,
+        },
+      );
       return res.data.data || [];
     },
     staleTime: 15_000,
@@ -161,7 +189,7 @@ export default function LiveOrderMonitor() {
   const currentOrders = orders.slice(indexOfFirstOrder, indexOfLastOrder);
   const totalPages = Math.ceil(orders.length / itemsPerPage);
 
-useEffect(() => {
+  useEffect(() => {
     if (!socket) return;
 
     const handleNewOrder = (newOrder) => {
@@ -183,8 +211,8 @@ useEffect(() => {
     const handleOrderUpdated = (updatedOrder) => {
       queryClient.setQueryData(["live-orders"], (oldOrders) =>
         (oldOrders || []).map((order) =>
-          order._id === updatedOrder._id ? updatedOrder : order
-        )
+          order._id === updatedOrder._id ? updatedOrder : order,
+        ),
       );
       queryClient.invalidateQueries({ queryKey: ["table-status"] });
     };
@@ -208,46 +236,45 @@ useEffect(() => {
     };
   }, [socket, queryClient, playAlert]);
 
-  const handleStatusTransition = useCallback(async (orderId, targetStatus) => {
-    let rejectReason = "";
+  const handleStatusTransition = useCallback(
+    async (orderId, targetStatus, customReason = "") => {
+      let rejectReason = customReason;
 
-    if (targetStatus === "REJECTED") {
-      const reason = prompt(
-        "Please enter the reason for rejection (e.g., Item Out of Stock, Kitchen Closed):",
-      );
-      if (reason === null) return;
-      if (!reason.trim()) {
-        alert("Rejection reason is mandatory!");
+      if (targetStatus === "REJECTED" && !rejectReason) {
+        // Agar reason pass nahi hua to modal open karenge dropdown ke liye
+        setRejectModalOrder(orderId);
         return;
       }
-      rejectReason = reason.trim();
-    }
 
-    try {
-      const res = await axios.patch(
-        `${import.meta.env.VITE_APP_API_BASE}/orders/${orderId}/status`,
-        { status: targetStatus, rejectReason },
-        { withCredentials: true },
-      );
+      try {
+        const res = await axios.patch(
+          `${import.meta.env.VITE_APP_API_BASE}/orders/${orderId}/status`,
+          { status: targetStatus, rejectReason },
+          { withCredentials: true },
+        );
 
-      const updatedOrderFromBackend = res.data.data;
+        const updatedOrderFromBackend = res.data.data;
 
-      queryClient.setQueryData(["live-orders"], (oldOrders) =>
-        (oldOrders || []).map((order) =>
-          order._id === orderId
-            ? {
-                ...order,
-                status: targetStatus,
-                rejectReason: updatedOrderFromBackend?.rejectReason || rejectReason,
-              }
-            : order,
-        ),
-      );
-      queryClient.invalidateQueries({ queryKey: ["table-status"] });
-    } catch (err) {
-      console.error("Error transitioning state context pipeline:", err);
-    }
-  }, [queryClient]);
+        queryClient.setQueryData(["live-orders"], (oldOrders) =>
+          (oldOrders || []).map((order) =>
+            order._id === orderId
+              ? {
+                  ...order,
+                  status: targetStatus,
+                  rejectReason:
+                    updatedOrderFromBackend?.rejectReason || rejectReason,
+                }
+              : order,
+          ),
+        );
+        queryClient.invalidateQueries({ queryKey: ["table-status"] });
+        setRejectModalOrder(null); // Modal close kar dein agar open ho toh
+      } catch (err) {
+        console.error("Error transitioning state context pipeline:", err);
+      }
+    },
+    [queryClient],
+  );
 
   const handleView = useCallback((order) => setSelectedOrder(order), []);
   const handleCloseModal = useCallback(() => setSelectedOrder(null), []);
@@ -265,7 +292,6 @@ useEffect(() => {
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-10 space-y-8 font-sans bg-[#F8F9FA] min-h-screen">
-      
       {/* Header Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs">
         <div>
@@ -273,7 +299,8 @@ useEffect(() => {
             Live Kitchen Monitor
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Manage incoming orders, table occupancy statuses, and kitchen execution queue.
+            Manage incoming orders, table occupancy statuses, and kitchen
+            execution queue.
           </p>
         </div>
         <div className="flex items-center gap-2.5 bg-rose-50/80 border border-rose-100 px-4 py-2 rounded-2xl self-start sm:self-center shadow-2xs">
@@ -291,15 +318,21 @@ useEffect(() => {
             Table Live Status Grid
           </p>
         </div>
-        <TableStatusStrip tables={tableStatus} isLoading={isLoadingTableStatus} />
+        <TableStatusStrip
+          tables={tableStatus}
+          isLoading={isLoadingTableStatus}
+        />
       </div>
 
       {/* Orders Section */}
       {orders.length === 0 ? (
         <div className="bg-white rounded-3xl border border-slate-200/80 p-16 text-center shadow-xs flex flex-col items-center justify-center max-w-xl mx-auto space-y-3">
-          <p className="text-sm font-bold text-slate-800">No live orders right now</p>
+          <p className="text-sm font-bold text-slate-800">
+            No live orders right now
+          </p>
           <p className="text-xs text-slate-500 font-medium">
-            New customer incoming orders will appear here automatically in real-time stream loop.
+            New customer incoming orders will appear here automatically in
+            real-time stream loop.
           </p>
         </div>
       ) : (
@@ -316,8 +349,12 @@ useEffect(() => {
                   <th className="px-6 py-4 whitespace-nowrap">Table</th>
                   <th className="px-6 py-4 whitespace-nowrap">Customer</th>
                   <th className="px-6 py-4 whitespace-nowrap">Items Summary</th>
-                  <th className="px-6 py-4 text-right whitespace-nowrap">Total</th>
-                  <th className="px-6 py-4 text-center whitespace-nowrap">Actions</th>
+                  <th className="px-6 py-4 text-right whitespace-nowrap">
+                    Total
+                  </th>
+                  <th className="px-6 py-4 text-center whitespace-nowrap">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -338,7 +375,8 @@ useEffect(() => {
             <div className="flex flex-col sm:flex-row gap-4 justify-between items-center px-6 py-4 bg-slate-50/50 border-t border-slate-100">
               <p className="text-xs text-slate-500 font-medium">
                 Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                {Math.min(indexOfLastOrder, orders.length)} of {orders.length} orders
+                {Math.min(indexOfLastOrder, orders.length)} of {orders.length}{" "}
+                orders
               </p>
               <div className="flex gap-2">
                 <button
@@ -360,7 +398,54 @@ useEffect(() => {
           )}
         </div>
       )}
+      {rejectModalOrder && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-sm p-6 space-y-4 shadow-2xl border border-slate-100">
+            <h3 className="text-base font-black text-slate-900">
+              Select Rejection Reason
+            </h3>
+            <p className="text-xs text-slate-500">
+              Please choose a reason why this order is being rejected:
+            </p>
 
+            <select
+              value={rejectReasonDropdown}
+              onChange={(e) => setRejectReasonDropdown(e.target.value)}
+              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
+            >
+              <option value="Item Out of Stock">Item Out of Stock</option>
+              <option value="Kitchen Closed / Overloaded">
+                Kitchen Closed / Overloaded
+              </option>
+              <option value="Customer Requested Cancellation">
+                Customer Requested Cancellation
+              </option>
+              <option value="Store Closing Time">Store Closing Time</option>
+            </select>
+
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                onClick={() => setRejectModalOrder(null)}
+                className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs cursor-pointer hover:bg-slate-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() =>
+                  handleStatusTransition(
+                    rejectModalOrder,
+                    "REJECTED",
+                    rejectReasonDropdown,
+                  )
+                }
+                className="px-4 py-2 bg-rose-600 text-white rounded-xl font-bold text-xs cursor-pointer hover:bg-rose-700 shadow-lg shadow-rose-600/20"
+              >
+                Confirm Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {selectedOrder && (
         <OrderDetailsModal order={selectedOrder} onClose={handleCloseModal} />
       )}
