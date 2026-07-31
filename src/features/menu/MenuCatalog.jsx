@@ -23,12 +23,14 @@ export default function MenuCatalog() {
   const [activeCategoryFilter, setActiveCategoryFilter] = useState("ALL");
   const [formMode, setFormMode] = useState("DISH");
   const [selectedItems, setSelectedItems] = useState([]);
-  
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [aiImageFile, setAiImageFile] = useState(null);
+  const [aiImagePreview, setAiImagePreview] = useState("");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("");
-  
+
   // 🔑 File state and image preview state
   const [imageFile, setImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
@@ -37,8 +39,12 @@ export default function MenuCatalog() {
     queryKey: ["menu-items"],
     queryFn: async () => {
       const [itemsRes, combosRes] = await Promise.all([
-        axios.get(`${import.meta.env.VITE_APP_API_BASE}/menu/admin/items`, { withCredentials: true }),
-        axios.get(`${import.meta.env.VITE_APP_API_BASE}/menu/admin/combos`, { withCredentials: true }),
+        axios.get(`${import.meta.env.VITE_APP_API_BASE}/menu/admin/items`, {
+          withCredentials: true,
+        }),
+        axios.get(`${import.meta.env.VITE_APP_API_BASE}/menu/admin/combos`, {
+          withCredentials: true,
+        }),
       ]);
       return {
         items: itemsRes.data.data || [],
@@ -46,6 +52,31 @@ export default function MenuCatalog() {
       };
     },
     staleTime: 60_000,
+  });
+
+  const aiExtractMutation = useMutation({
+    mutationFn: async (formData) => {
+      return await axios.post(
+        `${import.meta.env.VITE_APP_API_BASE}/menu/admin/menu/ai-extract`,
+        formData,
+        {
+          withCredentials: true,
+          headers: { "Content-Type": "multipart/form-data" },
+        },
+      );
+    },
+    onSuccess: (res) => {
+      queryClient.invalidateQueries(["menu-items"]);
+      setIsAiModalOpen(false);
+      setAiImageFile(null);
+      setAiImagePreview("");
+      alert(res.data.message || "Menu items imported successfully!");
+    },
+    onError: (err) => {
+      alert(
+        err.response?.data?.message || "Error processing AI menu extraction.",
+      );
+    },
   });
 
   const categoriesList = useMemo(
@@ -93,12 +124,15 @@ export default function MenuCatalog() {
     const formData = new FormData();
     formData.append("name", name);
     formData.append("description", description);
-    formData.append("price", formMode === "COMBO" ? comboCalculatedPrice : price);
-    
+    formData.append(
+      "price",
+      formMode === "COMBO" ? comboCalculatedPrice : price,
+    );
+
     if (formMode === "DISH") {
       formData.append("category", category);
     }
-    
+
     if (formMode === "COMBO") {
       selectedItems.forEach((itemId) => formData.append("items[]", itemId));
     }
@@ -111,18 +145,21 @@ export default function MenuCatalog() {
 
   const upsertMutation = useMutation({
     mutationFn: async (formData) => {
-      const config = { withCredentials: true, headers: { "Content-Type": "multipart/form-data" } };
+      const config = {
+        withCredentials: true,
+        headers: { "Content-Type": "multipart/form-data" },
+      };
       if (editingItem) {
         return await axios.patch(
           `${import.meta.env.VITE_APP_API_BASE}/menu/admin/items/${editingItem._id}`,
           formData,
-          config
+          config,
         );
       }
       return await axios.post(
         `${import.meta.env.VITE_APP_API_BASE}/menu/admin/items`,
         formData,
-        config
+        config,
       );
     },
     onSuccess: () => {
@@ -136,22 +173,32 @@ export default function MenuCatalog() {
 
   const deleteMutation = useMutation({
     mutationFn: async (itemId) =>
-      await axios.delete(`${import.meta.env.VITE_APP_API_BASE}/menu/admin/items/${itemId}`, { withCredentials: true }),
+      await axios.delete(
+        `${import.meta.env.VITE_APP_API_BASE}/menu/admin/items/${itemId}`,
+        { withCredentials: true },
+      ),
     onSuccess: () => queryClient.invalidateQueries(["menu-items"]),
   });
 
   const deleteComboMutation = useMutation({
     mutationFn: async (comboId) =>
-      await axios.delete(`${import.meta.env.VITE_APP_API_BASE}/menu/admin/combos/${comboId}`, { withCredentials: true }),
+      await axios.delete(
+        `${import.meta.env.VITE_APP_API_BASE}/menu/admin/combos/${comboId}`,
+        { withCredentials: true },
+      ),
     onSuccess: () => queryClient.invalidateQueries(["menu-items"]),
   });
 
   const comboMutation = useMutation({
     mutationFn: async (formData) =>
-      await axios.post(`${import.meta.env.VITE_APP_API_BASE}/menu/admin/combos`, formData, {
-        withCredentials: true,
-        headers: { "Content-Type": "multipart/form-data" },
-      }),
+      await axios.post(
+        `${import.meta.env.VITE_APP_API_BASE}/menu/admin/combos`,
+        formData,
+        {
+          withCredentials: true,
+          headers: { "Content-Type": "multipart/form-data" },
+        },
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries(["menu-items"]);
       closeAndResetModal();
@@ -160,10 +207,14 @@ export default function MenuCatalog() {
 
   const updateComboMutation = useMutation({
     mutationFn: async ({ id, formData }) =>
-      await axios.patch(`${import.meta.env.VITE_APP_API_BASE}/menu/admin/combos/${id}`, formData, {
-        withCredentials: true,
-        headers: { "Content-Type": "multipart/form-data" },
-      }),
+      await axios.patch(
+        `${import.meta.env.VITE_APP_API_BASE}/menu/admin/combos/${id}`,
+        formData,
+        {
+          withCredentials: true,
+          headers: { "Content-Type": "multipart/form-data" },
+        },
+      ),
     onSuccess: () => {
       queryClient.invalidateQueries(["menu-items"]);
       closeAndResetModal();
@@ -276,7 +327,6 @@ export default function MenuCatalog() {
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-10 space-y-8 font-sans bg-[#F8F9FA] min-h-screen">
-      
       {/* Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs">
         <div className="flex items-center gap-4">
@@ -288,7 +338,8 @@ export default function MenuCatalog() {
               Digital Menu Catalog
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              Configure categories, single dishes, and active operational items pricing.
+              Configure categories, single dishes, and active operational items
+              pricing.
             </p>
           </div>
         </div>
@@ -297,6 +348,13 @@ export default function MenuCatalog() {
           className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-6 py-3.5 rounded-2xl transition-all shadow-xs shrink-0 cursor-pointer"
         >
           <Plus size={16} strokeWidth={3} /> Add New Dish
+        </button>
+
+        <button
+          onClick={() => setIsAiModalOpen(true)}
+          className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs px-5 py-3.5 rounded-2xl transition-all shadow-xs shrink-0 cursor-pointer"
+        >
+          <Sparkles size={16} strokeWidth={2.5} /> Upload Menu Image via AI
         </button>
       </div>
 
@@ -348,21 +406,21 @@ export default function MenuCatalog() {
                   <Sparkles size={10} /> COMBO
                 </div>
               )}
-              
+
               <div className="p-6 flex gap-4 items-start">
                 <div className="w-20 h-20 rounded-2xl bg-slate-50 border border-slate-100 shrink-0 overflow-hidden relative flex items-center justify-center text-slate-300">
                   {item.image ? (
                     <img
-  src={
-    item.image
-      ? item.image.startsWith("http")
-        ? item.image
-        : `${import.meta.env.VITE_APP_API_BASE.replace('/api', '')}${item.image}`
-      : null
-  }
-  alt={item.name}
-  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-/>
+                      src={
+                        item.image
+                          ? item.image.startsWith("http")
+                            ? item.image
+                            : `${import.meta.env.VITE_APP_API_BASE.replace("/api", "")}${item.image}`
+                          : null
+                      }
+                      alt={item.name}
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
                   ) : (
                     <ImageIcon size={24} />
                   )}
@@ -376,14 +434,19 @@ export default function MenuCatalog() {
                     {item.name}
                   </h3>
                   <p className="text-xs text-slate-500 font-medium line-clamp-2 leading-relaxed">
-                    {item.description || "No direct kitchen culinary preparations logs specified."}
+                    {item.description ||
+                      "No direct kitchen culinary preparations logs specified."}
                   </p>
                 </div>
               </div>
 
               <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex justify-between items-center">
                 <span className="text-base font-black text-slate-900 flex items-center tracking-tight">
-                  <IndianRupee size={15} strokeWidth={2.5} className="mt-0.5 text-slate-700" />
+                  <IndianRupee
+                    size={15}
+                    strokeWidth={2.5}
+                    className="mt-0.5 text-slate-700"
+                  />
                   {item.price?.toLocaleString("en-IN")}
                 </span>
 
@@ -446,11 +509,17 @@ export default function MenuCatalog() {
                   <input
                     type="checkbox"
                     checked={selectedItems.includes(item._id)}
-                    onChange={(e) => toggleSelectedItem(item._id, e.target.checked)}
+                    onChange={(e) =>
+                      toggleSelectedItem(item._id, e.target.checked)
+                    }
                     className="rounded text-red-500 focus:ring-red-500/20"
                   />
-                  <span className="flex-1 font-bold text-slate-800 text-xs">{item.name}</span>
-                  <span className="text-xs font-black text-slate-500">₹{item.price}</span>
+                  <span className="flex-1 font-bold text-slate-800 text-xs">
+                    {item.name}
+                  </span>
+                  <span className="text-xs font-black text-slate-500">
+                    ₹{item.price}
+                  </span>
                 </label>
               ))}
             </div>
@@ -459,7 +528,9 @@ export default function MenuCatalog() {
               <span className="text-[11px] font-black uppercase tracking-wider text-red-600">
                 Combo Total Price
               </span>
-              <span className="text-base font-black text-red-700">₹{comboCalculatedPrice}</span>
+              <span className="text-base font-black text-red-700">
+                ₹{comboCalculatedPrice}
+              </span>
             </div>
           </div>
         )}
@@ -468,7 +539,11 @@ export default function MenuCatalog() {
           <Input
             label="Title"
             required
-            placeholder={formMode === "DISH" ? "e.g., Spicy Paneer Tikka" : "e.g., Weekend Special Combo"}
+            placeholder={
+              formMode === "DISH"
+                ? "e.g., Spicy Paneer Tikka"
+                : "e.g., Weekend Special Combo"
+            }
             value={name}
             onChange={(e) => setName(e.target.value)}
           />
@@ -485,7 +560,11 @@ export default function MenuCatalog() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              label={formMode === "COMBO" ? "Calculated Price (INR)" : "Selling Price (INR)"}
+              label={
+                formMode === "COMBO"
+                  ? "Calculated Price (INR)"
+                  : "Selling Price (INR)"
+              }
               type="number"
               required
               readOnly={formMode === "COMBO"}
@@ -501,26 +580,34 @@ export default function MenuCatalog() {
               </label>
               <label className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer transition-all shadow-xs">
                 <Upload size={15} />
-                <span className="truncate">{imageFile ? imageFile.name : "Choose File..."}</span>
-                <input type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
+                <span className="truncate">
+                  {imageFile ? imageFile.name : "Choose File..."}
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
               </label>
             </div>
           </div>
 
           {/* Image Preview */}
           {imagePreview && (
-  <div className="relative w-20 h-20 rounded-2xl overflow-hidden border border-slate-200">
-    <img 
-      src={
-        imagePreview.startsWith("http") || imagePreview.startsWith("blob:")
-          ? imagePreview
-          : `${import.meta.env.VITE_APP_API_BASE.replace('/api', '')}${imagePreview}`
-      } 
-      alt="Preview" 
-      className="w-full h-full object-cover" 
-    />
-  </div>
-)}
+            <div className="relative w-20 h-20 rounded-2xl overflow-hidden border border-slate-200">
+              <img
+                src={
+                  imagePreview.startsWith("http") ||
+                  imagePreview.startsWith("blob:")
+                    ? imagePreview
+                    : `${import.meta.env.VITE_APP_API_BASE.replace("/api", "")}${imagePreview}`
+                }
+                alt="Preview"
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
 
           <div className="space-y-1.5">
             <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
@@ -551,6 +638,93 @@ export default function MenuCatalog() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* AI Menu Upload Modal */}
+      <Modal
+        isOpen={isAiModalOpen}
+        onClose={() => {
+          setIsAiModalOpen(false);
+          setAiImageFile(null);
+          setAiImagePreview("");
+        }}
+        title="Auto-Fill Menu via AI Vision"
+      >
+        <div className="space-y-6">
+          <p className="text-xs text-slate-500 leading-relaxed">
+            Restaurant ka physical menu ya printed card ki clear photo upload
+            karein. AI automatically items, prices, aur categories detect karke
+            aapke catalog me live add kar dega.
+          </p>
+
+          <div className="space-y-1.5">
+            <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              Upload Menu Snapshot
+            </label>
+            <label className="flex flex-col items-center justify-center gap-2 w-full p-6 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100/50 cursor-pointer transition-all">
+              <Upload size={24} className="text-purple-500" />
+              <span className="text-xs font-bold text-slate-700">
+                {aiImageFile ? aiImageFile.name : "Click to browse menu image"}
+              </span>
+              <span className="text-[10px] text-slate-400">
+                Supports JPG, PNG, WEBP
+              </span>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    setAiImageFile(file);
+                    setAiImagePreview(URL.createObjectURL(file));
+                  }
+                }}
+                className="hidden"
+              />
+            </label>
+          </div>
+
+          {aiImagePreview && (
+            <div className="relative w-full h-40 rounded-2xl overflow-hidden border border-slate-200">
+              <img
+                src={aiImagePreview}
+                alt="Menu Preview"
+                className="w-full h-full object-cover"
+              />
+            </div>
+          )}
+
+          <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
+            <button
+              type="button"
+              onClick={() => setIsAiModalOpen(false)}
+              className="px-5 py-3 rounded-2xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!aiImageFile || aiExtractMutation.isPending}
+              onClick={() => {
+                const formData = new FormData();
+                formData.append("image", aiImageFile);
+                aiExtractMutation.mutate(formData);
+              }}
+              className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 transition cursor-pointer shadow-sm shadow-purple-500/20 disabled:opacity-50"
+            >
+              {aiExtractMutation.isPending ? (
+                <>
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Analyzing Menu...
+                </>
+              ) : (
+                <>
+                  <Sparkles size={14} /> Extract & Save Items
+                </>
+              )}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
