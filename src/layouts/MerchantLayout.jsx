@@ -13,6 +13,7 @@ import Analysis from "../features/analysis/Analysis";
 import Offers from "../features/offers/Offers";
 import Payment from "../features/payment/Payment";
 import logo from "../assets/cho.png";
+import AIMarketingDashboard from "../components/AIMarketingDashboard";
 
 export default function MerchantLayout() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -74,6 +75,7 @@ export default function MerchantLayout() {
             <Route path="/analysis" element={<Analysis />} />
             <Route path="/offer" element={<Offers />} />
             <Route path="/payment" element={<Payment />} />
+            <Route path="/marketing" element={<AIMarketingDashboard/>}/>
             <Route path="/super-admin" element={<SuperAdminPanel />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
