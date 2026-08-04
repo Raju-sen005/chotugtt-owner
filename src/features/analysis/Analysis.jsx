@@ -94,8 +94,8 @@ function Analysis() {
   const topItems = stats.topItems || [];
 
   const summaryCards = [
-    { label: "Today Revenue", val: `₹${rev.today || 0}`, icon: DollarSign, color: "text-emerald-600 bg-emerald-50" },
-    { label: "Total Revenue", val: `₹${rev.totalRevenue || 0}`, icon: TrendingUp, color: "text-blue-600 bg-blue-50" },
+    { label: "Today Revenue", val: `₹${Number(rev.today || 0).toFixed(2)}`, icon: DollarSign, color: "text-emerald-600 bg-emerald-50" },
+    { label: "Total Revenue", val: `₹${Number(rev.totalRevenue || 0).toFixed(2)}`, icon: TrendingUp, color: "text-blue-600 bg-blue-50" },
     { label: "Total Orders", val: rev.totalOrders || 0, icon: ShoppingBag, color: "text-purple-600 bg-purple-50" },
     { label: "Top Items", val: topItems.length, icon: Award, color: "text-rose-600 bg-rose-50" },
   ];

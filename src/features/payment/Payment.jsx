@@ -7,22 +7,27 @@ import * as XLSX from "xlsx";
 export default function Payment() {
   const [filter, setFilter] = React.useState("today");
 
+  const API_BASE = import.meta.env.VITE_APP_API_BASE; // 🆕
+
   // 1. Current Period Bills Fetch Karein
   const { data: bills, isLoading } = useQuery({
     queryKey: ["bills", filter],
     queryFn: () =>
       axios
-        .get(`/orders/billing?filter=${filter}`)
+        .get(`${API_BASE}/orders/billing?filter=${filter}`, {
+          withCredentials: true, // 🆕
+        })
         .then((res) => res.data.data),
   });
 
   // 2. Previous Period Bills Fetch Karein (Profit/Loss Comparison ke liye)
-  // Note: Backend par aisa endpoint hona chahiye jo pichle period ka data ya comparison return kare.
   const { data: prevData } = useQuery({
     queryKey: ["bills-prev", filter],
     queryFn: () =>
       axios
-        .get(`/orders/billing/previous?filter=${filter}`)
+        .get(`${API_BASE}/orders/billing/previous?filter=${filter}`, {
+          withCredentials: true, // 🆕
+        })
         .then((res) => res.data)
         .catch(() => ({ total: 0 })),
   });
@@ -30,7 +35,6 @@ export default function Payment() {
   const totalRevenue =
     bills?.reduce((acc, curr) => acc + (curr.total || 0), 0) || 0;
 
-  // Previous revenue (Agar backend se data na mile toh fallback 0 rakhein)
   const prevRevenue = prevData?.total || 0;
 
   // 💡 Profit / Loss & Percentage Change Logic
@@ -45,7 +49,6 @@ export default function Payment() {
         ? "100"
         : "0";
 
-  // 1. Download Excel Logic
   const handleDownload = () => {
     if (!bills || bills.length === 0) return;
     const formattedData = bills.map((bill) => ({
@@ -128,7 +131,6 @@ export default function Payment() {
               ₹{totalRevenue.toLocaleString()}
             </h3>
 
-            {/* Profit / Loss Badge */}
             {revenueDifference !== 0 ? (
               <span
                 className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black uppercase ${

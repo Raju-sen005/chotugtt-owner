@@ -12,11 +12,17 @@ import {
   ArrowLeft,
   ArrowRight,
   // Receipt,
-  IndianRupee
+  IndianRupee,
 } from "lucide-react";
 import OrderDetailsModal from "../../components/OrderDetailsModal";
 
-const OrderRow = memo(function OrderRow({ order, onStatusChange, onView, onClear }) {
+const OrderRow = memo(function OrderRow({
+  order,
+  onStatusChange,
+  onView,
+  onClear,
+  onCancelItem,
+}) {
   const hasMergedTables = order.mergedTables && order.mergedTables.length > 0;
 
   return (
@@ -42,13 +48,29 @@ const OrderRow = memo(function OrderRow({ order, onStatusChange, onView, onClear
       </td>
       <td className="px-6 py-4 text-xs text-slate-600 font-medium">
         <div className="flex flex-col gap-0.5 max-w-[220px]">
-          {order.items.map((i, index) => (
-            <span
-              key={index}
-              className={`truncate ${i.status === "REJECTED" ? "line-through text-rose-400 text-[11px]" : ""}`}
-            >
-              • {i.quantity}x {i.name}
-            </span>
+          {order.items.map((item) => (
+            <div key={item._id} className="flex items-center gap-1.5 group">
+              <span
+                className={`truncate ${
+                  item.status === "REJECTED"
+                    ? "line-through text-rose-400 text-[11px] opacity-50"
+                    : ""
+                }`}
+              >
+                • {item.quantity}x {item.name}
+              </span>
+              {item.status !== "REJECTED" &&
+                order.status !== "COMPLETED" &&
+                order.status !== "REJECTED" && (
+                  <button
+                    onClick={() => onCancelItem(order._id, item._id)}
+                    title="Cancel this item"
+                    className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition"
+                  >
+                     Cancel
+                  </button>
+                )}
+            </div>
           ))}
         </div>
       </td>
@@ -79,7 +101,7 @@ const OrderRow = memo(function OrderRow({ order, onStatusChange, onView, onClear
               {order.status}
             </span>
           )}
-          
+
           {/* Generate Bill & Clear Table Button */}
           {order.status === "ACCEPTED" && order.tableNumber !== "N/A" && (
             <button
@@ -249,6 +271,37 @@ export default function LiveOrderMonitor() {
     };
   }, [socket, queryClient, playAlert]);
 
+  // 🆕 Cancel a single item — hits the real backend endpoint and refreshes
+  // subtotal/tax/total from the response (backend does the recalculation).
+  const handleCancelItem = useCallback(
+    async (orderId, itemId) => {
+      const confirmed = window.confirm(
+        "Cancel this item from the order? Total will be recalculated. This can't be undone.",
+      );
+      if (!confirmed) return;
+
+      try {
+        const res = await axios.patch(
+          `${import.meta.env.VITE_APP_API_BASE}/orders/${orderId}/item/${itemId}/cancel`,
+          {},
+          { withCredentials: true },
+        );
+
+        const updatedOrder = res.data.data;
+
+        queryClient.setQueryData(["live-orders"], (oldOrders = []) =>
+          oldOrders.map((order) =>
+            order._id === orderId ? updatedOrder : order,
+          ),
+        );
+      } catch (err) {
+        console.error("Failed to cancel item", err);
+        alert(err.response?.data?.message || "Failed to cancel item");
+      }
+    },
+    [queryClient],
+  );
+
   const handleStatusTransition = useCallback(
     async (orderId, targetStatus, customReason = "") => {
       let rejectReason = customReason;
@@ -330,7 +383,9 @@ We look forward to serving you again!
           "_blank",
         );
       } else {
-        console.warn("No customer phone on file — skipping WhatsApp, completing order anyway.");
+        console.warn(
+          "No customer phone on file — skipping WhatsApp, completing order anyway.",
+        );
       }
 
       try {
@@ -442,6 +497,7 @@ We look forward to serving you again!
                     onStatusChange={handleStatusTransition}
                     onView={handleView}
                     onClear={handleBillAndWhatsApp}
+                    onCancelItem={handleCancelItem}
                   />
                 ))}
               </tbody>
