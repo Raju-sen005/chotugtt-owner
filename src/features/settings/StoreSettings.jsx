@@ -262,7 +262,7 @@ export default function StoreSettings() {
         <body>
           <div class="standee-card">
             <div class="brand-container">
-              ${restaurantLogo ? `<img id="print-logo" src="${restaurantLogo}" class="logo-img" crossorigin="anonymous" />` : ""}
+              ${restaurantLogo ? `<img id="print-logo" src="${restaurantLogo}" class="logo-img" />` : ""}
               <h2 class="brand-name">${restaurantName}</h2>
               <div class="divider-gold"></div>
             </div>
