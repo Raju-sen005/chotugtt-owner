@@ -1,205 +1,766 @@
-import { useEffect, useCallback, memo } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useAuth } from "../context/AuthContext";
+import {
+  Printer,
+  Copy,
+  CheckCircle,
+  Plus,
+  Trash2,
+  QrCode,
+  Power,
+  X,
+  Pencil,
+  FolderPlus,
+  ChevronDown,
+} from "lucide-react";
+import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
+import { QRCodeCanvas } from "qrcode.react";
 import axios from "axios";
-import { Users, IndianRupee, ShieldCheck, Sparkles } from "lucide-react";
-import { useSocket } from "../context/SocketContext";
 
-const TableCard = memo(function TableCard({ order, onClear }) {
-  const hasMergedTables = order.mergedTables && order.mergedTables.length > 0;
+// 🔑 Extracted + memoized TableCard component
+const TableCard = memo(function TableCard({
+  table,
+  url,
+  isCopied,
+  onCopy,
+  onPrint,
+  onRemove,
+  onToggle,
+  canRemove,
+  qrRef,
+}) {
+  const tableNo = table.tableNumber;
+  const isDisabled = table.isDisabled;
 
   return (
-    <div className="bg-white p-6 sm:p-8 rounded-3xl border border-emerald-200/80 shadow-xs hover:border-emerald-300 transition-all duration-300 flex flex-col justify-between group relative overflow-hidden">
-      <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 rounded-bl-full -z-0 opacity-50 group-hover:scale-110 transition-transform duration-500" />
-      
-      <div className="relative z-10 space-y-6">
-        <div className="flex justify-between items-start">
-          <div className="space-y-1">
-            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 inline-block">
-              Occupied Active
-            </span>
-            <h3 className="text-xl font-black text-slate-900 tracking-tight flex items-center gap-2 pt-1">
-              Table {order.tableNumber}
-              {hasMergedTables && (
-                <span
-                  title={`Merged with Table ${order.mergedTables.join(", ")}`}
-                  className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200/60 px-2 py-0.5 rounded-lg text-[10px] font-black uppercase tracking-wider"
-                >
-                  <Users size={10} /> +{order.mergedTables.join(", ")}
+    <div
+      className={`bg-white p-6 rounded-3xl border transition-all space-y-5 group flex flex-col justify-between ${
+        isDisabled
+          ? "border-amber-300 bg-amber-50/20 opacity-75"
+          : "border-slate-200/80 shadow-xs hover:border-slate-300"
+      }`}
+    >
+      <div>
+        <div className="flex justify-between items-center mb-4">
+          <div className="flex items-center gap-2.5">
+            <div
+              className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-[11px] px-1 ${
+                isDisabled
+                  ? "bg-amber-100 text-amber-700"
+                  : "bg-slate-100 text-slate-700"
+              }`}
+              title={tableNo}
+            >
+              {String(tableNo).slice(0, 4)}
+            </div>
+            <div>
+              <span className="font-black text-slate-900 text-base block">
+                {tableNo}
+              </span>
+              {isDisabled && (
+                <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">
+                  Disabled / Locked
                 </span>
               )}
-            </h3>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => onToggle(tableNo, !isDisabled)}
+              className={`p-2 rounded-xl transition-all cursor-pointer ${
+                isDisabled
+                  ? "text-amber-600 bg-amber-50 hover:bg-amber-100"
+                  : "text-slate-400 hover:text-amber-600 hover:bg-amber-50"
+              }`}
+              title={isDisabled ? "Enable Table QR" : "Disable Table QR"}
+            >
+              <Power size={16} />
+            </button>
+
+            <button
+              onClick={() => onRemove(tableNo)}
+              disabled={!canRemove}
+              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent transition-all cursor-pointer"
+              title="Remove Table"
+            >
+              <Trash2 size={16} />
+            </button>
           </div>
         </div>
 
-        <div className="bg-slate-50/80 border border-slate-100 p-4 rounded-2xl space-y-1">
-          <p className="font-bold text-slate-900 text-sm tracking-tight">{order.customerName}</p>
-          <p className="text-xs text-slate-500 font-medium">{order.customerPhone || "No phone provided"}</p>
-        </div>
-
-        <div className="flex items-baseline justify-between pt-2">
-          <span className="text-xs font-bold text-slate-400 uppercase tracking-wider">Current Bill</span>
-          <span className="text-2xl font-black text-slate-900 tracking-tight">
-            ₹{order.total?.toLocaleString('en-IN')}
-          </span>
+        <div
+          className={`flex justify-center p-6 rounded-2xl border transition-colors ${
+            isDisabled
+              ? "bg-amber-50/50 border-amber-100 grayscale-[30%]"
+              : "bg-slate-50/80 border-slate-100 group-hover:bg-slate-50"
+          }`}
+        >
+          {url ? (
+            <QRCodeCanvas
+              ref={qrRef}
+              value={url}
+              size={150}
+              level={"H"}
+              className="w-full max-w-[140px] h-auto shadow-xs rounded-lg"
+            />
+          ) : (
+            <div className="text-xs text-slate-400 py-10">Loading QR...</div>
+          )}
         </div>
       </div>
 
-      <div className="pt-6 relative z-10">
+      <div className="space-y-2.5">
         <button
-          onClick={() => onClear(order)}
-          className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white py-4 rounded-2xl font-bold text-xs tracking-wide transition-all shadow-xs cursor-pointer active:scale-[0.98]"
+          onClick={() => onCopy(url, tableNo)}
+          disabled={!url}
+          className={`w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-all cursor-pointer ${
+            isCopied
+              ? "bg-emerald-50 text-emerald-600 border-emerald-200"
+              : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+          }`}
         >
-          <IndianRupee size={16} strokeWidth={2.5} /> Generate Bill & Clear Table
+          {isCopied ? <CheckCircle size={14} /> : <Copy size={14} />}
+          {isCopied ? "Link Copied!" : "Copy Table Link"}
         </button>
+
+        <div className="grid">
+          <button
+            onClick={() => onPrint(tableNo)}
+            disabled={!url}
+            className="py-2.5 text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-100 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+          >
+            <Printer size={14} className="text-slate-500" /> Print Standee
+          </button>
+        </div>
       </div>
     </div>
   );
 });
 
-export default function TableMonitor() {
-  const queryClient = useQueryClient();
-  const socket = useSocket();
+// 🔑 Ek section ka poora block — header (naam, count, rename/delete) + uski tables ka grid
+const SectionBlock = memo(function SectionBlock({
+  section,
+  tables,
+  onRenameSection,
+  onDeleteSection,
+  renderCard,
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+  const [isRenaming, setIsRenaming] = useState(false);
+  const [renameValue, setRenameValue] = useState(section);
 
-  const { data: activeOrders = [], isLoading } = useQuery({
-    queryKey: ["table-monitor-orders"],
-    queryFn: async () => {
-      const res = await axios.get(`${import.meta.env.VITE_APP_API_BASE}/orders/live`, {
-        withCredentials: true,
-      });
-      return (res.data.data || []).filter(
-        (o) => o.status === "ACCEPTED" && o.tableNumber !== "N/A",
+  const submitRename = () => {
+    const clean = renameValue.trim();
+    if (clean && clean !== section) onRenameSection(section, clean);
+    setIsRenaming(false);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between px-1">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setCollapsed((c) => !c)}
+            className="p-1 text-slate-400 hover:text-slate-700 cursor-pointer"
+          >
+            <ChevronDown
+              size={18}
+              className={`transition-transform ${collapsed ? "-rotate-90" : ""}`}
+            />
+          </button>
+
+          {isRenaming ? (
+            <input
+              autoFocus
+              value={renameValue}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onBlur={submitRename}
+              onKeyDown={(e) => e.key === "Enter" && submitRename()}
+              className="font-black text-slate-800 text-base bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 outline-none"
+            />
+          ) : (
+            <h3 className="font-black text-slate-800 text-base">{section}</h3>
+          )}
+
+          <span className="text-xs font-bold bg-white px-2.5 py-1 rounded-full border border-slate-200 text-slate-600 shadow-xs">
+            {tables.length} {tables.length === 1 ? "Table" : "Tables"}
+          </span>
+        </div>
+
+        {section !== "General" && !isRenaming && (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setIsRenaming(true)}
+              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
+              title="Rename Section"
+            >
+              <Pencil size={14} />
+            </button>
+            <button
+              onClick={() => onDeleteSection(section)}
+              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg cursor-pointer"
+              title="Delete Section"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {!collapsed && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {tables.length === 0 ? (
+            <div className="col-span-full text-xs text-slate-400 bg-white border border-dashed border-slate-200 rounded-2xl py-8 text-center">
+              Is section mein abhi koi table nahi hai — "Add Table" se add
+              karein.
+            </div>
+          ) : (
+            tables.map((table) => renderCard(table))
+          )}
+        </div>
+      )}
+    </div>
+  );
+});
+
+export default function TableMonitor() {
+  const { user } = useAuth();
+  const [copied, setCopied] = useState(null);
+  const qrRefs = useRef({});
+
+  const [storeDetails, setStoreDetails] = useState({ name: "", logo: "" });
+  const [tables, setTables] = useState([]);
+  const [sections, setSections] = useState(["General"]);
+
+  // Add Table modal state
+  const [showAddTable, setShowAddTable] = useState(false);
+  const [newTableName, setNewTableName] = useState("");
+  const [newTableSection, setNewTableSection] = useState("General");
+  const [creatingNewSection, setCreatingNewSection] = useState(false);
+  const [newSectionInline, setNewSectionInline] = useState("");
+  const [isSavingTable, setIsSavingTable] = useState(false);
+
+  // Add Section modal state
+  const [showAddSection, setShowAddSection] = useState(false);
+  const [newSectionName, setNewSectionName] = useState("");
+  const [isSavingSection, setIsSavingSection] = useState(false);
+
+  const apiBase = import.meta.env.VITE_APP_API_BASE;
+
+  // Restaurant Profile Fetch
+  useEffect(() => {
+    axios
+      .get(`${apiBase}/restaurant/profile`, { withCredentials: true })
+      .then((res) => {
+        if (res.data?.data) {
+          setStoreDetails({
+            name: res.data.data.name || "",
+            logo: res.data.data.logo || "",
+          });
+        }
+      })
+      .catch((err) =>
+        console.warn("Could not fetch restaurant profile for print:", err?.message),
       );
-    },
-    staleTime: 15_000,
-    refetchOnWindowFocus: false,
-  });
+  }, [apiBase]);
+
+  const fetchTables = useCallback(async () => {
+    try {
+      const res = await axios.get(`${apiBase}/tables/admin`, { withCredentials: true });
+      const backendTables = res.data?.data;
+      if (Array.isArray(backendTables)) {
+        const formatted = backendTables.map((t) =>
+          typeof t === "string"
+            ? { tableNumber: t, isDisabled: false, section: "General" }
+            : { ...t, section: t.section || "General" },
+        );
+        setTables(formatted);
+      }
+    } catch (err) {
+      console.warn("Could not sync table list from backend:", err?.message);
+    }
+  }, [apiBase]);
+
+  const fetchSections = useCallback(async () => {
+    try {
+      const res = await axios.get(`${apiBase}/sections/admin`, { withCredentials: true });
+      const backendSections = res.data?.data;
+      if (Array.isArray(backendSections)) {
+        const names = backendSections.map((s) => s.name);
+        // "General" hamesha list mein rahe, chahe backend mein abhi na bana ho
+        setSections(names.includes("General") ? names : ["General", ...names]);
+      }
+    } catch (err) {
+      console.warn("Could not fetch sections from backend:", err?.message);
+    }
+  }, [apiBase]);
 
   useEffect(() => {
-    if (!socket) return;
+    fetchTables();
+    fetchSections();
+  }, [fetchTables, fetchSections]);
 
-    const refresh = () => queryClient.invalidateQueries({ queryKey: ["table-monitor-orders"] });
+  const activeRestaurantId = user?.restaurantId || user?._id;
 
-    socket.on("NEW_ORDER_RECEIVED", refresh);
-    socket.on("ORDER_STATUS_UPDATED", refresh);
-    return () => {
-      socket.off("NEW_ORDER_RECEIVED", refresh);
-      socket.off("ORDER_STATUS_UPDATED", refresh);
-    };
-  }, [socket, queryClient]);
+  const printQRCode = useCallback(
+    (tableNo) => {
+      const canvas = qrRefs.current[tableNo];
+      if (!canvas) return;
+      const dataUrl = canvas.toDataURL("image/png");
 
-  const handleBillAndWhatsApp = useCallback(
-    async (order) => {
-      const tableLabel = order.mergedTables?.length
-        ? `${order.tableNumber} & ${order.mergedTables.join(", ")}`
-        : order.tableNumber;
+      const restaurantName = storeDetails.name || "OUR RESTAURANT";
 
-      const confirmed = window.confirm(
-        `Send the bill to ${order.customerName} (Table ${tableLabel}) and clear the table? This can't be undone.`,
-      );
-      if (!confirmed) return;
-
-      const message = ` *PAYMENT RECEIPT*
-
-Hello *${order.customerName}*,
-
-Thank you for dining with us.
-Your payment has been successfully received.
-
- *Table No:* ${tableLabel}
- *Total Paid:* ₹${Number(order.total).toFixed(2)}
-
-━━━━━━━━━━━━━━━━━━
-
-We hope you enjoyed your experience.
-
-Thank you for choosing us.
-We look forward to serving you again!
-
- Have a wonderful day.`;
-
-      let formattedPhone = String(order.customerPhone || "").replace(/\D/g, "");
-      if (formattedPhone && !formattedPhone.startsWith("91")) {
-        formattedPhone = `91${formattedPhone}`;
+      let restaurantLogo = storeDetails.logo || "";
+      if (restaurantLogo && restaurantLogo.startsWith("/")) {
+        try {
+          const urlObj = new URL(apiBase);
+          restaurantLogo = `${urlObj.origin}${restaurantLogo}`;
+        } catch {
+          restaurantLogo = `${window.location.origin}${restaurantLogo}`;
+        }
       }
 
-      if (formattedPhone) {
-        window.open(
-          `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`,
-          "_blank",
-        );
-      } else {
-        console.warn("No customer phone on file — skipping WhatsApp, completing order anyway.");
-      }
+      const windowContent = `
+      <html>
+        <head>
+          <title>Table ${tableNo} - ${restaurantName} Standee</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+            body { 
+              font-family: 'Plus Jakarta Sans', sans-serif; 
+              display: flex; align-items: center; justify-content: center; 
+              height: 100vh; margin: 0; background: #ffffff; 
+              -webkit-print-color-adjust: exact; print-color-adjust: exact;
+            }
+            .standee-card { 
+              width: 340px; background: linear-gradient(135deg, #FAF8F5 0%, #F3EFEA 100%);
+              border: 1.5px solid #D4AF37; border-radius: 16px; padding: 32px 24px; 
+              text-align: center; box-shadow: 0 12px 30px rgba(0,0,0,0.08); box-sizing: border-box;
+            }
+            .brand-container { display: flex; flex-direction: column; align-items: center; margin-bottom: 20px; }
+            .logo-img { width: 52px; height: 52px; object-fit: contain; border-radius: 50%; border: 1px solid #D4AF37; padding: 2px; background: #fff; margin-bottom: 8px; }
+            .brand-name { font-family: 'Cinzel', serif; font-size: 13px; font-weight: 700; letter-spacing: 2px; color: #2C2C2C; text-transform: uppercase; margin: 0; }
+            .divider-gold { width: 40px; height: 1.5px; background-color: #D4AF37; margin: 10px auto 16px auto; }
+            .qr-box { background: #ffffff; padding: 14px; border-radius: 12px; display: inline-block; border: 1px solid #E6E0D5; margin-bottom: 18px; }
+            img.qr-image { width: 170px; height: 170px; display: block; }
+            .scan-subtitle { font-size: 11px; font-weight: 600; color: #7A756D; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 4px 0; }
+            .menu-title { font-family: 'Cinzel', serif; color: #1A1A1A; margin: 0; font-size: 28px; font-weight: 800; letter-spacing: 1.5px; }
+            .table-footer { margin-top: 20px; background: #1A1A1A; color: #F3EFEA; padding: 8px 16px; border-radius: 30px; display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; }
+          </style>
+        </head>
+        <body>
+          <div class="standee-card">
+            <div class="brand-container">
+              ${restaurantLogo ? `<img id="print-logo" src="${restaurantLogo}" class="logo-img" />` : ""}
+              <h2 class="brand-name">${restaurantName}</h2>
+              <div class="divider-gold"></div>
+            </div>
+            <div class="qr-box">
+              <img src="${dataUrl}" class="qr-image" />
+            </div>
+            <div class="scan-subtitle">Please Scan To View</div>
+            <h1 class="menu-title">DIGITAL MENU</h1>
+            <div class="table-footer">Table ${tableNo}</div>
+          </div>
+          <script>
+            const logo = document.getElementById('print-logo');
+            function triggerPrint() {
+              window.focus();
+              window.print();
+              window.close();
+            }
+            if (logo) {
+              if (logo.complete) {
+                triggerPrint();
+              } else {
+                logo.onload = triggerPrint;
+                logo.onerror = triggerPrint;
+              }
+            } else {
+              triggerPrint();
+            }
+          </script>
+        </body>
+      </html>`;
 
-      try {
-        await axios.patch(
-          `${import.meta.env.VITE_APP_API_BASE}/orders/${order._id}/complete`,
-          {},
-          { withCredentials: true },
-        );
-
-        queryClient.setQueryData(["table-monitor-orders"], (prev) =>
-          (prev || []).filter((o) => o._id !== order._id),
-        );
-        queryClient.invalidateQueries({ queryKey: ["table-status"] });
-      } catch (err) {
-        console.error("Failed to complete order", err);
-        queryClient.invalidateQueries({ queryKey: ["table-monitor-orders"] });
-      }
+      const printWindow = window.open("", "_blank");
+      if (!printWindow) return;
+      printWindow.document.open();
+      printWindow.document.write(windowContent);
+      printWindow.document.close();
     },
-    [queryClient],
+    [storeDetails, apiBase],
   );
 
-  if (isLoading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
-        <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
-        <p className="text-xs font-bold text-slate-400 tracking-wider uppercase">
-          Loading table status...
-        </p>
-      </div>
-    );
-  }
+  // 🔑 Add Table modal open — defaults reset
+  const openAddTableModal = useCallback(() => {
+    setNewTableName("");
+    setNewTableSection(sections[0] || "General");
+    setCreatingNewSection(false);
+    setNewSectionInline("");
+    setShowAddTable(true);
+  }, [sections]);
+
+  // 🔑 Custom naam + section ke saath table create
+  const submitAddTable = useCallback(async () => {
+    const cleanName = newTableName.trim();
+    if (!cleanName) return alert("Table ka naam daalein (jaise AC1, T5)");
+
+    const finalSection = creatingNewSection
+      ? newSectionInline.trim() || "General"
+      : newTableSection;
+
+    if (tables.some((t) => t.tableNumber.toLowerCase() === cleanName.toLowerCase())) {
+      return alert("Is naam ki table pehle se maujood hai");
+    }
+
+    setIsSavingTable(true);
+    try {
+      const res = await axios.post(
+        `${apiBase}/tables/admin`,
+        { tableNumber: cleanName, section: finalSection },
+        { withCredentials: true },
+      );
+      if (res.data?.success && Array.isArray(res.data.data)) {
+        const formatted = res.data.data.map((t) => ({
+          ...t,
+          section: t.section || "General",
+        }));
+        setTables(formatted);
+        setShowAddTable(false);
+        fetchSections();
+      }
+    } catch (err) {
+      alert(err?.response?.data?.message || err?.message);
+    } finally {
+      setIsSavingTable(false);
+    }
+  }, [newTableName, newTableSection, creatingNewSection, newSectionInline, tables, apiBase, fetchSections]);
+
+  // 🔑 Standalone khaali section banana
+  const submitAddSection = useCallback(async () => {
+    const clean = newSectionName.trim();
+    if (!clean) return alert("Section ka naam daalein (jaise AC, Rooftop)");
+
+    setIsSavingSection(true);
+    try {
+      await axios.post(`${apiBase}/sections/admin`, { name: clean }, { withCredentials: true });
+      await fetchSections();
+      setShowAddSection(false);
+      setNewSectionName("");
+    } catch (err) {
+      alert(err?.response?.data?.message || err?.message);
+    } finally {
+      setIsSavingSection(false);
+    }
+  }, [newSectionName, apiBase, fetchSections]);
+
+  const renameSection = useCallback(
+    async (oldName, newName) => {
+      try {
+        await axios.patch(
+          `${apiBase}/sections/admin/${encodeURIComponent(oldName)}`,
+          { newName },
+          { withCredentials: true },
+        );
+        setSections((prev) => prev.map((s) => (s === oldName ? newName : s)));
+        setTables((prev) =>
+          prev.map((t) => (t.section === oldName ? { ...t, section: newName } : t)),
+        );
+      } catch (err) {
+        alert(err?.response?.data?.message || err?.message);
+      }
+    },
+    [apiBase],
+  );
+
+  const deleteSection = useCallback(
+    async (name) => {
+      if (
+        !window.confirm(
+          `"${name}" section delete karein? Isme jo tables hain woh "General" mein move ho jayengi.`,
+        )
+      )
+        return;
+      try {
+        await axios.delete(`${apiBase}/sections/admin/${encodeURIComponent(name)}`, {
+          withCredentials: true,
+        });
+        setSections((prev) => prev.filter((s) => s !== name));
+        setTables((prev) =>
+          prev.map((t) => (t.section === name ? { ...t, section: "General" } : t)),
+        );
+      } catch (err) {
+        alert(err?.response?.data?.message || err?.message);
+      }
+    },
+    [apiBase],
+  );
+
+  const removeTable = useCallback(
+    (tableNo) => {
+      setTables((prev) => {
+        if (prev.length <= 1) return prev;
+        return prev.filter((t) => t.tableNumber !== tableNo);
+      });
+
+      axios
+        .delete(`${apiBase}/tables/admin/${encodeURIComponent(tableNo)}`, { withCredentials: true })
+        .catch((err) => console.warn("Could not sync table removal to backend:", err?.message));
+    },
+    [apiBase],
+  );
+
+  const toggleTableStatus = useCallback(
+    (tableNo, newDisabledState) => {
+      setTables((prev) =>
+        prev.map((t) => (t.tableNumber === tableNo ? { ...t, isDisabled: newDisabledState } : t)),
+      );
+
+      axios
+        .patch(
+          `${apiBase}/tables/admin/${encodeURIComponent(tableNo)}/toggle`,
+          { isDisabled: newDisabledState },
+          { withCredentials: true },
+        )
+        .catch((err) => console.warn("Could not sync table toggle state to backend:", err?.message));
+    },
+    [apiBase],
+  );
+
+  const generateTableUrl = useCallback(
+    (tableNo) => {
+      if (!activeRestaurantId) return "";
+      const token = btoa(`${activeRestaurantId}-TABLE-${tableNo}`);
+      return `${window.location.origin}/catalog/${activeRestaurantId}?t=${token}`;
+    },
+    [activeRestaurantId],
+  );
+
+  const tableUrls = useMemo(() => {
+    const map = {};
+    tables.forEach((t) => {
+      map[t.tableNumber] = generateTableUrl(t.tableNumber);
+    });
+    return map;
+  }, [tables, generateTableUrl]);
+
+  const handleCopyLink = useCallback(async (url, tableNo) => {
+    if (!url) return;
+    await navigator.clipboard.writeText(url);
+    setCopied(tableNo);
+    setTimeout(() => setCopied(null), 2000);
+  }, []);
+
+  // 🔑 Sections ke hisaab se tables group karein — jo section list mein nahi hai
+  // (edge case) woh bhi "General" ke saath dikh jaaye
+  const groupedBySections = useMemo(() => {
+    const knownSections = sections.length ? sections : ["General"];
+    const map = {};
+    knownSections.forEach((s) => (map[s] = []));
+
+    tables.forEach((t) => {
+      const sec = t.section || "General";
+      if (!map[sec]) map[sec] = [];
+      map[sec].push(t);
+    });
+
+    return knownSections
+      .filter((s) => map[s] !== undefined)
+      .map((s) => ({ section: s, tables: map[s] }));
+  }, [sections, tables]);
+
+  const renderCard = (table) => (
+    <TableCard
+      key={table.tableNumber}
+      table={table}
+      url={tableUrls[table.tableNumber]}
+      isCopied={copied === table.tableNumber}
+      onCopy={handleCopyLink}
+      onPrint={printQRCode}
+      onRemove={removeTable}
+      onToggle={toggleTableStatus}
+      canRemove={tables.length > 1}
+      qrRef={(el) => (qrRefs.current[table.tableNumber] = el)}
+    />
+  );
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-10 space-y-8 font-sans bg-[#F8F9FA] min-h-screen">
-      
       {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs">
-        <div>
-          <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
-            Live Table Monitor
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Monitor active dining tables, review live bills, and process checkout completions.
-          </p>
-        </div>
-        <div className="flex items-center gap-2.5 bg-emerald-50/80 border border-emerald-100 px-4 py-2 rounded-2xl self-start sm:self-center shadow-2xs">
-          <Sparkles size={16} className="text-emerald-600" />
-          <span className="text-[11px] font-black tracking-wider uppercase text-emerald-700">
-            {activeOrders.length} Tables Occupied
-          </span>
-        </div>
-      </div>
-
-      {/* Grid Content */}
-      {activeOrders.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-16 text-center shadow-xs flex flex-col items-center justify-center max-w-xl mx-auto space-y-3">
-          <div className="p-4 bg-emerald-50 rounded-2xl text-emerald-600 border border-emerald-100">
-            <ShieldCheck size={32} />
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-red-50 text-red-600 rounded-2xl border border-red-100">
+            <QrCode size={28} />
           </div>
-          <div className="space-y-1">
-            <h2 className="text-base font-black text-slate-900">All Tables Are Free</h2>
-            <p className="text-xs text-slate-500 font-medium leading-relaxed">
-              There are no active dine-in orders at the moment. All tables are available for new customers.
+          <div>
+            <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+              Store Settings & QR Engine
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+              Custom table names, sections aur QR standees manage karein.
             </p>
           </div>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {activeOrders.map((order) => (
-            <TableCard key={order._id} order={order} onClear={handleBillAndWhatsApp} />
-          ))}
+
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <button
+            onClick={() => setShowAddSection(true)}
+            className="flex-1 sm:flex-none bg-white border border-slate-200 text-slate-700 px-4 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-slate-50 transition-all cursor-pointer"
+          >
+            <FolderPlus size={16} /> Add Section
+          </button>
+          <button
+            onClick={openAddTableModal}
+            disabled={!activeRestaurantId}
+            className="flex-1 sm:flex-none bg-gradient-to-r from-red-500 to-rose-600 text-white px-5 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 hover:opacity-95 shadow-sm shadow-red-500/20 transition-all cursor-pointer disabled:opacity-50"
+          >
+            <Plus size={16} /> Add Table
+          </button>
+        </div>
+      </div>
+
+      {/* Info Stats Bar */}
+      <div className="flex items-center justify-between px-2">
+        <h3 className="font-black text-slate-800 text-base">All Sections</h3>
+        <span className="text-xs font-bold bg-white px-3 py-1 rounded-full border border-slate-200 text-slate-600 shadow-xs">
+          {tables.length} Total Tables
+        </span>
+      </div>
+
+      {/* Section-wise Tables */}
+      <div className="space-y-10">
+        {groupedBySections.map(({ section, tables: sectionTables }) => (
+          <SectionBlock
+            key={section}
+            section={section}
+            tables={sectionTables}
+            onRenameSection={renameSection}
+            onDeleteSection={deleteSection}
+            renderCard={renderCard}
+          />
+        ))}
+      </div>
+
+      {/* Add Table Modal */}
+      {showAddTable && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="font-black text-slate-900 text-lg">Add New Table</h3>
+              <button
+                onClick={() => setShowAddTable(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">
+                Table Name
+              </label>
+              <input
+                autoFocus
+                value={newTableName}
+                onChange={(e) => setNewTableName(e.target.value)}
+                placeholder="e.g. AC1, T5, VIP-2"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">
+                Section
+              </label>
+
+              {!creatingNewSection ? (
+                <select
+                  value={newTableSection}
+                  onChange={(e) => {
+                    if (e.target.value === "__new__") {
+                      setCreatingNewSection(true);
+                    } else {
+                      setNewTableSection(e.target.value);
+                    }
+                  }}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400 bg-white"
+                >
+                  {sections.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                  <option value="__new__">+ Create New Section</option>
+                </select>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    autoFocus
+                    value={newSectionInline}
+                    onChange={(e) => setNewSectionInline(e.target.value)}
+                    placeholder="e.g. AC, Rooftop"
+                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400"
+                  />
+                  <button
+                    onClick={() => {
+                      setCreatingNewSection(false);
+                      setNewSectionInline("");
+                    }}
+                    className="px-3 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 cursor-pointer"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={submitAddTable}
+              disabled={isSavingTable}
+              className="w-full bg-gradient-to-r from-red-500 to-rose-600 text-white py-3 rounded-xl font-bold text-sm hover:opacity-95 transition-all cursor-pointer disabled:opacity-50"
+            >
+              {isSavingTable ? "Adding..." : "Add Table"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add Section Modal */}
+      {showAddSection && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="font-black text-slate-900 text-lg">Add New Section</h3>
+              <button
+                onClick={() => setShowAddSection(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">
+                Section Name
+              </label>
+              <input
+                autoFocus
+                value={newSectionName}
+                onChange={(e) => setNewSectionName(e.target.value)}
+                placeholder="e.g. AC, Non-AC, Rooftop"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400"
+              />
+            </div>
+
+            <button
+              onClick={submitAddSection}
+              disabled={isSavingSection}
+              className="w-full bg-gradient-to-r from-red-500 to-rose-600 text-white py-3 rounded-xl font-bold text-sm hover:opacity-95 transition-all cursor-pointer disabled:opacity-50"
+            >
+              {isSavingSection ? "Creating..." : "Create Section"}
+            </button>
+          </div>
         </div>
       )}
     </div>

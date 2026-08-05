@@ -67,7 +67,7 @@ const OrderRow = memo(function OrderRow({
                     title="Cancel this item"
                     className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition"
                   >
-                     Cancel
+                    Cancel
                   </button>
                 )}
             </div>
@@ -168,7 +168,7 @@ const TableStatusStrip = memo(function TableStatusStrip({ tables, isLoading }) {
               : "bg-emerald-50/80 border-emerald-200 text-emerald-700 shadow-2xs"
           }`}
         >
-          <p className="text-xs font-black tracking-tight">T{t.tableNumber}</p>
+          <p className="text-xs font-black tracking-tight">{t.tableNumber}</p>
           <p className="text-[9px] font-black uppercase tracking-wider mt-0.5 opacity-90">
             {t.isOccupied ? "Occupied" : "Free"}
           </p>
@@ -349,59 +349,32 @@ export default function LiveOrderMonitor() {
         : order.tableNumber;
 
       const confirmed = window.confirm(
-        `Send the bill to ${order.customerName} (Table ${tableLabel}) and clear the table? This can't be undone.`,
+        `Generate bill for ${order.customerName} (Table ${tableLabel}) and clear the table?`,
       );
+
       if (!confirmed) return;
 
-      const message = ` *PAYMENT RECEIPT*
-
-Hello *${order.customerName}*,
-
-Thank you for dining with us.
-Your payment has been successfully received.
-
- *Table No:* ${tableLabel}
- *Total Paid:* ₹${Number(order.total).toFixed(2)}
-
-━━━━━━━━━━━━━━━━━━
-
-We hope you enjoyed your experience.
-
-Thank you for choosing us.
-We look forward to serving you again!
-
- Have a wonderful day.`;
-
-      let formattedPhone = String(order.customerPhone || "").replace(/\D/g, "");
-      if (formattedPhone && !formattedPhone.startsWith("91")) {
-        formattedPhone = `91${formattedPhone}`;
-      }
-
-      if (formattedPhone) {
-        window.open(
-          `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`,
-          "_blank",
-        );
-      } else {
-        console.warn(
-          "No customer phone on file — skipping WhatsApp, completing order anyway.",
-        );
-      }
-
       try {
+        // ✅ Order Complete
         await axios.patch(
           `${import.meta.env.VITE_APP_API_BASE}/orders/${order._id}/complete`,
           {},
           { withCredentials: true },
         );
 
+        // ✅ Remove from Live Orders
         queryClient.setQueryData(["live-orders"], (prev) =>
           (prev || []).filter((o) => o._id !== order._id),
         );
+
+        // ✅ Refresh Tables & Billing
         queryClient.invalidateQueries({ queryKey: ["table-status"] });
         queryClient.invalidateQueries({ queryKey: ["table-monitor-orders"] });
+
+        alert("Bill generated successfully. Table is now free.");
       } catch (err) {
         console.error("Failed to complete order", err);
+        alert(err.response?.data?.message || "Failed to generate bill.");
         queryClient.invalidateQueries({ queryKey: ["live-orders"] });
       }
     },

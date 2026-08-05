@@ -344,7 +344,9 @@ export default function PublicMenu() {
   const [lastOrderSnapshot, setLastOrderSnapshot] = useState(null);
 
   const isValidName = /^[A-Za-z ]{3,50}$/.test(customerName.trim());
-  const isValidPhone = /^[6-9]\d{9}$/.test(customerPhone.trim());
+  const isValidPhone =
+    customerPhone.trim() === "" || /^[6-9]\d{9}$/.test(customerPhone.trim());
+
   const isValidAddress =
     orderType !== "DELIVERY" || deliveryAddress.trim().length > 4;
 
@@ -353,8 +355,7 @@ export default function PublicMenu() {
     [cart],
   );
 
-  const isFormValid =
-    isValidName && isValidPhone && isValidAddress && totalItemsInCart > 0;
+  const isFormValid = isValidName && isValidAddress && totalItemsInCart > 0;
 
   const {
     data: catalog,
@@ -793,8 +794,8 @@ export default function PublicMenu() {
   }
 
   const nameHasError = touched.name && !isValidName;
-  const phoneHasError = touched.phone && !isValidPhone;
-
+  const phoneHasError =
+    touched.phone && customerPhone.trim() !== "" && !isValidPhone;
   return (
     <div className="min-h-screen bg-slate-200/60">
       <div className="min-h-screen bg-slate-50 text-slate-900 pb-28 antialiased font-sans max-w-md sm:max-w-2xl lg:max-w-5xl mx-auto shadow-sm relative sm:border-x border-slate-200/60">
@@ -1464,10 +1465,9 @@ export default function PublicMenu() {
                         />
                         <input
                           type="tel"
-                          required
                           inputMode="numeric"
                           maxLength={10}
-                          placeholder={t("phoneNumber")}
+                          placeholder={t("phoneNumber(Optional)")}
                           value={customerPhone}
                           onChange={(e) =>
                             setCustomerPhone(

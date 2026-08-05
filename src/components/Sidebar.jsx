@@ -4,7 +4,7 @@ import {
   LayoutDashboard,
   ShoppingBag,
   Utensils,
-  Settings,
+  // Settings,
   BarChart3,
   Tag,
   QrCode,
@@ -20,7 +20,7 @@ const NAV_ITEMS = [
   { to: "/analysis", icon: BarChart3, label: "Analysis" },
   { to: "/payment", icon: DollarSign, label: "Payment" },
   { to: "/offer", icon: Tag, label: "Offers" },
-  { to: "/settings", icon: Settings, label: "Settings" },
+  // { to: "/settings", icon: Settings, label: "Settings" },
 ];
 
 export default function Sidebar({ closeMobileSidebar }) {
