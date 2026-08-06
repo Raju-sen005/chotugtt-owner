@@ -13,6 +13,7 @@ import Analysis from "../features/analysis/Analysis";
 import Offers from "../features/offers/Offers";
 import Payment from "../features/payment/Payment";
 import logo from "../assets/cho.png";
+import CounterPOS from "../components/CounterPOS";
 import AIMarketingDashboard from "../components/AIMarketingDashboard";
 
 export default function MerchantLayout() {
@@ -55,11 +56,7 @@ export default function MerchantLayout() {
               <Menu size={20} />
             </button>
             <h2 className="text-sm font-black text-slate-900 tracking-tight lg:hidden">
-              <img
-                src={logo}
-                alt="Chotu"
-                style={{height:"100px"}}
-              />
+              <img src={logo} alt="Chotu" style={{ height: "100px" }} />
             </h2>
           </div>
           <Navbar />
@@ -75,7 +72,8 @@ export default function MerchantLayout() {
             <Route path="/analysis" element={<Analysis />} />
             <Route path="/offer" element={<Offers />} />
             <Route path="/payment" element={<Payment />} />
-            <Route path="/marketing" element={<AIMarketingDashboard/>}/>
+            <Route path="/marketing" element={<AIMarketingDashboard />} />
+            <Route path="/counter" element={<CounterPOS />} />
             <Route path="/super-admin" element={<SuperAdminPanel />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

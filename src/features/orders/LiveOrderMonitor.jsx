@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, memo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
+import { useAuth } from "../../context/AuthContext";
 import { useSocket } from "../../context/SocketContext";
 import { useNotificationSound } from "../../hooks/useNotificationSound";
 import {
@@ -179,6 +180,7 @@ const TableStatusStrip = memo(function TableStatusStrip({ tables, isLoading }) {
 });
 
 export default function LiveOrderMonitor() {
+  const { user } = useAuth();
   const [selectedOrder, setSelectedOrder] = useState(null);
   const queryClient = useQueryClient();
   const socket = useSocket();
@@ -187,15 +189,41 @@ export default function LiveOrderMonitor() {
   const [rejectReasonDropdown, setRejectReasonDropdown] =
     useState("Item Out of Stock");
 
+  const apiBase = import.meta.env.VITE_APP_API_BASE;
+
+  // 🧾 Restaurant profile — needed for the printed bill header (name, address, GSTIN, contact)
+  const [storeDetails, setStoreDetails] = useState({
+    name: "",
+    address: "",
+    contact: "",
+    gstin: "",
+  });
+
+  useEffect(() => {
+    axios
+      .get(`${apiBase}/restaurant/profile`, { withCredentials: true })
+      .then((res) => {
+        const d = res.data?.data;
+        if (d) {
+          setStoreDetails({
+            name: d.name || "",
+            address: d.address || d.location || "",
+            contact: d.contactNumber || d.phone || d.contact || "",
+            gstin: d.gstin || d.gstNumber || "",
+          });
+        }
+      })
+      .catch((err) =>
+        console.warn("Could not fetch restaurant profile for bill print:", err?.message),
+      );
+  }, [apiBase]);
+
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ["live-orders"],
     queryFn: async () => {
-      const res = await axios.get(
-        `${import.meta.env.VITE_APP_API_BASE}/orders/live`,
-        {
-          withCredentials: true,
-        },
-      );
+      const res = await axios.get(`${apiBase}/orders/live`, {
+        withCredentials: true,
+      });
       return res.data.data || [];
     },
     staleTime: 15_000,
@@ -205,12 +233,9 @@ export default function LiveOrderMonitor() {
   const { data: tableStatus = [], isLoading: isLoadingTableStatus } = useQuery({
     queryKey: ["table-status"],
     queryFn: async () => {
-      const res = await axios.get(
-        `${import.meta.env.VITE_APP_API_BASE}/tables/status`,
-        {
-          withCredentials: true,
-        },
-      );
+      const res = await axios.get(`${apiBase}/tables/status`, {
+        withCredentials: true,
+      });
       return res.data.data || [];
     },
     staleTime: 15_000,
@@ -282,7 +307,7 @@ export default function LiveOrderMonitor() {
 
       try {
         const res = await axios.patch(
-          `${import.meta.env.VITE_APP_API_BASE}/orders/${orderId}/item/${itemId}/cancel`,
+          `${apiBase}/orders/${orderId}/item/${itemId}/cancel`,
           {},
           { withCredentials: true },
         );
@@ -299,7 +324,7 @@ export default function LiveOrderMonitor() {
         alert(err.response?.data?.message || "Failed to cancel item");
       }
     },
-    [queryClient],
+    [queryClient, apiBase],
   );
 
   const handleStatusTransition = useCallback(
@@ -313,7 +338,7 @@ export default function LiveOrderMonitor() {
 
       try {
         const res = await axios.patch(
-          `${import.meta.env.VITE_APP_API_BASE}/orders/${orderId}/status`,
+          `${apiBase}/orders/${orderId}/status`,
           { status: targetStatus, rejectReason },
           { withCredentials: true },
         );
@@ -338,7 +363,152 @@ export default function LiveOrderMonitor() {
         console.error("Error transitioning state context pipeline:", err);
       }
     },
-    [queryClient],
+    [queryClient, apiBase],
+  );
+
+  // 🧾 Opens a thermal-receipt-style print window for a completed order
+  const printBillReceipt = useCallback(
+    (order) => {
+      const items = order.items || [];
+      const subtotal =
+        order.subtotal ??
+        items.reduce((sum, i) => sum + (i.price || 0) * (i.quantity || 0), 0);
+      const discount = order.discount || 0;
+      const tax = order.tax || 0;
+      // const cgst = tax / 2;
+      // const sgst = tax / 2;
+      const grandTotal = order.total ?? subtotal - discount + tax;
+      const roundOff = grandTotal - (subtotal - discount + tax);
+      const totalQty = items.reduce((sum, i) => sum + (i.quantity || 0), 0);
+
+      const tableLabel = order.mergedTables?.length
+        ? `${order.tableNumber}, ${order.mergedTables.join(", ")}`
+        : order.tableNumber;
+
+      const now = new Date();
+      const dateStr = `${String(now.getDate()).padStart(2, "0")}/${String(
+        now.getMonth() + 1,
+      ).padStart(2, "0")}/${String(now.getFullYear()).slice(-2)}`;
+      const timeStr = now.toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+
+      const cashierName = user?.name || user?.username || user?.email || "Staff";
+
+      const itemRows = items
+        .map(
+          (i) => `
+        <tr>
+          <td class="col-item">${i.name}</td>
+          <td class="col-qty">${i.quantity}</td>
+          <td class="col-price">${(i.price || 0).toFixed(2)}</td>
+          <td class="col-amount">${((i.price || 0) * (i.quantity || 0)).toFixed(2)}</td>
+        </tr>`,
+        )
+        .join("");
+
+      const windowContent = `
+      <html>
+        <head>
+          <title>Bill - Table ${tableLabel}</title>
+          <style>
+            @media print {
+              @page { margin: 0; }
+            }
+            * { box-sizing: border-box; }
+            body {
+              font-family: 'Courier New', ui-monospace, monospace;
+              margin: 0; padding: 0;
+              display: flex; justify-content: center;
+              background: #fff;
+            }
+            .receipt {
+              width: 300px;
+              padding: 18px 14px;
+              color: #111;
+            }
+            .center { text-align: center; }
+            .shop-name { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; margin: 0 0 2px 0; }
+            .shop-line { font-size: 11px; line-height: 1.35; margin: 0; }
+            .divider { border-top: 1px dashed #444; margin: 10px 0; }
+            .row { display: flex; justify-content: space-between; font-size: 12px; margin: 2px 0; }
+            .row b { font-weight: 700; }
+            table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 4px; }
+            thead td { font-weight: 700; font-size: 11px; padding-bottom: 4px; border-bottom: 1px solid #333; }
+            td { padding: 3px 0; vertical-align: top; }
+            .col-item { width: 46%; }
+            .col-qty { width: 14%; text-align: center; }
+            .col-price { width: 20%; text-align: right; }
+            .col-amount { width: 20%; text-align: right; }
+            .totals-row { display: flex; justify-content: space-between; font-size: 12px; margin: 3px 0; }
+            .grand-total { font-size: 15px; font-weight: 700; border-top: 1px dashed #444; padding-top: 6px; margin-top: 6px; }
+            .footer-line { font-size: 10px; text-align: center; margin-top: 12px; line-height: 1.4; }
+          </style>
+        </head>
+        <body>
+          <div class="receipt">
+            <div class="center">
+              <p class="shop-name">${storeDetails.name || "OUR RESTAURANT"}</p>
+              ${storeDetails.address ? `<p class="shop-line">${storeDetails.address}</p>` : ""}
+              ${storeDetails.contact ? `<p class="shop-line">CONTACT NO - ${storeDetails.contact}</p>` : ""}
+              ${storeDetails.gstin ? `<p class="shop-line">GSTIN-${storeDetails.gstin}</p>` : ""}
+            </div>
+
+            <div class="divider"></div>
+            <p class="row"><span>Name:</span><span>${order.customerName || ""}</span></p>
+
+            <div class="divider"></div>
+            <div class="row">
+              <span>Date: ${dateStr}<br/>${timeStr}</span>
+              <span>Dine In: ${tableLabel}</span>
+            </div>
+            <div class="row">
+              <span>Cashier:<br/>${cashierName}</span>
+              <span>Bill No.: ${order.orderId}</span>
+            </div>
+
+            <div class="divider"></div>
+            <table>
+              <thead>
+                <tr>
+                  <td class="col-item">Item</td>
+                  <td class="col-qty">Qty.</td>
+                  <td class="col-price">Price</td>
+                  <td class="col-amount">Amount</td>
+                </tr>
+              </thead>
+              <tbody>
+                ${itemRows}
+              </tbody>
+            </table>
+
+            <div class="divider"></div>
+            <div class="totals-row"><span>Total Qty: ${totalQty}</span><span>Sub Total &nbsp; ${subtotal.toFixed(2)}</span></div>
+            ${discount ? `<div class="totals-row"><span>Discount</span><span>-${discount.toFixed(2)}</span></div>` : ""}
+            
+            ${roundOff ? `<div class="totals-row"><span>Round off</span><span>${roundOff.toFixed(2)}</span></div>` : ""}
+
+            <div class="row grand-total"><span>Grand Total</span><span>₹${grandTotal.toFixed(2)}</span></div>
+
+            <div class="footer-line">Thank you for visiting!</div>
+          </div>
+          <script>
+            window.focus();
+            window.print();
+            window.onafterprint = () => window.close();
+          </script>
+        </body>
+      </html>`;
+
+      const printWindow = window.open("", "_blank", "width=380,height=650");
+      if (!printWindow) return;
+      printWindow.document.open();
+      printWindow.document.write(windowContent);
+      printWindow.document.close();
+    },
+    [storeDetails, user],
   );
 
   // Bill & WhatsApp clear table handler added from TableMonitor
@@ -356,11 +526,14 @@ export default function LiveOrderMonitor() {
 
       try {
         // ✅ Order Complete
-        await axios.patch(
-          `${import.meta.env.VITE_APP_API_BASE}/orders/${order._id}/complete`,
+        const res = await axios.patch(
+          `${apiBase}/orders/${order._id}/complete`,
           {},
           { withCredentials: true },
         );
+
+        // 🧾 Print the bill — use backend response if it has updated totals, else the local order
+        printBillReceipt(res.data?.data || order);
 
         // ✅ Remove from Live Orders
         queryClient.setQueryData(["live-orders"], (prev) =>
@@ -370,15 +543,13 @@ export default function LiveOrderMonitor() {
         // ✅ Refresh Tables & Billing
         queryClient.invalidateQueries({ queryKey: ["table-status"] });
         queryClient.invalidateQueries({ queryKey: ["table-monitor-orders"] });
-
-        alert("Bill generated successfully. Table is now free.");
       } catch (err) {
         console.error("Failed to complete order", err);
         alert(err.response?.data?.message || "Failed to generate bill.");
         queryClient.invalidateQueries({ queryKey: ["live-orders"] });
       }
     },
-    [queryClient],
+    [queryClient, apiBase, printBillReceipt],
   );
 
   const handleView = useCallback((order) => setSelectedOrder(order), []);

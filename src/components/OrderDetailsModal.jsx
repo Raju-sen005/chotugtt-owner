@@ -82,24 +82,26 @@ export default function OrderDetailsModal({ order, onClose }) {
             Ordered Items
           </p>
           <div className="max-h-48 overflow-y-auto space-y-2 pr-1 divide-y divide-slate-50">
-            {order.items.map((item, idx) => (
-              <div
-                key={idx}
-                className="flex justify-between items-center pt-2 text-xs"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="font-bold bg-slate-100 text-slate-800 w-6 h-6 rounded-lg flex items-center justify-center text-[11px]">
-                    {item.quantity}
-                  </span>
-                  <span className="font-semibold text-slate-700">
-                    {item.name}
+            {order.items
+              .filter((item) => item.status !== "REJECTED")
+              .map((item, idx) => (
+                <div
+                  key={idx}
+                  className="flex justify-between items-center pt-2 text-xs"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold bg-slate-100 text-slate-800 w-6 h-6 rounded-lg flex items-center justify-center text-[11px]">
+                      {item.quantity}
+                    </span>
+                    <span className="font-semibold text-slate-700">
+                      {item.name}
+                    </span>
+                  </div>
+                  <span className="font-bold text-slate-900">
+                    ₹{item.price * item.quantity}
                   </span>
                 </div>
-                <span className="font-bold text-slate-900">
-                  ₹{item.price * item.quantity}
-                </span>
-              </div>
-            ))}
+              ))}
           </div>
         </div>
 

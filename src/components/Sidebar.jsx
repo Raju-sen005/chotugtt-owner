@@ -20,6 +20,7 @@ const NAV_ITEMS = [
   { to: "/analysis", icon: BarChart3, label: "Analysis" },
   { to: "/payment", icon: DollarSign, label: "Payment" },
   { to: "/offer", icon: Tag, label: "Offers" },
+  { to: "/counter", icon: ShoppingBag, label: "Counter POS" },
   // { to: "/settings", icon: Settings, label: "Settings" },
 ];
 
