@@ -491,43 +491,45 @@ export default function PublicMenu() {
     [cart],
   );
 
-  const appliedDiscount = useMemo(() => {
-    if (!catalog?.offers || catalog.offers.length === 0) return 0;
+  const { appliedDiscount, itemDiscountMap } = useMemo(() => {
+    if (!catalog?.offers || catalog.offers.length === 0)
+      return { appliedDiscount: 0, itemDiscountMap: {} };
+
     let totalDiscount = 0;
+    const map = {};
 
     Object.entries(cart).forEach(([itemId, details]) => {
       const itemTotalPrice = Number(details.price) * Number(details.quantity);
 
-      // Is item ke liye sabhi applicable offers dhoondo
       const applicableOffers = catalog.offers.filter((offer) => {
         const hasTargetItems =
           offer.targetItems && offer.targetItems.length > 0;
-        // Specific (targeted) offer sirf tab applicable jab item us list mein ho
         if (hasTargetItems) return offer.targetItems.includes(itemId);
-        // Blanket/global offer (no targetItems) — sabhi items ke liye
         return true;
       });
 
       if (applicableOffers.length === 0) return;
 
-      // 🔑 FIX: agar is item ka apna specific (targeted) offer maujood hai,
-      // to blanket offers ko is item ke liye ignore karo — warna wahi item
-      // dono offers mein count ho ke double-discount ban jaata hai
       const targetedOffers = applicableOffers.filter(
         (o) => o.targetItems && o.targetItems.length > 0,
       );
       const relevantOffers =
         targetedOffers.length > 0 ? targetedOffers : applicableOffers;
 
-      // Multiple applicable offers mein se sirf best (highest %) hi is item pe apply hoga
       const bestOffer = relevantOffers.reduce((best, o) =>
         Number(o.discountValue) > Number(best.discountValue) ? o : best,
       );
 
-      totalDiscount += (itemTotalPrice * Number(bestOffer.discountValue)) / 100;
+      // 🔑 is item ka apna discount alag se store karo — cancel ke waqt
+      // isi value ko use karenge, ratio-guess nahi
+      const itemDiscount = Math.round(
+        (itemTotalPrice * Number(bestOffer.discountValue)) / 100,
+      );
+      map[itemId] = itemDiscount;
+      totalDiscount += itemDiscount;
     });
 
-    return Math.round(totalDiscount);
+    return { appliedDiscount: Math.round(totalDiscount), itemDiscountMap: map };
   }, [catalog, cart]);
 
   const finalPayableAmount = Math.max(0, totalCartAmount - appliedDiscount);
@@ -598,7 +600,6 @@ export default function PublicMenu() {
     });
   }, [lastOrderSnapshot]);
 
-  
   const handleApplyMergeTable = useCallback(() => {
     if (!mergeTableNumber.trim()) return;
     setAppliedMergeTable(mergeTableNumber.trim());
@@ -616,7 +617,7 @@ export default function PublicMenu() {
       const orderPayload = {
         restaurantId,
         tableToken,
-       
+
         mergeWithTable: appliedMergeTable || null,
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
@@ -629,6 +630,7 @@ export default function PublicMenu() {
           price: Number(details.price),
           itemType: details.type === "combo" ? "COMBO" : "SINGLE",
           notes: details.notes || "",
+          discount: itemDiscountMap[id] || 0, // 🆕 add this
         })),
         subtotal: Number(totalCartAmount),
         discount: Number(appliedDiscount),

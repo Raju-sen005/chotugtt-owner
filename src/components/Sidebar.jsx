@@ -2,27 +2,63 @@ import { NavLink } from "react-router-dom";
 import { useMemo } from "react";
 import {
   LayoutDashboard,
-  ShoppingBag,
-  Utensils,
-  // Settings,
-  BarChart3,
-  Tag,
+  ClipboardList,
+  UtensilsCrossed,
   QrCode,
-  DollarSign,
+  BarChart3,
+  BadgePercent,
+  Wallet,
+  ScanLine,
+  UserRound,
 } from "lucide-react";
 import logo from "../assets/cho.png";
 
 const NAV_ITEMS = [
-  { to: "/", icon: LayoutDashboard, label: "Overview" },
-  { to: "/orders", icon: ShoppingBag, label: "Live Orders" },
-  { to: "/menu", icon: Utensils, label: "Menu Catalog" },
-  { to: "/table-monitor", icon: QrCode, label: "Table Monitor" },
-  { to: "/analysis", icon: BarChart3, label: "Analysis" },
-  { to: "/payment", icon: DollarSign, label: "Payment" },
-  { to: "/offer", icon: Tag, label: "Offers" },
-  { to: "/counter", icon: ShoppingBag, label: "Counter POS" },
-  { to: "/profile", icon: LayoutDashboard, label: "Profile" }
-  // { to: "/settings", icon: Settings, label: "Settings" },
+  {
+    to: "/",
+    icon: LayoutDashboard,
+    label: "Overview",
+  },
+  {
+    to: "/orders",
+    icon: ClipboardList,
+    label: "Live Orders",
+  },
+  {
+    to: "/menu",
+    icon: UtensilsCrossed,
+    label: "Menu Catalog",
+  },
+  {
+    to: "/table-monitor",
+    icon: QrCode,
+    label: "Table Monitor",
+  },
+  {
+    to: "/analysis",
+    icon: BarChart3,
+    label: "Analysis",
+  },
+  {
+    to: "/payment",
+    icon: Wallet,
+    label: "Payment",
+  },
+  {
+    to: "/offer",
+    icon: BadgePercent,
+    label: "Offers",
+  },
+  {
+    to: "/counter",
+    icon: ScanLine,
+    label: "Counter POS",
+  },
+  {
+    to: "/profile",
+    icon: UserRound,
+    label: "Profile",
+  },
 ];
 
 export default function Sidebar({ closeMobileSidebar }) {

@@ -197,6 +197,8 @@ export default function LiveOrderMonitor() {
     address: "",
     contact: "",
     gstin: "",
+    upiId: "",
+    upiQrCode: "",
   });
 
   useEffect(() => {
@@ -205,16 +207,28 @@ export default function LiveOrderMonitor() {
       .then((res) => {
         const d = res.data?.data;
         if (d) {
+          // 🔑 address ab object hai — string bana lo
+          const formattedAddress = d.address
+            ? [d.address.street, d.address.city, d.address.state, d.address.zip]
+                .filter(Boolean)
+                .join(", ")
+            : "";
+
           setStoreDetails({
             name: d.name || "",
-            address: d.address || d.location || "",
-            contact: d.contactNumber || d.phone || d.contact || "",
+            address: formattedAddress,
+            contact: d.phone || d.contactNumber || d.contact || "",
             gstin: d.gstin || d.gstNumber || "",
+            upiId: d.upiId || "",
+            upiQrCode: d.upiQrCode || d.qrCodeUrl || "",
           });
         }
       })
       .catch((err) =>
-        console.warn("Could not fetch restaurant profile for bill print:", err?.message),
+        console.warn(
+          "Could not fetch restaurant profile for bill print:",
+          err?.message,
+        ),
       );
   }, [apiBase]);
 
@@ -369,14 +383,14 @@ export default function LiveOrderMonitor() {
   // 🧾 Opens a thermal-receipt-style print window for a completed order
   const printBillReceipt = useCallback(
     (order) => {
-      const items = order.items || [];
+      // 🔑 FIX: cancelled/rejected items bill par nahi aane chahiye
+      const items = (order.items || []).filter((i) => i.status !== "REJECTED");
+
       const subtotal =
         order.subtotal ??
         items.reduce((sum, i) => sum + (i.price || 0) * (i.quantity || 0), 0);
       const discount = order.discount || 0;
       const tax = order.tax || 0;
-      // const cgst = tax / 2;
-      // const sgst = tax / 2;
       const grandTotal = order.total ?? subtotal - discount + tax;
       const roundOff = grandTotal - (subtotal - discount + tax);
       const totalQty = items.reduce((sum, i) => sum + (i.quantity || 0), 0);
@@ -395,120 +409,146 @@ export default function LiveOrderMonitor() {
         hour12: false,
       });
 
-      const cashierName = user?.name || user?.username || user?.email || "Staff";
+      const cashierName =
+        user?.name || user?.username || user?.email || "Staff";
+
+      // 🔑 image ko absolute URL banao (relative path ho to base attach karo)
+      const resolveUrl = (path) => {
+        if (!path) return "";
+        return path.startsWith("http")
+          ? path
+          : `${apiBase.replace("/api", "")}${path}`;
+      };
+
+      const upiQrUrl = resolveUrl(storeDetails.upiQrCode);
 
       const itemRows = items
         .map(
           (i) => `
-        <tr>
-          <td class="col-item">${i.name}</td>
-          <td class="col-qty">${i.quantity}</td>
-          <td class="col-price">${(i.price || 0).toFixed(2)}</td>
-          <td class="col-amount">${((i.price || 0) * (i.quantity || 0)).toFixed(2)}</td>
-        </tr>`,
+      <tr>
+        <td class="col-item">${i.name}</td>
+        <td class="col-qty">${i.quantity}</td>
+        <td class="col-price">${(i.price || 0).toFixed(2)}</td>
+        <td class="col-amount">${((i.price || 0) * (i.quantity || 0)).toFixed(2)}</td>
+      </tr>`,
         )
         .join("");
 
       const windowContent = `
-      <html>
-        <head>
-          <title>Bill - Table ${tableLabel}</title>
-          <style>
-            @media print {
-              @page { margin: 0; }
-            }
-            * { box-sizing: border-box; }
-            body {
-              font-family: 'Courier New', ui-monospace, monospace;
-              margin: 0; padding: 0;
-              display: flex; justify-content: center;
-              background: #fff;
-            }
-            .receipt {
-              width: 300px;
-              padding: 18px 14px;
-              color: #111;
-            }
-            .center { text-align: center; }
-            .shop-name { font-size: 16px; font-weight: 700; letter-spacing: 0.5px; margin: 0 0 2px 0; }
-            .shop-line { font-size: 11px; line-height: 1.35; margin: 0; }
-            .divider { border-top: 1px dashed #444; margin: 10px 0; }
-            .row { display: flex; justify-content: space-between; font-size: 12px; margin: 2px 0; }
-            .row b { font-weight: 700; }
-            table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 4px; }
-            thead td { font-weight: 700; font-size: 11px; padding-bottom: 4px; border-bottom: 1px solid #333; }
-            td { padding: 3px 0; vertical-align: top; }
-            .col-item { width: 46%; }
-            .col-qty { width: 14%; text-align: center; }
-            .col-price { width: 20%; text-align: right; }
-            .col-amount { width: 20%; text-align: right; }
-            .totals-row { display: flex; justify-content: space-between; font-size: 12px; margin: 3px 0; }
-            .grand-total { font-size: 15px; font-weight: 700; border-top: 1px dashed #444; padding-top: 6px; margin-top: 6px; }
-            .footer-line { font-size: 10px; text-align: center; margin-top: 12px; line-height: 1.4; }
-          </style>
-        </head>
-        <body>
-          <div class="receipt">
-            <div class="center">
-              <p class="shop-name">${storeDetails.name || "OUR RESTAURANT"}</p>
-              ${storeDetails.address ? `<p class="shop-line">${storeDetails.address}</p>` : ""}
-              ${storeDetails.contact ? `<p class="shop-line">CONTACT NO - ${storeDetails.contact}</p>` : ""}
-              ${storeDetails.gstin ? `<p class="shop-line">GSTIN-${storeDetails.gstin}</p>` : ""}
-            </div>
-
-            <div class="divider"></div>
-            <p class="row"><span>Name:</span><span>${order.customerName || ""}</span></p>
-
-            <div class="divider"></div>
-            <div class="row">
-              <span>Date: ${dateStr}<br/>${timeStr}</span>
-              <span>Dine In: ${tableLabel}</span>
-            </div>
-            <div class="row">
-              <span>Cashier:<br/>${cashierName}</span>
-              <span>Bill No.: ${order.orderId}</span>
-            </div>
-
-            <div class="divider"></div>
-            <table>
-              <thead>
-                <tr>
-                  <td class="col-item">Item</td>
-                  <td class="col-qty">Qty.</td>
-                  <td class="col-price">Price</td>
-                  <td class="col-amount">Amount</td>
-                </tr>
-              </thead>
-              <tbody>
-                ${itemRows}
-              </tbody>
-            </table>
-
-            <div class="divider"></div>
-            <div class="totals-row"><span>Total Qty: ${totalQty}</span><span>Sub Total &nbsp; ${subtotal.toFixed(2)}</span></div>
-            ${discount ? `<div class="totals-row"><span>Discount</span><span>-${discount.toFixed(2)}</span></div>` : ""}
-            
-            ${roundOff ? `<div class="totals-row"><span>Round off</span><span>${roundOff.toFixed(2)}</span></div>` : ""}
-
-            <div class="row grand-total"><span>Grand Total</span><span>₹${grandTotal.toFixed(2)}</span></div>
-
-            <div class="footer-line">Thank you for visiting!</div>
+    <html>
+      <head>
+        <title>Bill - Table ${tableLabel}</title>
+        <style>
+          @media print {
+            @page { margin: 0; }
+          }
+          * { box-sizing: border-box; }
+          body {
+            font-family: 'Courier New', ui-monospace, monospace;
+            margin: 0; padding: 0;
+            display: flex; justify-content: center;
+            background: #fff;
+          }
+          .receipt {
+            width: 300px;
+            padding: 18px 14px;
+            color: #111;
+          }
+          .center { text-align: center; }
+          .shop-name { font-size: 17px; font-weight: 700; letter-spacing: 0.5px; margin: 0 0 3px 0; }
+          .shop-line { font-size: 11px; line-height: 1.4; margin: 0; color: #333; }
+          .divider { border-top: 1px dashed #444; margin: 10px 0; }
+          .divider-solid { border-top: 2px solid #111; margin: 10px 0; }
+          .row { display: flex; justify-content: space-between; font-size: 12px; margin: 2px 0; }
+          .row b { font-weight: 700; }
+          table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 4px; }
+          thead td { font-weight: 700; font-size: 11px; padding-bottom: 5px; border-bottom: 1px solid #333; }
+          td { padding: 4px 0; vertical-align: top; }
+          .col-item { width: 46%; }
+          .col-qty { width: 14%; text-align: center; }
+          .col-price { width: 20%; text-align: right; }
+          .col-amount { width: 20%; text-align: right; }
+          .totals-row { display: flex; justify-content: space-between; font-size: 12px; margin: 3px 0; }
+          .grand-total { font-size: 16px; font-weight: 700; border-top: 1px dashed #444; padding-top: 7px; margin-top: 7px; }
+          .footer-line { font-size: 10px; text-align: center; margin-top: 14px; line-height: 1.5; color: #555; }
+          .upi-block { text-align: center; margin-top: 14px; }
+          .upi-block img { width: 120px; height: 120px; object-fit: contain; }
+          .upi-id { font-size: 11px; font-weight: 700; margin-top: 6px; }
+          .scan-label { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 6px; color: #333; }
+        </style>
+      </head>
+      <body>
+        <div class="receipt">
+          <div class="center">
+            <p class="shop-name">${storeDetails.name || "OUR RESTAURANT"}</p>
+            ${storeDetails.address ? `<p class="shop-line">${storeDetails.address}</p>` : ""}
+            ${storeDetails.contact ? `<p class="shop-line">Contact: ${storeDetails.contact}</p>` : ""}
+            ${storeDetails.gstin ? `<p class="shop-line">GSTIN: ${storeDetails.gstin}</p>` : ""}
           </div>
-          <script>
-            window.focus();
-            window.print();
-            window.onafterprint = () => window.close();
-          </script>
-        </body>
-      </html>`;
 
-      const printWindow = window.open("", "_blank", "width=380,height=650");
+          <div class="divider-solid"></div>
+
+          <div class="row">
+            <span>Date: ${dateStr}<br/>Time: ${timeStr}</span>
+            <span>Dine In: ${tableLabel}</span>
+          </div>
+          <div class="row">
+            <span>Cashier:<br/>${cashierName}</span>
+            <span>Bill No.:<br/>${order.orderId}</span>
+          </div>
+          <p class="row"><span>Name:</span><span>${order.customerName || "Guest"}</span></p>
+
+          <div class="divider"></div>
+          <table>
+            <thead>
+              <tr>
+                <td class="col-item">Item</td>
+                <td class="col-qty">Qty.</td>
+                <td class="col-price">Price</td>
+                <td class="col-amount">Amount</td>
+              </tr>
+            </thead>
+            <tbody>
+              ${itemRows}
+            </tbody>
+          </table>
+
+          <div class="divider"></div>
+          <div class="totals-row"><span>Total Qty: ${totalQty}</span><span>Sub Total  ${subtotal.toFixed(2)}</span></div>
+          ${discount ? `<div class="totals-row"><span>Discount</span><span>-${discount.toFixed(2)}</span></div>` : ""}
+          ${tax ? `<div class="totals-row"><span>Tax</span><span>${tax.toFixed(2)}</span></div>` : ""}
+          ${roundOff ? `<div class="totals-row"><span>Round off</span><span>${roundOff.toFixed(2)}</span></div>` : ""}
+
+          <div class="row grand-total"><span>Grand Total</span><span>₹${grandTotal.toFixed(2)}</span></div>
+
+          ${
+            upiQrUrl
+              ? `<div class="upi-block">
+                  <div class="divider"></div>
+                  <p class="scan-label">SCAN &amp; PAY</p>
+                  <img src="${upiQrUrl}" alt="UPI QR" />
+                  ${storeDetails.upiId ? `<p class="upi-id">${storeDetails.upiId}</p>` : ""}
+                </div>`
+              : ""
+          }
+
+          <div class="footer-line">Thank you for visiting!<br/>Visit again 🙏</div>
+        </div>
+        <script>
+          window.focus();
+          window.print();
+          window.onafterprint = () => window.close();
+        </script>
+      </body>
+    </html>`;
+
+      const printWindow = window.open("", "_blank", "width=380,height=680");
       if (!printWindow) return;
       printWindow.document.open();
       printWindow.document.write(windowContent);
       printWindow.document.close();
     },
-    [storeDetails, user],
+    [storeDetails, user, apiBase],
   );
 
   // Bill & WhatsApp clear table handler added from TableMonitor
