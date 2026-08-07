@@ -14,6 +14,7 @@ import Offers from "../features/offers/Offers";
 import Payment from "../features/payment/Payment";
 import logo from "../assets/cho.png";
 import CounterPOS from "../components/CounterPOS";
+import Profile from "../features/profile/RestaurantProfile";
 import AIMarketingDashboard from "../components/AIMarketingDashboard";
 
 export default function MerchantLayout() {
@@ -75,6 +76,7 @@ export default function MerchantLayout() {
             <Route path="/marketing" element={<AIMarketingDashboard />} />
             <Route path="/counter" element={<CounterPOS />} />
             <Route path="/super-admin" element={<SuperAdminPanel />} />
+            <Route path="/profile" element={<Profile />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

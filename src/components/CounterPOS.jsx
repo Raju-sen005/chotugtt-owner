@@ -21,7 +21,7 @@ export default function CounterPOS() {
 
   const [activeTab, setActiveTab] = useState("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-
+  const [offers, setOffers] = useState([]);
   const [showTableModal, setShowTableModal] = useState(false);
   const [selectedTable, setSelectedTable] = useState("");
   const [loading, setLoading] = useState(false);
@@ -47,6 +47,16 @@ export default function CounterPOS() {
           setCombos(combosRes.data?.data || combosRes.data || []);
         } catch (e) {
           console.warn("Combos fetch skipped or failed:", e.message);
+        }
+
+        try {
+          const offersRes = await axios.get(`${apiBase}/offers`, {
+            withCredentials: true,
+          });
+
+          setOffers(offersRes.data?.data || offersRes.data || []);
+        } catch (e) {
+          console.warn("Offers fetch failed:", e.message);
         }
 
         const ordersRes = await axios.get(`${apiBase}/orders/live`, {
@@ -76,6 +86,8 @@ export default function CounterPOS() {
     }));
     return [...formattedItems, ...formattedCombos];
   }, [items, combos]);
+
+  
 
   const categories = useMemo(() => {
     const cats = new Set(items.map((i) => i.category).filter(Boolean));
@@ -128,9 +140,48 @@ export default function CounterPOS() {
   const removeFromCart = (id) => {
     setCart((prev) => prev.filter((i) => i._id !== id));
   };
-
   const subtotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
-  const total = subtotal;
+
+  const appliedDiscount = useMemo(() => {
+    if (!offers.length) return 0;
+
+    let totalDiscount = 0;
+
+    cart.forEach((item) => {
+      const itemTotalPrice = Number(item.price) * Number(item.quantity);
+
+      const applicableOffers = offers.filter((offer) => {
+        const hasTargetItems =
+          offer.targetItems && offer.targetItems.length > 0;
+
+        if (hasTargetItems) {
+          return offer.targetItems.includes(item._id);
+        }
+
+        return true;
+      });
+
+      if (!applicableOffers.length) return;
+
+      const targetedOffers = applicableOffers.filter(
+        (o) => o.targetItems && o.targetItems.length > 0,
+      );
+
+      const relevantOffers =
+        targetedOffers.length > 0 ? targetedOffers : applicableOffers;
+
+      const bestOffer = relevantOffers.reduce((best, current) =>
+        Number(current.discountValue) > Number(best.discountValue)
+          ? current
+          : best,
+      );
+
+      totalDiscount += (itemTotalPrice * Number(bestOffer.discountValue)) / 100;
+    });
+
+    return Math.round(totalDiscount);
+  }, [cart, offers]);
+  const total = Math.max(0, subtotal - appliedDiscount);
 
   const handleParcelOrder = async () => {
     if (cart.length === 0) return alert("Cart is empty!");
@@ -149,7 +200,7 @@ export default function CounterPOS() {
             itemModel: i.itemModel,
           })),
           subtotal,
-          discount: 0,
+          discount: appliedDiscount,
           tax: 0,
           total,
         },
@@ -185,7 +236,7 @@ export default function CounterPOS() {
             itemModel: i.itemModel,
           })),
           subtotal,
-          discount: 0,
+          discount: appliedDiscount,
           tax: 0,
           total,
         },
@@ -205,10 +256,8 @@ export default function CounterPOS() {
 
   return (
     <div className="max-w-7xl mx-auto p-4 sm:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 font-sans min-h-[92vh] bg-slate-50/50">
-
       {/* Left 8 Cols: Catalog & Menu Grid */}
       <div className="lg:col-span-8 flex flex-col space-y-5">
-
         {/* Header & Search Bar */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200">
           <div className="flex items-center gap-3">
@@ -271,7 +320,9 @@ export default function CounterPOS() {
           ) : filteredCatalog.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-80 bg-white rounded-2xl border border-slate-200 p-6 text-center">
               <UtensilsCrossed className="w-12 h-12 text-slate-300 mb-2" />
-              <p className="text-sm font-bold text-slate-800">No menu items found</p>
+              <p className="text-sm font-bold text-slate-800">
+                No menu items found
+              </p>
               <p className="text-xs text-slate-400 mt-1 max-w-xs">
                 Try switching categories or clear out the search keyword.
               </p>
@@ -404,6 +455,12 @@ export default function CounterPOS() {
               <span>Subtotal</span>
               <span>₹{subtotal.toFixed(2)}</span>
             </div>
+            {appliedDiscount > 0 && (
+              <div className="flex justify-between text-emerald-600 font-bold">
+                <span>Discount</span>
+                <span>- ₹{appliedDiscount.toFixed(2)}</span>
+              </div>
+            )}
             <div className="flex justify-between text-slate-900 font-black text-sm pt-2 border-t border-dashed border-slate-200">
               <span>Grand Total</span>
               <span>₹{total.toFixed(2)}</span>
@@ -460,7 +517,8 @@ export default function CounterPOS() {
 
             {activeTables.length === 0 && (
               <p className="text-[11px] text-rose-700 font-semibold bg-rose-50 border border-rose-200 p-3 rounded-xl leading-relaxed">
-                ⚠️ No active running tables found right now. Open a table order from regular orders first.
+                ⚠️ No active running tables found right now. Open a table order
+                from regular orders first.
               </p>
             )}
 

@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { to: "/payment", icon: DollarSign, label: "Payment" },
   { to: "/offer", icon: Tag, label: "Offers" },
   { to: "/counter", icon: ShoppingBag, label: "Counter POS" },
+  { to: "/profile", icon: LayoutDashboard, label: "Profile" }
   // { to: "/settings", icon: Settings, label: "Settings" },
 ];
 

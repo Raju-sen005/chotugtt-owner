@@ -598,28 +598,7 @@ export default function PublicMenu() {
     });
   }, [lastOrderSnapshot]);
 
-  // 🔑 Call Waiter — backend endpoint chahiye: POST /tables/call-waiter
-  // body: { restaurantId, tableToken }. Endpoint na ho to bhi UI degrade
-  // gracefully karta hai (toast dikhata hai, error silently log hota hai).
-  // const handleCallWaiter = useCallback(async () => {
-  //   setIsCallingWaiter(true);
-  //   try {
-  //     await axios.post(
-  //       `${import.meta.env.VITE_APP_API_BASE}/tables/call-waiter`,
-  //       {
-  //         restaurantId,
-  //         tableToken,
-  //       },
-  //     );
-  //   } catch (err) {
-  //     console.warn("Call-waiter endpoint not available yet:", err?.message);
-  //   } finally {
-  //     setIsCallingWaiter(false);
-  //     setWaiterToast(true);
-  //     setTimeout(() => setWaiterToast(false), 3000);
-  //   }
-  // }, [restaurantId, tableToken]);
-
+  
   const handleApplyMergeTable = useCallback(() => {
     if (!mergeTableNumber.trim()) return;
     setAppliedMergeTable(mergeTableNumber.trim());
@@ -637,13 +616,11 @@ export default function PublicMenu() {
       const orderPayload = {
         restaurantId,
         tableToken,
-        // 🔑 Backend ko group-billing ke liye ye field chahiye hoga:
-        // agar mergeWithTable set hai, to backend dono tables ke orders
-        // ko ek hi bill/session ke andar group kare.
+       
         mergeWithTable: appliedMergeTable || null,
         customerName: customerName.trim(),
         customerPhone: customerPhone.trim(),
-        orderType: orderType === "PICKUP" ? "TAKEAWAY" : "DELIVERY",
+        orderType: orderType === "PICKUP" ? "DINE_IN" : "DELIVERY",
         deliveryAddress: orderType === "DELIVERY" ? deliveryAddress.trim() : "",
         items: Object.entries(cart).map(([id, details]) => ({
           itemId: id,
