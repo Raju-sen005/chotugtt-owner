@@ -139,7 +139,7 @@ const TableCard = memo(function TableCard({
 export default function StoreSettings() {
   const { user } = useAuth();
   const [copied, setCopied] = useState(null);
-  const [isAdding, setIsAdding] = useState(false); // 🔑 Double click / race condition rokne ke liye
+  const [isAdding, setIsAdding] = useState(false); // 🔑 Double click / race condition
   const qrRefs = useRef({});
 
   const [storeDetails, setStoreDetails] = useState({ name: "", logo: "" });
@@ -167,7 +167,7 @@ export default function StoreSettings() {
       );
   }, []);
 
-  // Backend se tables sync karein (localStorage fallback hata diya hai taaki stale data conflict na kare)
+  
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -192,7 +192,7 @@ export default function StoreSettings() {
     };
   }, []);
 
-  // 🔑 Safe Restaurant ID extraction (default-store ka jhanjhat khatam)
+  // 🔑 Safe Restaurant ID extraction 
   const activeRestaurantId = user?.restaurantId || user?._id;
 
   const downloadQRCode = useCallback((tableNo) => {
@@ -217,10 +217,9 @@ export default function StoreSettings() {
 
       const restaurantName = storeDetails.name || "OUR RESTAURANT";
 
-      // 🔑 Yahan relative logo path ko absolute URL mein convert kiya gaya hai
+      
       let restaurantLogo = storeDetails.logo || "";
       if (restaurantLogo && restaurantLogo.startsWith("/")) {
-        // Agar API base URL mein '/api' jaisa kuch hai, toh hum sirf origin (domain) nikal lenge
         try {
           const apiBase = import.meta.env.VITE_APP_API_BASE || "";
           const urlObj = new URL(apiBase);
@@ -323,18 +322,17 @@ export default function StoreSettings() {
       .then((res) => {
         if (res.data?.success && Array.isArray(res.data.data)) {
           const formatted = res.data.data.map((t) => {
-            // Agar backend object bhej raha hai
+            
             if (typeof t === "object" && t !== null) {
               const tableNum = t.tableNumber || t.number;
-              // Check karein ki purani state mein ye table disabled thi kya, warna backend ke hisab se set karein
+              
               const existingTable = tables.find(
                 (item) => item.tableNumber === String(tableNum),
               );
 
               return {
                 tableNumber: String(tableNum),
-                // Agar backend explicitly isActive bhej raha hai toh use ulta karein (isActive false matlab disabled true)
-                // Warna agar pehle se state thi toh wahi rakhein, nahi toh default false (enabled) rakhein
+                
                 isDisabled:
                   t.isActive !== undefined
                     ? !t.isActive
@@ -343,7 +341,7 @@ export default function StoreSettings() {
                       : false,
               };
             }
-            // Agar sirf string array aa rahi hai
+            // Agar only string array aa  hai
             const existingTable = tables.find(
               (item) => item.tableNumber === String(t),
             );

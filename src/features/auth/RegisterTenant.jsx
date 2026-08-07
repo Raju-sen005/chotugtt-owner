@@ -37,11 +37,11 @@ export default function RegisterTenant({ onSwitchToLogin }) {
       
       const phoneRegex = /^[0-9]{10}$/;
       if (!phoneRegex.test(phone)) {
-        setError('Mobile number exactly 10 digits ka hona chahiye.');
+        setError('The mobile number must be exactly 10 digits long.');
         return;
       }
 
-      // 🚀 FormData ka use karein kyunki file upload ho rahi hai
+      
       const formData = new FormData();
       formData.append('restaurantName', restaurantName);
       formData.append('slug', generatedSlug);
@@ -77,7 +77,7 @@ export default function RegisterTenant({ onSwitchToLogin }) {
           <div>
             <span className="text-4xl">🎉</span>
             <h2 className="text-2xl font-black text-slate-900 mt-2">Registration Live!</h2>
-            <p className="text-xs text-slate-500 mt-1">Aapka multi-tenant storefront setup allocate ho gaya hai.</p>
+            <p className="text-xs text-slate-500 mt-1">Your multi-tenant storefront setup has been allocated.</p>
           </div>
 
           <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 inline-block shadow-inner">
@@ -85,7 +85,7 @@ export default function RegisterTenant({ onSwitchToLogin }) {
           </div>
 
           <div className="space-y-2 text-left">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Aapka Live Menu Sub-URL:</label>
+            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Your Live Menu Sub-URL:</label>
             <a href={successData.url} target="_blank" rel="noreferrer" className="block p-3 rounded-xl bg-red-50 text-red-600 font-mono text-xs font-bold break-all border border-red-100 hover:bg-red-100 transition-all">
               {successData.url}
             </a>

@@ -137,7 +137,7 @@ const TableCard = memo(function TableCard({
   );
 });
 
-// 🔑 Ek section ka poora block — header (naam, count, rename/delete) + uski tables ka grid
+// 🔑 Ek section ka all block — header (name, count, rename/delete) + the tables ka grid
 const SectionBlock = memo(function SectionBlock({
   section,
   tables,
@@ -211,8 +211,8 @@ const SectionBlock = memo(function SectionBlock({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
           {tables.length === 0 ? (
             <div className="col-span-full text-xs text-slate-400 bg-white border border-dashed border-slate-200 rounded-2xl py-8 text-center">
-              Is section mein abhi koi table nahi hai — "Add Table" se add
-              karein.
+              There are no tables in this section yet — add one using "Add
+              Table".
             </div>
           ) : (
             tables.map((table) => renderCard(table))
@@ -260,13 +260,18 @@ export default function TableMonitor() {
         }
       })
       .catch((err) =>
-        console.warn("Could not fetch restaurant profile for print:", err?.message),
+        console.warn(
+          "Could not fetch restaurant profile for print:",
+          err?.message,
+        ),
       );
   }, [apiBase]);
 
   const fetchTables = useCallback(async () => {
     try {
-      const res = await axios.get(`${apiBase}/tables/admin`, { withCredentials: true });
+      const res = await axios.get(`${apiBase}/tables/admin`, {
+        withCredentials: true,
+      });
       const backendTables = res.data?.data;
       if (Array.isArray(backendTables)) {
         const formatted = backendTables.map((t) =>
@@ -283,11 +288,13 @@ export default function TableMonitor() {
 
   const fetchSections = useCallback(async () => {
     try {
-      const res = await axios.get(`${apiBase}/sections/admin`, { withCredentials: true });
+      const res = await axios.get(`${apiBase}/sections/admin`, {
+        withCredentials: true,
+      });
       const backendSections = res.data?.data;
       if (Array.isArray(backendSections)) {
         const names = backendSections.map((s) => s.name);
-        // "General" hamesha list mein rahe, chahe backend mein abhi na bana ho
+        // "General" always in the list, even if not created in the backend
         setSections(names.includes("General") ? names : ["General", ...names]);
       }
     } catch (err) {
@@ -401,17 +408,21 @@ export default function TableMonitor() {
     setShowAddTable(true);
   }, [sections]);
 
-  // 🔑 Custom naam + section ke saath table create
+  // 🔑 Custom name + section ke with table create
   const submitAddTable = useCallback(async () => {
     const cleanName = newTableName.trim();
-    if (!cleanName) return alert("Table ka naam daalein (jaise AC1, T5)");
+    if (!cleanName) return alert("Enter the table name (e.g., A1, H5)");
 
     const finalSection = creatingNewSection
       ? newSectionInline.trim() || "General"
       : newTableSection;
 
-    if (tables.some((t) => t.tableNumber.toLowerCase() === cleanName.toLowerCase())) {
-      return alert("Is naam ki table pehle se maujood hai");
+    if (
+      tables.some(
+        (t) => t.tableNumber.toLowerCase() === cleanName.toLowerCase(),
+      )
+    ) {
+      return alert("A table with this name already exists");
     }
 
     setIsSavingTable(true);
@@ -435,16 +446,28 @@ export default function TableMonitor() {
     } finally {
       setIsSavingTable(false);
     }
-  }, [newTableName, newTableSection, creatingNewSection, newSectionInline, tables, apiBase, fetchSections]);
+  }, [
+    newTableName,
+    newTableSection,
+    creatingNewSection,
+    newSectionInline,
+    tables,
+    apiBase,
+    fetchSections,
+  ]);
 
-  // 🔑 Standalone khaali section banana
+  // 🔑 Standalone empty section banana
   const submitAddSection = useCallback(async () => {
     const clean = newSectionName.trim();
-    if (!clean) return alert("Section ka naam daalein (jaise AC, Rooftop)");
+    if (!clean) return alert("Enter the section name (e.g., AC, Rooftop)");
 
     setIsSavingSection(true);
     try {
-      await axios.post(`${apiBase}/sections/admin`, { name: clean }, { withCredentials: true });
+      await axios.post(
+        `${apiBase}/sections/admin`,
+        { name: clean },
+        { withCredentials: true },
+      );
       await fetchSections();
       setShowAddSection(false);
       setNewSectionName("");
@@ -465,7 +488,9 @@ export default function TableMonitor() {
         );
         setSections((prev) => prev.map((s) => (s === oldName ? newName : s)));
         setTables((prev) =>
-          prev.map((t) => (t.section === oldName ? { ...t, section: newName } : t)),
+          prev.map((t) =>
+            t.section === oldName ? { ...t, section: newName } : t,
+          ),
         );
       } catch (err) {
         alert(err?.response?.data?.message || err?.message);
@@ -478,17 +503,22 @@ export default function TableMonitor() {
     async (name) => {
       if (
         !window.confirm(
-          `"${name}" section delete karein? Isme jo tables hain woh "General" mein move ho jayengi.`,
+          `"${name}" Delete the section? The tables within it will be moved to "General".`,
         )
       )
         return;
       try {
-        await axios.delete(`${apiBase}/sections/admin/${encodeURIComponent(name)}`, {
-          withCredentials: true,
-        });
+        await axios.delete(
+          `${apiBase}/sections/admin/${encodeURIComponent(name)}`,
+          {
+            withCredentials: true,
+          },
+        );
         setSections((prev) => prev.filter((s) => s !== name));
         setTables((prev) =>
-          prev.map((t) => (t.section === name ? { ...t, section: "General" } : t)),
+          prev.map((t) =>
+            t.section === name ? { ...t, section: "General" } : t,
+          ),
         );
       } catch (err) {
         alert(err?.response?.data?.message || err?.message);
@@ -505,8 +535,15 @@ export default function TableMonitor() {
       });
 
       axios
-        .delete(`${apiBase}/tables/admin/${encodeURIComponent(tableNo)}`, { withCredentials: true })
-        .catch((err) => console.warn("Could not sync table removal to backend:", err?.message));
+        .delete(`${apiBase}/tables/admin/${encodeURIComponent(tableNo)}`, {
+          withCredentials: true,
+        })
+        .catch((err) =>
+          console.warn(
+            "Could not sync table removal to backend:",
+            err?.message,
+          ),
+        );
     },
     [apiBase],
   );
@@ -514,7 +551,11 @@ export default function TableMonitor() {
   const toggleTableStatus = useCallback(
     (tableNo, newDisabledState) => {
       setTables((prev) =>
-        prev.map((t) => (t.tableNumber === tableNo ? { ...t, isDisabled: newDisabledState } : t)),
+        prev.map((t) =>
+          t.tableNumber === tableNo
+            ? { ...t, isDisabled: newDisabledState }
+            : t,
+        ),
       );
 
       axios
@@ -523,7 +564,12 @@ export default function TableMonitor() {
           { isDisabled: newDisabledState },
           { withCredentials: true },
         )
-        .catch((err) => console.warn("Could not sync table toggle state to backend:", err?.message));
+        .catch((err) =>
+          console.warn(
+            "Could not sync table toggle state to backend:",
+            err?.message,
+          ),
+        );
     },
     [apiBase],
   );
@@ -552,8 +598,8 @@ export default function TableMonitor() {
     setTimeout(() => setCopied(null), 2000);
   }, []);
 
-  // 🔑 Sections ke hisaab se tables group karein — jo section list mein nahi hai
-  // (edge case) woh bhi "General" ke saath dikh jaaye
+  // 🔑 Sections ke according se tables group  — jo section list mein na hai
+  // (edge case) woh bhi "General" ke with see
   const groupedBySections = useMemo(() => {
     const knownSections = sections.length ? sections : ["General"];
     const map = {};
@@ -598,7 +644,7 @@ export default function TableMonitor() {
               Table Monitor
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              Custom table names, sections aur QR standees manage karein.
+              Manage custom table names, sections, and QR standees.
             </p>
           </div>
         </div>
@@ -647,7 +693,9 @@ export default function TableMonitor() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm space-y-5 shadow-2xl">
             <div className="flex items-center justify-between">
-              <h3 className="font-black text-slate-900 text-lg">Add New Table</h3>
+              <h3 className="font-black text-slate-900 text-lg">
+                Add New Table
+              </h3>
               <button
                 onClick={() => setShowAddTable(false)}
                 className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
@@ -731,7 +779,9 @@ export default function TableMonitor() {
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm space-y-5 shadow-2xl">
             <div className="flex items-center justify-between">
-              <h3 className="font-black text-slate-900 text-lg">Add New Section</h3>
+              <h3 className="font-black text-slate-900 text-lg">
+                Add New Section
+              </h3>
               <button
                 onClick={() => setShowAddSection(false)}
                 className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"

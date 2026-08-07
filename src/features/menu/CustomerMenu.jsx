@@ -18,7 +18,7 @@ export default function CustomerMenu({ onUpdateCart, cart }) {
       return res.data.data;
     },
     enabled: !!restaurantId,
-    staleTime: 5 * 60_000, // 5 min tak fresh — menu itni baar change nahi hoti
+    staleTime: 5 * 60_000, // 5 min tak fresh — menu 
   });
 
   const categoryNames = useMemo(
@@ -26,7 +26,7 @@ export default function CustomerMenu({ onUpdateCart, cart }) {
     [catalog.categories]
   );
 
-  // useState ke bajaye derived value — pehla category jab catalog load ho
+  // useState ke  derived value — first category jab catalog load ho
   const [activeCategory, setActiveCategory] = useState('');
   useEffect(() => {
     if (categoryNames.length > 0 && !activeCategory) {
@@ -55,7 +55,7 @@ export default function CustomerMenu({ onUpdateCart, cart }) {
   if (isError) {
     return (
       <div className="max-w-md mx-auto min-h-screen flex items-center justify-center p-6 text-center">
-        <p className="text-sm font-bold text-slate-400">Menu load nahi ho paya. Please refresh karein.</p>
+        <p className="text-sm font-bold text-slate-400">Menu could not be loaded. Please refresh and try again.</p>
       </div>
     );
   }

@@ -3,7 +3,7 @@ import { useAuth } from "./context/AuthContext";
 import MerchantLayout from "./layouts/MerchantLayout";
 import PublicMenu from "./features/public/PublicMenu";
 import AuthGate from "./features/auth/AuthGate";
-import SubscriptionCheckout from "./components/SubscriptionCheckout"; // Apne path ke hisaab se check karein
+import SubscriptionCheckout from "./components/SubscriptionCheckout"; 
 
 export default function App() {
   const { user } = useAuth();

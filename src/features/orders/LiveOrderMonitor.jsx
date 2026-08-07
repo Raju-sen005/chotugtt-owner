@@ -191,7 +191,7 @@ export default function LiveOrderMonitor() {
 
   const apiBase = import.meta.env.VITE_APP_API_BASE;
 
-  // 🧾 Restaurant profile — needed for the printed bill header (name, address, GSTIN, contact)
+  // 🧾 Restaurant profile — needed for the printed bill header (name, address, contact)
   const [storeDetails, setStoreDetails] = useState({
     name: "",
     address: "",
@@ -207,7 +207,7 @@ export default function LiveOrderMonitor() {
       .then((res) => {
         const d = res.data?.data;
         if (d) {
-          // 🔑 address ab object hai — string bana lo
+          // 🔑 address ab object hai — string  lo
           const formattedAddress = d.address
             ? [d.address.street, d.address.city, d.address.state, d.address.zip]
                 .filter(Boolean)
@@ -383,7 +383,7 @@ export default function LiveOrderMonitor() {
   // 🧾 Opens a thermal-receipt-style print window for a completed order
   const printBillReceipt = useCallback(
     (order) => {
-      // 🔑 FIX: cancelled/rejected items bill par nahi aane chahiye
+      // 🔑 FIX: cancelled/rejected items bill par 
       const items = (order.items || []).filter((i) => i.status !== "REJECTED");
 
       const subtotal =
@@ -412,7 +412,7 @@ export default function LiveOrderMonitor() {
       const cashierName =
         user?.name || user?.username || user?.email || "Staff";
 
-      // 🔑 image ko absolute URL banao (relative path ho to base attach karo)
+      // 🔑 image ko absolute URL  (relative path ho to base attach karo)
       const resolveUrl = (path) => {
         if (!path) return "";
         return path.startsWith("http")

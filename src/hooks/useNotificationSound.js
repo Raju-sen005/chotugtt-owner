@@ -9,7 +9,6 @@ export const useNotificationSound = () => {
     const audio = audioRef.current;
     audio.currentTime = 0;
     
-    // Play ko promise ki tarah handle karein
     const playPromise = audio.play();
     
     if (playPromise !== undefined) {

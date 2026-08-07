@@ -14,7 +14,7 @@ export default function AIMarketingDashboard() {
     setLoading(true);
     setError("");
     try {
-      // LocalStorage ya fallback valid MongoDB ID use ki gayi hai
+      // LocalStorage ya fallback valid MongoDB ID use ki gai hai
       const restaurantId =
         localStorage.getItem("restaurantId") || "6a62eeac1c1ecd9b010b8c13";
 

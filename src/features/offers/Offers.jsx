@@ -142,7 +142,7 @@ export default function Offers() {
           </div>
           <div>
             <h2 className="text-2xl font-black text-slate-900 tracking-tight">Restaurant Offers & Discounts</h2>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Customers ke liye special promotional campaigns launch karein.</p>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">Launch special promotional campaigns for customers.</p>
           </div>
         </div>
       </div>

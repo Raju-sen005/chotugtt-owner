@@ -4,7 +4,7 @@ export default function OrderDetailsModal({ order, onClose }) {
   if (!order) return null;
 
   const handlePrint = () => {
-    window.print(); // Yeh browser ka print dialog khol dega
+    window.print(); // Yeh browser ka print dialog open   
   };
 
   return (

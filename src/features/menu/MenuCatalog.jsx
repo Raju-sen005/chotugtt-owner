@@ -652,9 +652,7 @@ export default function MenuCatalog() {
       >
         <div className="space-y-6">
           <p className="text-xs text-slate-500 leading-relaxed">
-            Restaurant ka physical menu ya printed card ki clear photo upload
-            karein. AI automatically items, prices, aur categories detect karke
-            aapke catalog me live add kar dega.
+           Upload a clear photo of the restaurant's physical menu or printed card. AI will automatically detect items, prices, and categories and add them live to your catalog.
           </p>
 
           <div className="space-y-1.5">

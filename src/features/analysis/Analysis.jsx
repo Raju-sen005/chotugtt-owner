@@ -4,7 +4,7 @@ import axios from "axios";
 import { Sun, Coffee, Moon, CloudSun, TrendingUp, DollarSign, ShoppingBag, Award, BarChart3 } from "lucide-react";
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from "recharts";
 
-// Module-level — har render pe naya object nahi banega
+// Module-level — har render pe new object not create
 const HOURLY_ICONS = {
   Morning: <Sun className="w-4 h-4 text-amber-500" />,
   Afternoon: <CloudSun className="w-4 h-4 text-orange-400" />,
@@ -84,7 +84,7 @@ function Analysis() {
     return (
       <div className="p-8 text-center bg-white rounded-3xl border border-slate-200 max-w-md mx-auto mt-12">
         <p className="text-sm font-bold text-rose-500">
-          Analytics data load nahi ho payi. Please refresh karke try karein.
+          Analytics data could not be loaded. Please refresh and try again.
         </p>
       </div>
     );

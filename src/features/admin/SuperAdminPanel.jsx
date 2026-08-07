@@ -70,7 +70,7 @@ export default function SuperAdminPanel() {
                 Super Admin Console
               </h1>
               <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                Platform ke sabhi registered restaurants aur tenants ko manage karein.
+                Manage all registered restaurants and tenants on the platform.
               </p>
             </div>
           </div>
@@ -97,7 +97,7 @@ export default function SuperAdminPanel() {
           {restaurants.length === 0 ? (
             <div className="text-center py-16 space-y-3">
               <Store className="mx-auto text-slate-300" size={48} />
-              <p className="text-slate-600 font-bold text-sm">Koi restaurant registered nahi hai.</p>
+              <p className="text-slate-600 font-bold text-sm">No restaurants registered yet.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -190,7 +190,7 @@ export default function SuperAdminPanel() {
                             {store.isActive !== false ? "Block" : "Unblock"}
                           </button>
 
-                          {/* Approve/Unapprove Button */}
+                          {/* Approve/Reject Button */}
                           <button
                             onClick={() =>
                               handleStatusUpdate(store._id, "isApproved", store.isApproved)

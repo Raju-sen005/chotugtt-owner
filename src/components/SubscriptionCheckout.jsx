@@ -44,7 +44,7 @@ export default function SubscriptionCheckout() {
       {/* Top Header */}
       <div className="max-w-7xl mx-auto w-full flex items-center justify-between pb-8 border-b border-slate-200/80">
         <div className="flex items-center gap-3">
-          <img src={logo} alt="Chotu" className="h-10 object-contain" />
+          <img src={logo} alt="Logo" className="h-10 object-contain" />
           <span className="font-black text-xl tracking-tight">Chotu</span>
         </div>
         <div className="bg-rose-50 text-rose-600 px-4 py-2 rounded-xl text-xs font-bold border border-rose-100 flex items-center gap-2">
@@ -59,7 +59,7 @@ export default function SubscriptionCheckout() {
             Scale Your Restaurant Operations
           </h1>
           <p className="text-slate-500 text-sm max-w-xl mx-auto font-medium">
-            Aapka store live rakhne aur advanced automation, WhatsApp billing & analytics access karne ke liye ek plan select karein.
+            Select a plan to keep your store live and access advanced automation, WhatsApp billing, and analytics.
           </p>
 
           {error && (
@@ -71,27 +71,44 @@ export default function SubscriptionCheckout() {
 
         {/* Pricing Cards Grid */}
         <div className="grid lg:grid-cols-3 gap-8 items-center">
-          
           {/* 1. STARTER PLAN */}
           <div className="bg-white rounded-3xl p-8 border border-slate-200/80 shadow-sm space-y-6 flex flex-col justify-between relative hover:border-slate-300 transition-all">
             <div className="space-y-4">
               <div>
                 <h3 className="text-xl font-bold text-slate-900">Starter</h3>
-                <p className="text-slate-500 text-xs mt-1">Single outlet, up to 10 tables</p>
+                <p className="text-slate-500 text-xs mt-1">
+                  Single outlet, up to 10 tables
+                </p>
               </div>
               <div className="flex items-baseline gap-1">
                 <span className="text-4xl font-black text-slate-900">₹999</span>
-                <span className="text-xs text-slate-400 font-medium">/month</span>
+                <span className="text-xs text-slate-400 font-medium">
+                  /month
+                </span>
               </div>
-              <p className="text-[11px] text-slate-400 font-medium">billed monthly, cancel anytime</p>
+              <p className="text-[11px] text-slate-400 font-medium">
+                billed monthly, cancel anytime
+              </p>
 
               <hr className="border-slate-100" />
 
               <ul className="space-y-3 text-xs text-slate-600 font-medium">
-                <li className="flex items-center gap-2.5"><Check size={16} className="text-emerald-500 shrink-0" /> QR menu & ordering</li>
-                <li className="flex items-center gap-2.5"><Check size={16} className="text-emerald-500 shrink-0" /> Kitchen display screen (KDS)</li>
-                <li className="flex items-center gap-2.5"><Check size={16} className="text-emerald-500 shrink-0" /> WhatsApp invoicing</li>
-                <li className="flex items-center gap-2.5"><Check size={16} className="text-emerald-500 shrink-0" /> Email support</li>
+                <li className="flex items-center gap-2.5">
+                  <Check size={16} className="text-emerald-500 shrink-0" /> QR
+                  menu & ordering
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <Check size={16} className="text-emerald-500 shrink-0" />{" "}
+                  Kitchen display screen (KDS)
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <Check size={16} className="text-emerald-500 shrink-0" />{" "}
+                  WhatsApp invoicing
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <Check size={16} className="text-emerald-500 shrink-0" />{" "}
+                  Email support
+                </li>
               </ul>
             </div>
 
@@ -116,21 +133,39 @@ export default function SubscriptionCheckout() {
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
                   Pro <Zap size={18} className="text-rose-500 fill-rose-500" />
                 </h3>
-                <p className="text-slate-400 text-xs mt-1">Single outlet, unlimited tables</p>
+                <p className="text-slate-400 text-xs mt-1">
+                  Single outlet, unlimited tables
+                </p>
               </div>
               <div className="flex items-baseline gap-1">
                 <span className="text-4xl font-black text-white">₹2,499</span>
-                <span className="text-xs text-slate-400 font-medium">/month</span>
+                <span className="text-xs text-slate-400 font-medium">
+                  /month
+                </span>
               </div>
-              <p className="text-[11px] text-slate-400 font-medium">billed monthly, cancel anytime</p>
+              <p className="text-[11px] text-slate-400 font-medium">
+                billed monthly, cancel anytime
+              </p>
 
               <hr className="border-slate-800" />
 
               <ul className="space-y-3 text-xs text-slate-300 font-medium">
-                <li className="flex items-center gap-2.5"><Check size={16} className="text-rose-500 shrink-0" /> Everything in Starter</li>
-                <li className="flex items-center gap-2.5"><Check size={16} className="text-rose-500 shrink-0" /> Live order analytics dashboard</li>
-                <li className="flex items-center gap-2.5"><Check size={16} className="text-rose-500 shrink-0" /> Menu & inventory sync</li>
-                <li className="flex items-center gap-2.5"><Check size={16} className="text-rose-500 shrink-0" /> Priority WhatsApp support</li>
+                <li className="flex items-center gap-2.5">
+                  <Check size={16} className="text-rose-500 shrink-0" />{" "}
+                  Everything in Starter
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <Check size={16} className="text-rose-500 shrink-0" /> Live
+                  order analytics dashboard
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <Check size={16} className="text-rose-500 shrink-0" /> Menu &
+                  inventory sync
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <Check size={16} className="text-rose-500 shrink-0" />{" "}
+                  Priority WhatsApp support
+                </li>
               </ul>
             </div>
 
@@ -151,20 +186,38 @@ export default function SubscriptionCheckout() {
                 <h3 className="text-xl font-bold text-slate-900 flex items-center gap-2">
                   Enterprise <Building2 size={16} className="text-slate-400" />
                 </h3>
-                <p className="text-slate-500 text-xs mt-1">Multi-outlet chains & franchises</p>
+                <p className="text-slate-500 text-xs mt-1">
+                  Multi-outlet chains & franchises
+                </p>
               </div>
               <div className="py-2">
-                <span className="text-3xl font-black text-slate-900 tracking-tight">Custom</span>
-                <p className="text-xs text-slate-400 font-medium mt-0.5">volume pricing per outlet</p>
+                <span className="text-3xl font-black text-slate-900 tracking-tight">
+                  Custom
+                </span>
+                <p className="text-xs text-slate-400 font-medium mt-0.5">
+                  volume pricing per outlet
+                </p>
               </div>
 
               <hr className="border-slate-100" />
 
               <ul className="space-y-3 text-xs text-slate-600 font-medium">
-                <li className="flex items-center gap-2.5"><Check size={16} className="text-emerald-500 shrink-0" /> Everything in Pro</li>
-                <li className="flex items-center gap-2.5"><Check size={16} className="text-emerald-500 shrink-0" /> Multi-outlet master dashboard</li>
-                <li className="flex items-center gap-2.5"><Check size={16} className="text-emerald-500 shrink-0" /> Custom POS integrations</li>
-                <li className="flex items-center gap-2.5"><Check size={16} className="text-emerald-500 shrink-0" /> Dedicated account manager</li>
+                <li className="flex items-center gap-2.5">
+                  <Check size={16} className="text-emerald-500 shrink-0" />{" "}
+                  Everything in Pro
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <Check size={16} className="text-emerald-500 shrink-0" />{" "}
+                  Multi-outlet master dashboard
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <Check size={16} className="text-emerald-500 shrink-0" />{" "}
+                  Custom POS integrations
+                </li>
+                <li className="flex items-center gap-2.5">
+                  <Check size={16} className="text-emerald-500 shrink-0" />{" "}
+                  Dedicated account manager
+                </li>
               </ul>
             </div>
 
@@ -177,7 +230,6 @@ export default function SubscriptionCheckout() {
               {loadingPlan === "ENTERPRISE" ? "Processing..." : "Talk to Sales"}
             </button>
           </div>
-
         </div>
       </div>
 

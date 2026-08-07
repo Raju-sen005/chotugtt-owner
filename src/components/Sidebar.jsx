@@ -73,7 +73,7 @@ export default function Sidebar({ closeMobileSidebar }) {
       <div className="p-0 border-b border-slate-800/80 flex items-center justify-center min-h-[90px] overflow-hidden">
         <img
           src={logo}
-          alt="Chotu"
+          alt="Logo"
           className="max-h-30 w-auto object-contain"
         />
       </div>

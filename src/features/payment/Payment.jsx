@@ -9,7 +9,7 @@ export default function Payment() {
 
   const API_BASE = import.meta.env.VITE_APP_API_BASE; // 🆕
 
-  // 1. Current Period Bills Fetch Karein
+  // 1. Current Period Bills Fetch 
   const { data: bills, isLoading } = useQuery({
     queryKey: ["bills", filter],
     queryFn: () =>
@@ -20,7 +20,7 @@ export default function Payment() {
         .then((res) => res.data.data),
   });
 
-  // 2. Previous Period Bills Fetch Karein (Profit/Loss Comparison ke liye)
+  // 2. Previous Period Bills Fetch  (Profit/Loss Comparison ke )
   const { data: prevData } = useQuery({
     queryKey: ["bills-prev", filter],
     queryFn: () =>
@@ -91,7 +91,7 @@ export default function Payment() {
             Payment History
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Aapke store ki revenue aur financial performance overview.
+            Overview of your store's revenue and financial performance.
           </p>
         </div>
 

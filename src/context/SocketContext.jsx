@@ -7,7 +7,7 @@ const SocketContext = createContext(null);
 export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
   const { user } = useAuth();
-  const restaurantId = user?.restaurantId; // primitive value nikal liya
+  const restaurantId = user?.restaurantId; // primitive value 
 
   useEffect(() => {
     if (!restaurantId) {
@@ -29,7 +29,7 @@ export const SocketProvider = ({ children }) => {
     return () => {
       socketInstance.disconnect();
     };
-    // 🔑 sirf restaurantId (primitive) pe depend, poore user object pe nahi
+    // 🔑 only restaurantId (primitive) pe depend, all user object pe 
   }, [restaurantId]);
 
   const value = useMemo(() => socket, [socket]);

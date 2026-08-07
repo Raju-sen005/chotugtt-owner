@@ -30,7 +30,7 @@ export const AuthProvider = ({ children }) => {
     
     // Agar subscription expire ya past due hai
     if (res.data.requiresSubscription) {
-      return res.data; // Yeh login component mein catch hoga
+      return res.data; // Yeh login component mein catch 
     }
 
     if (res.data.success) setUser(res.data.data);
