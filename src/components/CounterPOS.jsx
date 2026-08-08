@@ -87,8 +87,6 @@ export default function CounterPOS() {
     return [...formattedItems, ...formattedCombos];
   }, [items, combos]);
 
-  
-
   const categories = useMemo(() => {
     const cats = new Set(items.map((i) => i.category).filter(Boolean));
     if (combos.length > 0) cats.add("COMBO");
@@ -142,10 +140,14 @@ export default function CounterPOS() {
   };
   const subtotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
-  const appliedDiscount = useMemo(() => {
-    if (!offers.length) return 0;
+  // 🔑 FIX: total discount ke sath-sath per-item discount bhi track karo,
+  // taaki order place karte waqt har item ke sath uska apna discount save ho
+  // (backend cancelOrderItem isi field se sahi recalculation karta hai)
+  const { appliedDiscount, itemDiscountMap } = useMemo(() => {
+    if (!offers.length) return { appliedDiscount: 0, itemDiscountMap: {} };
 
     let totalDiscount = 0;
+    const map = {};
 
     cart.forEach((item) => {
       const itemTotalPrice = Number(item.price) * Number(item.quantity);
@@ -155,7 +157,11 @@ export default function CounterPOS() {
           offer.targetItems && offer.targetItems.length > 0;
 
         if (hasTargetItems) {
-          return offer.targetItems.includes(item._id);
+          // 🔑 FIX: targetItems populate() ki wajah se objects ({_id, name})
+          // ban jaate hain, plain string ObjectId nahi — dono handle karo
+          return offer.targetItems.some(
+            (t) => String(t._id || t) === String(item._id),
+          );
         }
 
         return true;
@@ -176,11 +182,17 @@ export default function CounterPOS() {
           : best,
       );
 
-      totalDiscount += (itemTotalPrice * Number(bestOffer.discountValue)) / 100;
+      const itemDiscount = Math.round(
+        (itemTotalPrice * Number(bestOffer.discountValue)) / 100,
+      );
+
+      map[item._id] = itemDiscount;
+      totalDiscount += itemDiscount;
     });
 
-    return Math.round(totalDiscount);
+    return { appliedDiscount: Math.round(totalDiscount), itemDiscountMap: map };
   }, [cart, offers]);
+
   const total = Math.max(0, subtotal - appliedDiscount);
 
   const handleParcelOrder = async () => {
@@ -194,10 +206,12 @@ export default function CounterPOS() {
           items: cart.map((i) => ({
             menuItem: i.catalogType === "ITEM" ? i._id : undefined,
             combo: i.catalogType === "COMBO" ? i._id : undefined,
+            catalogType: i.catalogType, // 🆕 backend itemType isi se decide karta hai
             name: i.name,
             price: i.price,
             quantity: i.quantity,
             itemModel: i.itemModel,
+            discount: itemDiscountMap[i._id] || 0, // 🆕 per-item discount
           })),
           subtotal,
           discount: appliedDiscount,
@@ -230,10 +244,12 @@ export default function CounterPOS() {
           items: cart.map((i) => ({
             menuItem: i.catalogType === "ITEM" ? i._id : undefined,
             combo: i.catalogType === "COMBO" ? i._id : undefined,
+            catalogType: i.catalogType, // 🆕 backend itemType isi se decide karta hai
             name: i.name,
             price: i.price,
             quantity: i.quantity,
             itemModel: i.itemModel,
+            discount: itemDiscountMap[i._id] || 0, // 🆕 per-item discount
           })),
           subtotal,
           discount: appliedDiscount,
@@ -416,6 +432,11 @@ export default function CounterPOS() {
                     <span className="text-[11px] text-slate-500 font-medium">
                       ₹{item.price} × {item.quantity}
                     </span>
+                    {itemDiscountMap[item._id] > 0 && (
+                      <span className="text-[10px] text-emerald-600 font-bold block">
+                        -₹{itemDiscountMap[item._id]} offer applied
+                      </span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <div className="flex items-center bg-white border border-slate-200 rounded-lg overflow-hidden">
