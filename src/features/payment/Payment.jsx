@@ -6,10 +6,12 @@ import * as XLSX from "xlsx";
 
 export default function Payment() {
   const [filter, setFilter] = React.useState("today");
+  const [currentPage, setCurrentPage] = React.useState(1);
 
+  const ITEMS_PER_PAGE = 10;
   const API_BASE = import.meta.env.VITE_APP_API_BASE; // 🆕
 
-  // 1. Current Period Bills Fetch 
+  // 1. Current Period Bills Fetch
   const { data: bills, isLoading } = useQuery({
     queryKey: ["bills", filter],
     queryFn: () =>
@@ -32,6 +34,15 @@ export default function Payment() {
         .catch(() => ({ total: 0 })),
   });
 
+  const totalBills = bills?.length || 0;
+
+  const totalPages = Math.ceil(totalBills / ITEMS_PER_PAGE);
+
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const endIndex = startIndex + ITEMS_PER_PAGE;
+
+  const paginatedBills = bills?.slice(startIndex, endIndex) || [];
+
   const totalRevenue =
     bills?.reduce((acc, curr) => acc + (curr.total || 0), 0) || 0;
 
@@ -40,7 +51,7 @@ export default function Payment() {
   // 💡 Profit / Loss & Percentage Change Logic
   const revenueDifference = totalRevenue - prevRevenue;
   const isProfit = revenueDifference > 0;
-  const isLoss = revenueDifference < 0;
+  // const isLoss = revenueDifference < 0;
 
   const percentageChange =
     prevRevenue > 0
@@ -108,7 +119,10 @@ export default function Payment() {
         {["today", "week", "month", "year"].map((f) => (
           <button
             key={f}
-            onClick={() => setFilter(f)}
+            onClick={() => {
+              setFilter(f);
+              setCurrentPage(1);
+            }}
             className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition cursor-pointer ${
               filter === f
                 ? "bg-slate-900 text-white shadow-sm"
@@ -185,7 +199,7 @@ export default function Payment() {
                   </td>
                 </tr>
               ) : bills?.length > 0 ? (
-                bills.map((bill) => (
+                paginatedBills.map((bill) => (
                   <tr
                     key={bill._id}
                     className="hover:bg-slate-50 transition-colors"
@@ -217,6 +231,70 @@ export default function Payment() {
             </tbody>
           </table>
         </div>
+        {totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-5 py-4 border-t border-slate-100">
+            <p className="text-xs text-slate-500 font-medium">
+              Showing{" "}
+              <span className="font-bold text-slate-700">{startIndex + 1}</span>{" "}
+              to{" "}
+              <span className="font-bold text-slate-700">
+                {Math.min(endIndex, totalBills)}
+              </span>{" "}
+              of <span className="font-bold text-slate-700">{totalBills}</span>{" "}
+              transactions
+            </p>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage((prev) => prev - 1)}
+                className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                Previous
+              </button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, index) => index + 1)
+                  .filter((page) => {
+                    return (
+                      page === 1 ||
+                      page === totalPages ||
+                      Math.abs(page - currentPage) <= 1
+                    );
+                  })
+                  .map((page, index, pages) => (
+                    <React.Fragment key={page}>
+                      {index > 0 && pages[index - 1] !== page - 1 && (
+                        <span className="px-1 text-slate-400 text-xs">...</span>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPage(page)}
+                        className={`w-9 h-9 rounded-xl text-xs font-bold transition ${
+                          currentPage === page
+                            ? "bg-slate-900 text-white shadow-sm"
+                            : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    </React.Fragment>
+                  ))}
+              </div>
+
+              <button
+                type="button"
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage((prev) => prev + 1)}
+                className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

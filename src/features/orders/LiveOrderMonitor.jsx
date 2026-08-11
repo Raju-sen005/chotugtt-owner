@@ -186,11 +186,39 @@ export default function LiveOrderMonitor() {
   const socket = useSocket();
   const playAlert = useNotificationSound();
   const [rejectModalOrder, setRejectModalOrder] = useState(null);
+  const [showStatusPopup, setShowStatusPopup] = useState(false);
+  const [statusPopupType, setStatusPopupType] = useState("");
+  const [statusPopupOrderId, setStatusPopupOrderId] = useState(null);
+
+  const [cancelItemData, setCancelItemData] = useState(null);
+
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+
+  const [showErrorPopup, setShowErrorPopup] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [billOrder, setBillOrder] = useState(null);
   const [rejectReasonDropdown, setRejectReasonDropdown] =
     useState("Item Out of Stock");
 
   const apiBase = import.meta.env.VITE_APP_API_BASE;
+  const showSuccess = useCallback((message) => {
+    setSuccessMessage(message);
+    setShowSuccessPopup(true);
 
+    setTimeout(() => {
+      setShowSuccessPopup(false);
+    }, 3000);
+  }, []);
+
+  const showError = useCallback((message) => {
+    setErrorMessage(message);
+    setShowErrorPopup(true);
+
+    setTimeout(() => {
+      setShowErrorPopup(false);
+    }, 3000);
+  }, []);
   // 🧾 Restaurant profile — needed for the printed bill header (name, address, contact)
   const [storeDetails, setStoreDetails] = useState({
     name: "",
@@ -264,6 +292,17 @@ export default function LiveOrderMonitor() {
   const currentOrders = orders.slice(indexOfFirstOrder, indexOfLastOrder);
   const totalPages = Math.ceil(orders.length / itemsPerPage);
 
+  const handleStatusClick = useCallback((orderId, status) => {
+    if (status === "REJECTED") {
+      setRejectModalOrder(orderId);
+      return;
+    }
+
+    setStatusPopupOrderId(orderId);
+    setStatusPopupType(status);
+    setShowStatusPopup(true);
+  }, []);
+
   useEffect(() => {
     if (!socket) return;
 
@@ -312,34 +351,44 @@ export default function LiveOrderMonitor() {
 
   // 🆕 Cancel a single item — hits the real backend endpoint and refreshes
   // subtotal/tax/total from the response (backend does the recalculation).
-  const handleCancelItem = useCallback(
-    async (orderId, itemId) => {
-      const confirmed = window.confirm(
-        "Cancel this item from the order? Total will be recalculated. This can't be undone.",
+  const handleCancelItem = useCallback((orderId, itemId) => {
+    setCancelItemData({
+      orderId,
+      itemId,
+    });
+  }, []);
+
+  const confirmCancelItem = useCallback(async () => {
+    if (!cancelItemData) return;
+
+    const { orderId, itemId } = cancelItemData;
+
+    try {
+      const res = await axios.patch(
+        `${apiBase}/orders/${orderId}/item/${itemId}/cancel`,
+        {},
+        { withCredentials: true },
       );
-      if (!confirmed) return;
 
-      try {
-        const res = await axios.patch(
-          `${apiBase}/orders/${orderId}/item/${itemId}/cancel`,
-          {},
-          { withCredentials: true },
-        );
+      const updatedOrder = res.data.data;
 
-        const updatedOrder = res.data.data;
+      queryClient.setQueryData(["live-orders"], (oldOrders = []) =>
+        oldOrders.map((order) =>
+          order._id === orderId ? updatedOrder : order,
+        ),
+      );
 
-        queryClient.setQueryData(["live-orders"], (oldOrders = []) =>
-          oldOrders.map((order) =>
-            order._id === orderId ? updatedOrder : order,
-          ),
-        );
-      } catch (err) {
-        console.error("Failed to cancel item", err);
-        alert(err.response?.data?.message || "Failed to cancel item");
-      }
-    },
-    [queryClient, apiBase],
-  );
+      setCancelItemData(null);
+
+      showSuccess("Item Cancelled Successfully");
+    } catch (err) {
+      console.error("Failed to cancel item", err);
+
+      setCancelItemData(null);
+
+      showError(err.response?.data?.message || "Failed to cancel item");
+    }
+  }, [cancelItemData, apiBase, queryClient, showSuccess, showError]);
 
   const handleStatusTransition = useCallback(
     async (orderId, targetStatus, customReason = "") => {
@@ -356,7 +405,11 @@ export default function LiveOrderMonitor() {
           { status: targetStatus, rejectReason },
           { withCredentials: true },
         );
-
+        showSuccess(
+          targetStatus === "ACCEPTED"
+            ? "Order Accepted Successfully"
+            : "Order Rejected Successfully",
+        );
         const updatedOrderFromBackend = res.data.data;
 
         queryClient.setQueryData(["live-orders"], (oldOrders) =>
@@ -374,16 +427,22 @@ export default function LiveOrderMonitor() {
         queryClient.invalidateQueries({ queryKey: ["table-status"] });
         setRejectModalOrder(null);
       } catch (err) {
+        showError(
+          err.response?.data?.message ||
+            `Failed to ${
+              targetStatus === "ACCEPTED" ? "accept" : "reject"
+            } order`,
+        );
         console.error("Error transitioning state context pipeline:", err);
       }
     },
-    [queryClient, apiBase],
+    [queryClient, apiBase, showSuccess, showError],
   );
 
   // 🧾 Opens a thermal-receipt-style print window for a completed order
   const printBillReceipt = useCallback(
     (order) => {
-      // 🔑 FIX: cancelled/rejected items bill par 
+      // 🔑 FIX: cancelled/rejected items bill par
       const items = (order.items || []).filter((i) => i.status !== "REJECTED");
 
       const subtotal =
@@ -415,9 +474,19 @@ export default function LiveOrderMonitor() {
       // 🔑 image ko absolute URL  (relative path ho to base attach karo)
       const resolveUrl = (path) => {
         if (!path) return "";
-        return path.startsWith("http")
-          ? path
-          : `${apiBase.replace("/api", "")}${path}`;
+
+        // Base64/data URL ko directly use karo
+        if (path.startsWith("data:image/")) {
+          return path;
+        }
+
+        // Already absolute URL
+        if (path.startsWith("http://") || path.startsWith("https://")) {
+          return path;
+        }
+
+        // Relative backend path
+        return `${apiBase.replace("/api", "")}${path}`;
       };
 
       const upiQrUrl = resolveUrl(storeDetails.upiQrCode);
@@ -534,11 +603,32 @@ export default function LiveOrderMonitor() {
 
           <div class="footer-line">Thank you for visiting!<br/>Visit again 🙏</div>
         </div>
-        <script>
-          window.focus();
-          window.print();
-          window.onafterprint = () => window.close();
-        </script>
+<script>
+  window.focus();
+
+  const printWhenReady = async () => {
+    const images = Array.from(document.images);
+
+    await Promise.all(
+      images.map((img) => {
+        if (img.complete) {
+          return Promise.resolve();
+        }
+
+        return new Promise((resolve) => {
+          img.onload = resolve;
+          img.onerror = resolve;
+        });
+      })
+    );
+
+    window.print();
+  };
+
+  window.addEventListener("load", printWhenReady);
+
+  window.onafterprint = () => window.close();
+</script>
       </body>
     </html>`;
 
@@ -552,45 +642,59 @@ export default function LiveOrderMonitor() {
   );
 
   // Bill & WhatsApp clear table handler added from TableMonitor
-  const handleBillAndWhatsApp = useCallback(
-    async (order) => {
-      const tableLabel = order.mergedTables?.length
-        ? `${order.tableNumber} & ${order.mergedTables.join(", ")}`
-        : order.tableNumber;
+  const handleBillAndWhatsApp = useCallback((order) => {
+    setBillOrder(order);
+  }, []);
 
-      const confirmed = window.confirm(
-        `Generate bill for ${order.customerName} (Table ${tableLabel}) and clear the table?`,
+  const confirmGenerateBill = useCallback(async () => {
+    if (!billOrder) return;
+
+    try {
+      const res = await axios.patch(
+        `${apiBase}/orders/${billOrder._id}/complete`,
+        {},
+        { withCredentials: true },
       );
 
-      if (!confirmed) return;
+      // Print bill
+      printBillReceipt(res.data?.data || billOrder);
 
-      try {
-        // ✅ Order Complete
-        const res = await axios.patch(
-          `${apiBase}/orders/${order._id}/complete`,
-          {},
-          { withCredentials: true },
-        );
+      // Remove from live orders
+      queryClient.setQueryData(["live-orders"], (prev) =>
+        (prev || []).filter((o) => o._id !== billOrder._id),
+      );
 
-        // 🧾 Print the bill — use backend response if it has updated totals, else the local order
-        printBillReceipt(res.data?.data || order);
+      // Refresh tables and billing
+      queryClient.invalidateQueries({
+        queryKey: ["table-status"],
+      });
 
-        // ✅ Remove from Live Orders
-        queryClient.setQueryData(["live-orders"], (prev) =>
-          (prev || []).filter((o) => o._id !== order._id),
-        );
+      queryClient.invalidateQueries({
+        queryKey: ["table-monitor-orders"],
+      });
 
-        // ✅ Refresh Tables & Billing
-        queryClient.invalidateQueries({ queryKey: ["table-status"] });
-        queryClient.invalidateQueries({ queryKey: ["table-monitor-orders"] });
-      } catch (err) {
-        console.error("Failed to complete order", err);
-        alert(err.response?.data?.message || "Failed to generate bill.");
-        queryClient.invalidateQueries({ queryKey: ["live-orders"] });
-      }
-    },
-    [queryClient, apiBase, printBillReceipt],
-  );
+      setBillOrder(null);
+
+      showSuccess("Bill Generated Successfully");
+    } catch (err) {
+      console.error("Failed to complete order", err);
+
+      setBillOrder(null);
+
+      showError(err.response?.data?.message || "Failed to generate bill.");
+
+      queryClient.invalidateQueries({
+        queryKey: ["live-orders"],
+      });
+    }
+  }, [
+    billOrder,
+    apiBase,
+    printBillReceipt,
+    queryClient,
+    showSuccess,
+    showError,
+  ]);
 
   const handleView = useCallback((order) => setSelectedOrder(order), []);
   const handleCloseModal = useCallback(() => setSelectedOrder(null), []);
@@ -607,166 +711,321 @@ export default function LiveOrderMonitor() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-10 space-y-8 font-sans bg-[#F8F9FA] min-h-screen">
-      {/* Header Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs">
-        <div>
-          <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
-            Live Kitchen Monitor
-          </h1>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Manage incoming orders, table occupancy statuses, and kitchen
-            execution queue.
-          </p>
-        </div>
-        <div className="flex items-center gap-2.5 bg-rose-50/80 border border-rose-100 px-4 py-2 rounded-2xl self-start sm:self-center shadow-2xs">
-          <Radio size={16} className="text-rose-600 animate-pulse" />
-          <span className="text-[11px] font-black tracking-wider uppercase text-rose-600">
-            Stream Active
-          </span>
-        </div>
-      </div>
-
-      {/* Table Occupancy Strip */}
-      <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-xs space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
-            Table Live Status Grid
-          </p>
-        </div>
-        <TableStatusStrip
-          tables={tableStatus}
-          isLoading={isLoadingTableStatus}
-        />
-      </div>
-
-      {/* Orders Section */}
-      {orders.length === 0 ? (
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-16 text-center shadow-xs flex flex-col items-center justify-center max-w-xl mx-auto space-y-3">
-          <p className="text-sm font-bold text-slate-800">
-            No live orders right now
-          </p>
-          <p className="text-xs text-slate-500 font-medium">
-            New customer incoming orders will appear here automatically in
-            real-time stream loop.
-          </p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
-          <div className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider px-6 pt-4">
-            ← Swipe horizontally to see table details →
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[680px]">
-              <thead>
-                <tr className="bg-slate-50/70 border-b border-slate-200/80 text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider">
-                  <th className="px-6 py-4 whitespace-nowrap">Order ID</th>
-                  <th className="px-6 py-4 whitespace-nowrap">Table</th>
-                  <th className="px-6 py-4 whitespace-nowrap">Customer</th>
-                  <th className="px-6 py-4 whitespace-nowrap">Items Summary</th>
-                  <th className="px-6 py-4 text-right whitespace-nowrap">
-                    Total
-                  </th>
-                  <th className="px-6 py-4 text-center whitespace-nowrap">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {currentOrders.map((order) => (
-                  <OrderRow
-                    key={order._id}
-                    order={order}
-                    onStatusChange={handleStatusTransition}
-                    onView={handleView}
-                    onClear={handleBillAndWhatsApp}
-                    onCancelItem={handleCancelItem}
-                  />
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination Footer inside card container */}
-          {totalPages > 1 && (
-            <div className="flex flex-col sm:flex-row gap-4 justify-between items-center px-6 py-4 bg-slate-50/50 border-t border-slate-100">
-              <p className="text-xs text-slate-500 font-medium">
-                Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                {Math.min(indexOfLastOrder, orders.length)} of {orders.length}{" "}
-                orders
-              </p>
-              <div className="flex gap-2">
-                <button
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage((p) => p - 1)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 disabled:opacity-40 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
-                >
-                  <ArrowLeft size={14} /> Previous
-                </button>
-                <button
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage((p) => p + 1)}
-                  className="flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 disabled:opacity-40 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
-                >
-                  Next <ArrowRight size={14} />
-                </button>
-              </div>
+    <>
+      {showStatusPopup && statusPopupType === "ACCEPTED" && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center mb-4">
+              <Check size={24} strokeWidth={2.5} />
             </div>
-          )}
-        </div>
-      )}
-      {rejectModalOrder && (
-        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-sm p-6 space-y-4 shadow-2xl border border-slate-100">
-            <h3 className="text-base font-black text-slate-900">
-              Select Rejection Reason
-            </h3>
-            <p className="text-xs text-slate-500">
-              Please choose a reason why this order is being rejected:
+
+            <h3 className="text-lg font-black text-slate-900">Accept Order?</h3>
+
+            <p className="text-sm text-slate-500 mt-2">
+              Are you sure you want to accept this order?
             </p>
 
-            <select
-              value={rejectReasonDropdown}
-              onChange={(e) => setRejectReasonDropdown(e.target.value)}
-              className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
-            >
-              <option value="Item Out of Stock">Item Out of Stock</option>
-              <option value="Kitchen Closed / Overloaded">
-                Kitchen Closed / Overloaded
-              </option>
-              <option value="Customer Requested Cancellation">
-                Customer Requested Cancellation
-              </option>
-              <option value="Store Closing Time">Store Closing Time</option>
-            </select>
-
-            <div className="flex justify-end gap-2 pt-2">
+            <div className="flex gap-3 mt-6">
               <button
-                onClick={() => setRejectModalOrder(null)}
-                className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs cursor-pointer hover:bg-slate-200"
+                onClick={() => {
+                  setShowStatusPopup(false);
+                  setStatusPopupOrderId(null);
+                }}
+                className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 text-sm font-bold hover:bg-slate-50"
               >
                 Cancel
               </button>
+
               <button
-                onClick={() =>
-                  handleStatusTransition(
-                    rejectModalOrder,
-                    "REJECTED",
-                    rejectReasonDropdown,
-                  )
-                }
-                className="px-4 py-2 bg-rose-600 text-white rounded-xl font-bold text-xs cursor-pointer hover:bg-rose-700 shadow-lg shadow-rose-600/20"
+                onClick={() => {
+                  setShowStatusPopup(false);
+
+                  handleStatusTransition(statusPopupOrderId, "ACCEPTED");
+
+                  setStatusPopupOrderId(null);
+                }}
+                className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700"
               >
-                Confirm Reject
+                Accept
               </button>
             </div>
           </div>
         </div>
       )}
-      {selectedOrder && (
-        <OrderDetailsModal order={selectedOrder} onClose={handleCloseModal} />
+
+      {cancelItemData && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6">
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mb-4">
+              <X size={24} strokeWidth={2.5} />
+            </div>
+
+            <h3 className="text-lg font-black text-slate-900">Cancel Item?</h3>
+
+            <p className="text-sm text-slate-500 mt-2">
+              Are you sure you want to cancel this item? The order total will be
+              recalculated.
+            </p>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                onClick={() => setCancelItemData(null)}
+                className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 text-sm font-bold hover:bg-slate-50"
+              >
+                Keep Item
+              </button>
+
+              <button
+                onClick={confirmCancelItem}
+                className="flex-1 py-3 rounded-xl bg-rose-600 text-white text-sm font-bold hover:bg-rose-700"
+              >
+                Cancel Item
+              </button>
+            </div>
+          </div>
+        </div>
       )}
-    </div>
+
+      {showSuccessPopup && (
+        <div className="fixed top-6 right-6 z-[10001]">
+          <div className="bg-white border border-emerald-200 shadow-2xl rounded-2xl px-5 py-4 flex items-start gap-3 min-w-[320px]">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+              <Check size={20} strokeWidth={2.5} />
+            </div>
+
+            <div>
+              <p className="text-sm font-black text-slate-900">Success</p>
+              <p className="text-xs text-slate-500 mt-1">{successMessage}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {billOrder && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6">
+            <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center mb-4">
+              <IndianRupee size={24} strokeWidth={2.5} />
+            </div>
+
+            <h3 className="text-lg font-black text-slate-900">
+              Generate Bill?
+            </h3>
+
+            <p className="text-sm text-slate-500 mt-2 leading-relaxed">
+              Generate the bill for{" "}
+              <span className="font-bold text-slate-700">
+                {billOrder.customerName || "Guest"}
+              </span>{" "}
+              and clear{" "}
+              <span className="font-bold text-slate-700">
+                Table {billOrder.tableNumber}
+              </span>
+              ?
+            </p>
+
+            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-xl p-3 mt-3">
+              The bill will be printed and the table will be cleared.
+            </p>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => setBillOrder(null)}
+                className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 text-sm font-bold hover:bg-slate-50 transition"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmGenerateBill}
+                className="flex-1 py-3 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 transition"
+              >
+                Generate Bill
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showErrorPopup && (
+        <div className="fixed top-6 right-6 z-[10002]">
+          <div className="bg-white border border-rose-200 shadow-2xl rounded-2xl px-5 py-4 flex items-start gap-3 min-w-[320px]">
+            <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
+              <X size={20} strokeWidth={2.5} />
+            </div>
+
+            <div>
+              <p className="text-sm font-black text-slate-900">Error</p>
+              <p className="text-xs text-slate-500 mt-1">{errorMessage}</p>
+            </div>
+          </div>
+        </div>
+      )}
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-10 space-y-8 font-sans bg-[#F8F9FA] min-h-screen">
+        {/* Header Banner */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs">
+          <div>
+            <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
+              Live Kitchen Monitor
+            </h1>
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+              Manage incoming orders, table occupancy statuses, and kitchen
+              execution queue.
+            </p>
+          </div>
+          <div className="flex items-center gap-2.5 bg-rose-50/80 border border-rose-100 px-4 py-2 rounded-2xl self-start sm:self-center shadow-2xs">
+            <Radio size={16} className="text-rose-600 animate-pulse" />
+            <span className="text-[11px] font-black tracking-wider uppercase text-rose-600">
+              Stream Active
+            </span>
+          </div>
+        </div>
+
+        {/* Table Occupancy Strip */}
+        <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-xs space-y-3">
+          <div className="flex items-center justify-between">
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
+              Table Live Status Grid
+            </p>
+          </div>
+          <TableStatusStrip
+            tables={tableStatus}
+            isLoading={isLoadingTableStatus}
+          />
+        </div>
+
+        {/* Orders Section */}
+        {orders.length === 0 ? (
+          <div className="bg-white rounded-3xl border border-slate-200/80 p-16 text-center shadow-xs flex flex-col items-center justify-center max-w-xl mx-auto space-y-3">
+            <p className="text-sm font-bold text-slate-800">
+              No live orders right now
+            </p>
+            <p className="text-xs text-slate-500 font-medium">
+              New customer incoming orders will appear here automatically in
+              real-time stream loop.
+            </p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
+            <div className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider px-6 pt-4">
+              ← Swipe horizontally to see table details →
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse min-w-[680px]">
+                <thead>
+                  <tr className="bg-slate-50/70 border-b border-slate-200/80 text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider">
+                    <th className="px-6 py-4 whitespace-nowrap">Order ID</th>
+                    <th className="px-6 py-4 whitespace-nowrap">Table</th>
+                    <th className="px-6 py-4 whitespace-nowrap">Customer</th>
+                    <th className="px-6 py-4 whitespace-nowrap">
+                      Items Summary
+                    </th>
+                    <th className="px-6 py-4 text-right whitespace-nowrap">
+                      Total
+                    </th>
+                    <th className="px-6 py-4 text-center whitespace-nowrap">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {currentOrders.map((order) => (
+                    <OrderRow
+                      key={order._id}
+                      order={order}
+                      onStatusChange={handleStatusClick}
+                      onView={handleView}
+                      onClear={handleBillAndWhatsApp}
+                      onCancelItem={handleCancelItem}
+                    />
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination Footer inside card container */}
+            {totalPages > 1 && (
+              <div className="flex flex-col sm:flex-row gap-4 justify-between items-center px-6 py-4 bg-slate-50/50 border-t border-slate-100">
+                <p className="text-xs text-slate-500 font-medium">
+                  Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
+                  {Math.min(indexOfLastOrder, orders.length)} of {orders.length}{" "}
+                  orders
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage((p) => p - 1)}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 disabled:opacity-40 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
+                  >
+                    <ArrowLeft size={14} /> Previous
+                  </button>
+                  <button
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage((p) => p + 1)}
+                    className="flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 rounded-xl text-xs font-bold text-slate-700 disabled:opacity-40 hover:bg-slate-50 transition cursor-pointer shadow-2xs"
+                  >
+                    Next <ArrowRight size={14} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+        {rejectModalOrder && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl w-full max-w-sm p-6 space-y-4 shadow-2xl border border-slate-100">
+              <h3 className="text-base font-black text-slate-900">
+                Select Rejection Reason
+              </h3>
+              <p className="text-xs text-slate-500">
+                Please choose a reason why this order is being rejected:
+              </p>
+
+              <select
+                value={rejectReasonDropdown}
+                onChange={(e) => setRejectReasonDropdown(e.target.value)}
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
+              >
+                <option value="Item Out of Stock">Item Out of Stock</option>
+                <option value="Kitchen Closed / Overloaded">
+                  Kitchen Closed / Overloaded
+                </option>
+                <option value="Customer Requested Cancellation">
+                  Customer Requested Cancellation
+                </option>
+                <option value="Store Closing Time">Store Closing Time</option>
+              </select>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  onClick={() => setRejectModalOrder(null)}
+                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs cursor-pointer hover:bg-slate-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() =>
+                    handleStatusTransition(
+                      rejectModalOrder,
+                      "REJECTED",
+                      rejectReasonDropdown,
+                    )
+                  }
+                  className="px-4 py-2 bg-rose-600 text-white rounded-xl font-bold text-xs cursor-pointer hover:bg-rose-700 shadow-lg shadow-rose-600/20"
+                >
+                  Confirm Reject
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {selectedOrder && (
+          <OrderDetailsModal order={selectedOrder} onClose={handleCloseModal} />
+        )}
+      </div>
+    </>
   );
 }

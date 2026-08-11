@@ -11,6 +11,7 @@ import {
   Pencil,
   FolderPlus,
   ChevronDown,
+  CheckCircle2,
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
 import { QRCodeCanvas } from "qrcode.react";
@@ -228,10 +229,15 @@ export default function TableMonitor() {
   const [copied, setCopied] = useState(null);
   const qrRefs = useRef({});
 
-  const [storeDetails, setStoreDetails] = useState({ name: "", logo: "" });
+  const [storeDetails, setStoreDetails] = useState({
+    id: "",
+    name: "",
+    logo: "",
+  });
   const [tables, setTables] = useState([]);
   const [sections, setSections] = useState(["General"]);
-
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
   // Add Table modal state
   const [showAddTable, setShowAddTable] = useState(false);
   const [newTableName, setNewTableName] = useState("");
@@ -244,8 +250,19 @@ export default function TableMonitor() {
   const [showAddSection, setShowAddSection] = useState(false);
   const [newSectionName, setNewSectionName] = useState("");
   const [isSavingSection, setIsSavingSection] = useState(false);
+  const [showDeleteSectionModal, setShowDeleteSectionModal] = useState(false);
+  const [sectionToDelete, setSectionToDelete] = useState(null);
 
   const apiBase = import.meta.env.VITE_APP_API_BASE;
+
+  const showSuccess = useCallback((message) => {
+    setSuccessMessage(message);
+    setShowSuccessPopup(true);
+
+    setTimeout(() => {
+      setShowSuccessPopup(false);
+    }, 3000);
+  }, []);
 
   // Restaurant Profile Fetch
   useEffect(() => {
@@ -254,6 +271,7 @@ export default function TableMonitor() {
       .then((res) => {
         if (res.data?.data) {
           setStoreDetails({
+            id: res.data.data._id || res.data.data.id || "",
             name: res.data.data.name || "",
             logo: res.data.data.logo || "",
           });
@@ -307,7 +325,11 @@ export default function TableMonitor() {
     fetchSections();
   }, [fetchTables, fetchSections]);
 
-  const activeRestaurantId = user?.restaurantId || user?._id;
+  const activeRestaurantId =
+    user?.restaurantId?._id ||
+    user?.restaurantId ||
+    user?._id ||
+    storeDetails.id;
 
   const printQRCode = useCallback(
     (tableNo) => {
@@ -440,6 +462,8 @@ export default function TableMonitor() {
         setTables(formatted);
         setShowAddTable(false);
         fetchSections();
+
+        showSuccess(`Table ${cleanName} added successfully!`);
       }
     } catch (err) {
       alert(err?.response?.data?.message || err?.message);
@@ -454,6 +478,7 @@ export default function TableMonitor() {
     tables,
     apiBase,
     fetchSections,
+    showSuccess,
   ]);
 
   // 🔑 Standalone empty section banana
@@ -471,12 +496,14 @@ export default function TableMonitor() {
       await fetchSections();
       setShowAddSection(false);
       setNewSectionName("");
+
+      showSuccess(`Section "${clean}" created successfully!`);
     } catch (err) {
       alert(err?.response?.data?.message || err?.message);
     } finally {
       setIsSavingSection(false);
     }
-  }, [newSectionName, apiBase, fetchSections]);
+  }, [newSectionName, apiBase, fetchSections, showSuccess]);
 
   const renameSection = useCallback(
     async (oldName, newName) => {
@@ -486,92 +513,130 @@ export default function TableMonitor() {
           { newName },
           { withCredentials: true },
         );
+
         setSections((prev) => prev.map((s) => (s === oldName ? newName : s)));
+
         setTables((prev) =>
           prev.map((t) =>
             t.section === oldName ? { ...t, section: newName } : t,
           ),
         );
+
+        showSuccess(`Section renamed to "${newName}" successfully!`);
       } catch (err) {
-        alert(err?.response?.data?.message || err?.message);
+        alert(
+          err?.response?.data?.message ||
+            err?.message ||
+            "Failed to rename section",
+        );
       }
     },
-    [apiBase],
+    [apiBase, showSuccess],
   );
 
-  const deleteSection = useCallback(
-    async (name) => {
-      if (
-        !window.confirm(
-          `"${name}" Delete the section? The tables within it will be moved to "General".`,
-        )
-      )
-        return;
+  const deleteSection = useCallback((name) => {
+    setSectionToDelete(name);
+    setShowDeleteSectionModal(true);
+  }, []);
+
+  const confirmDeleteSection = useCallback(async () => {
+    if (!sectionToDelete) return;
+
+    try {
+      await axios.delete(
+        `${apiBase}/sections/admin/${encodeURIComponent(sectionToDelete)}`,
+        {
+          withCredentials: true,
+        },
+      );
+
+      setSections((prev) => prev.filter((s) => s !== sectionToDelete));
+
+      setTables((prev) =>
+        prev.map((t) =>
+          t.section === sectionToDelete ? { ...t, section: "General" } : t,
+        ),
+      );
+
+      setShowDeleteSectionModal(false);
+
+      showSuccess(`Section "${sectionToDelete}" deleted successfully!`);
+
+      setSectionToDelete(null);
+    } catch (err) {
+      alert(
+        err?.response?.data?.message ||
+          err?.message ||
+          "Failed to delete section",
+      );
+    }
+  }, [sectionToDelete, apiBase, showSuccess]);
+
+  const removeTable = useCallback(
+    async (tableNo) => {
+      if (tables.length <= 1) return;
+
       try {
-        await axios.delete(
-          `${apiBase}/sections/admin/${encodeURIComponent(name)}`,
+        const res = await axios.delete(
+          `${apiBase}/tables/admin/${encodeURIComponent(tableNo)}`,
           {
             withCredentials: true,
           },
         );
-        setSections((prev) => prev.filter((s) => s !== name));
-        setTables((prev) =>
-          prev.map((t) =>
-            t.section === name ? { ...t, section: "General" } : t,
-          ),
-        );
+
+        if (res.data?.success !== false) {
+          setTables((prev) => prev.filter((t) => t.tableNumber !== tableNo));
+
+          showSuccess(`Table ${tableNo} deleted successfully!`);
+        }
       } catch (err) {
-        alert(err?.response?.data?.message || err?.message);
+        alert(
+          err?.response?.data?.message ||
+            err?.message ||
+            "Failed to delete table",
+        );
       }
     },
-    [apiBase],
-  );
-
-  const removeTable = useCallback(
-    (tableNo) => {
-      setTables((prev) => {
-        if (prev.length <= 1) return prev;
-        return prev.filter((t) => t.tableNumber !== tableNo);
-      });
-
-      axios
-        .delete(`${apiBase}/tables/admin/${encodeURIComponent(tableNo)}`, {
-          withCredentials: true,
-        })
-        .catch((err) =>
-          console.warn(
-            "Could not sync table removal to backend:",
-            err?.message,
-          ),
-        );
-    },
-    [apiBase],
+    [tables.length, apiBase, showSuccess],
   );
 
   const toggleTableStatus = useCallback(
-    (tableNo, newDisabledState) => {
-      setTables((prev) =>
-        prev.map((t) =>
-          t.tableNumber === tableNo
-            ? { ...t, isDisabled: newDisabledState }
-            : t,
-        ),
-      );
-
-      axios
-        .patch(
+    async (tableNo, newDisabledState) => {
+      try {
+        const res = await axios.patch(
           `${apiBase}/tables/admin/${encodeURIComponent(tableNo)}/toggle`,
-          { isDisabled: newDisabledState },
-          { withCredentials: true },
-        )
-        .catch((err) =>
-          console.warn(
-            "Could not sync table toggle state to backend:",
-            err?.message,
-          ),
+          {
+            isDisabled: newDisabledState,
+          },
+          {
+            withCredentials: true,
+          },
         );
+
+        if (res.data?.success !== false) {
+          setTables((prev) =>
+            prev.map((t) =>
+              t.tableNumber === tableNo
+                ? { ...t, isDisabled: newDisabledState }
+                : t,
+            ),
+          );
+
+          showSuccess(
+            newDisabledState
+              ? `Table ${tableNo} disabled successfully!`
+              : `Table ${tableNo} enabled successfully!`,
+          );
+        }
+      } catch (err) {
+        alert(
+          err?.response?.data?.message ||
+            err?.message ||
+            "Failed to update table status",
+        );
+      }
     },
-    [apiBase],
+    [apiBase, showSuccess],
   );
 
   const generateTableUrl = useCallback(
@@ -632,187 +697,263 @@ export default function TableMonitor() {
   );
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-10 space-y-8 font-sans bg-[#F8F9FA] min-h-screen">
-      {/* Header Section */}
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-red-50 text-red-600 rounded-2xl border border-red-100">
-            <QrCode size={28} />
+    <>
+      {showSuccessPopup && (
+        <div className="fixed top-6 right-6 z-[9999] animate-in slide-in-from-right-5 fade-in duration-300">
+          <div className="flex items-start gap-3 bg-white border border-emerald-200 shadow-2xl rounded-2xl px-5 py-4 min-w-[320px] max-w-[400px]">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+              <CheckCircle2 size={22} strokeWidth={2.5} />
+            </div>
+
+            <div className="flex-1">
+              <p className="text-sm font-black text-slate-900">Success</p>
+
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                {successMessage}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setShowSuccessPopup(false)}
+              className="text-slate-400 hover:text-slate-700 transition-colors text-lg leading-none"
+            >
+              ×
+            </button>
           </div>
-          <div>
-            <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-              Table Monitor
-            </h1>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              Manage custom table names, sections, and QR standees.
+        </div>
+      )}
+
+      {showDeleteSectionModal && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 animate-in zoom-in-95 fade-in duration-200">
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mb-4">
+              <Trash2 size={22} strokeWidth={2.5} />
+            </div>
+
+            <h3 className="text-lg font-black text-slate-900">
+              Delete Section?
+            </h3>
+
+            <p className="text-sm text-slate-500 mt-2 leading-relaxed">
+              Are you sure you want to delete{" "}
+              <span className="font-bold text-slate-700">
+                "{sectionToDelete}"
+              </span>
+              ?
             </p>
+
+            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-xl p-3 mt-3">
+              Tables inside this section will be moved to
+              <span className="font-bold"> General</span>.
+            </p>
+
+            <div className="flex gap-3 mt-6">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowDeleteSectionModal(false);
+                  setSectionToDelete(null);
+                }}
+                className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 text-sm font-bold hover:bg-slate-50 transition-all"
+              >
+                Cancel
+              </button>
+
+              <button
+                type="button"
+                onClick={confirmDeleteSection}
+                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-rose-500 to-red-600 text-white text-sm font-bold hover:opacity-95 transition-all"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-10 space-y-8 font-sans bg-[#F8F9FA] min-h-screen">
+        {/* Header Section */}
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-red-50 text-red-600 rounded-2xl border border-red-100">
+              <QrCode size={28} />
+            </div>
+            <div>
+              <h1 className="text-2xl font-black text-slate-900 tracking-tight">
+                Table Monitor
+              </h1>
+              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                Manage custom table names, sections, and QR standees.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={() => setShowAddSection(true)}
+              className="flex-1 sm:flex-none bg-white border border-slate-200 text-slate-700 px-4 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-slate-50 transition-all cursor-pointer"
+            >
+              <FolderPlus size={16} /> Add Section
+            </button>
+            <button
+              onClick={openAddTableModal}
+              disabled={!activeRestaurantId}
+              className="flex-1 sm:flex-none bg-gradient-to-r from-red-500 to-rose-600 text-white px-5 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 hover:opacity-95 shadow-sm shadow-red-500/20 transition-all cursor-pointer disabled:opacity-50"
+            >
+              <Plus size={16} /> Add Table
+            </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <button
-            onClick={() => setShowAddSection(true)}
-            className="flex-1 sm:flex-none bg-white border border-slate-200 text-slate-700 px-4 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-slate-50 transition-all cursor-pointer"
-          >
-            <FolderPlus size={16} /> Add Section
-          </button>
-          <button
-            onClick={openAddTableModal}
-            disabled={!activeRestaurantId}
-            className="flex-1 sm:flex-none bg-gradient-to-r from-red-500 to-rose-600 text-white px-5 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 hover:opacity-95 shadow-sm shadow-red-500/20 transition-all cursor-pointer disabled:opacity-50"
-          >
-            <Plus size={16} /> Add Table
-          </button>
+        {/* Info Stats Bar */}
+        <div className="flex items-center justify-between px-2">
+          <h3 className="font-black text-slate-800 text-base">All Sections</h3>
+          <span className="text-xs font-bold bg-white px-3 py-1 rounded-full border border-slate-200 text-slate-600 shadow-xs">
+            {tables.length} Total Tables
+          </span>
         </div>
-      </div>
 
-      {/* Info Stats Bar */}
-      <div className="flex items-center justify-between px-2">
-        <h3 className="font-black text-slate-800 text-base">All Sections</h3>
-        <span className="text-xs font-bold bg-white px-3 py-1 rounded-full border border-slate-200 text-slate-600 shadow-xs">
-          {tables.length} Total Tables
-        </span>
-      </div>
+        {/* Section-wise Tables */}
+        <div className="space-y-10">
+          {groupedBySections.map(({ section, tables: sectionTables }) => (
+            <SectionBlock
+              key={section}
+              section={section}
+              tables={sectionTables}
+              onRenameSection={renameSection}
+              onDeleteSection={deleteSection}
+              renderCard={renderCard}
+            />
+          ))}
+        </div>
 
-      {/* Section-wise Tables */}
-      <div className="space-y-10">
-        {groupedBySections.map(({ section, tables: sectionTables }) => (
-          <SectionBlock
-            key={section}
-            section={section}
-            tables={sectionTables}
-            onRenameSection={renameSection}
-            onDeleteSection={deleteSection}
-            renderCard={renderCard}
-          />
-        ))}
-      </div>
-
-      {/* Add Table Modal */}
-      {showAddTable && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-sm space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <h3 className="font-black text-slate-900 text-lg">
-                Add New Table
-              </h3>
-              <button
-                onClick={() => setShowAddTable(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">
-                Table Name
-              </label>
-              <input
-                autoFocus
-                value={newTableName}
-                onChange={(e) => setNewTableName(e.target.value)}
-                placeholder="e.g. AC1, T5, VIP-2"
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">
-                Section
-              </label>
-
-              {!creatingNewSection ? (
-                <select
-                  value={newTableSection}
-                  onChange={(e) => {
-                    if (e.target.value === "__new__") {
-                      setCreatingNewSection(true);
-                    } else {
-                      setNewTableSection(e.target.value);
-                    }
-                  }}
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400 bg-white"
+        {/* Add Table Modal */}
+        {showAddTable && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-3xl p-6 w-full max-w-sm space-y-5 shadow-2xl">
+              <div className="flex items-center justify-between">
+                <h3 className="font-black text-slate-900 text-lg">
+                  Add New Table
+                </h3>
+                <button
+                  onClick={() => setShowAddTable(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
                 >
-                  {sections.map((s) => (
-                    <option key={s} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                  <option value="__new__">+ Create New Section</option>
-                </select>
-              ) : (
-                <div className="flex gap-2">
-                  <input
-                    autoFocus
-                    value={newSectionInline}
-                    onChange={(e) => setNewSectionInline(e.target.value)}
-                    placeholder="e.g. AC, Rooftop"
-                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400"
-                  />
-                  <button
-                    onClick={() => {
-                      setCreatingNewSection(false);
-                      setNewSectionInline("");
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">
+                  Table Name
+                </label>
+                <input
+                  autoFocus
+                  value={newTableName}
+                  onChange={(e) => setNewTableName(e.target.value)}
+                  placeholder="e.g. AC1, T5, VIP-2"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">
+                  Section
+                </label>
+
+                {!creatingNewSection ? (
+                  <select
+                    value={newTableSection}
+                    onChange={(e) => {
+                      if (e.target.value === "__new__") {
+                        setCreatingNewSection(true);
+                      } else {
+                        setNewTableSection(e.target.value);
+                      }
                     }}
-                    className="px-3 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 cursor-pointer"
+                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400 bg-white"
                   >
-                    <X size={14} />
-                  </button>
-                </div>
-              )}
-            </div>
+                    {sections.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                    <option value="__new__">+ Create New Section</option>
+                  </select>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      autoFocus
+                      value={newSectionInline}
+                      onChange={(e) => setNewSectionInline(e.target.value)}
+                      placeholder="e.g. AC, Rooftop"
+                      className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400"
+                    />
+                    <button
+                      onClick={() => {
+                        setCreatingNewSection(false);
+                        setNewSectionInline("");
+                      }}
+                      className="px-3 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 cursor-pointer"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
 
-            <button
-              onClick={submitAddTable}
-              disabled={isSavingTable}
-              className="w-full bg-gradient-to-r from-red-500 to-rose-600 text-white py-3 rounded-xl font-bold text-sm hover:opacity-95 transition-all cursor-pointer disabled:opacity-50"
-            >
-              {isSavingTable ? "Adding..." : "Add Table"}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Add Section Modal */}
-      {showAddSection && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-3xl p-6 w-full max-w-sm space-y-5 shadow-2xl">
-            <div className="flex items-center justify-between">
-              <h3 className="font-black text-slate-900 text-lg">
-                Add New Section
-              </h3>
               <button
-                onClick={() => setShowAddSection(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
+                onClick={submitAddTable}
+                disabled={isSavingTable}
+                className="w-full bg-gradient-to-r from-red-500 to-rose-600 text-white py-3 rounded-xl font-bold text-sm hover:opacity-95 transition-all cursor-pointer disabled:opacity-50"
               >
-                <X size={18} />
+                {isSavingTable ? "Adding..." : "Add Table"}
               </button>
             </div>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">
-                Section Name
-              </label>
-              <input
-                autoFocus
-                value={newSectionName}
-                onChange={(e) => setNewSectionName(e.target.value)}
-                placeholder="e.g. AC, Non-AC, Rooftop"
-                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400"
-              />
-            </div>
-
-            <button
-              onClick={submitAddSection}
-              disabled={isSavingSection}
-              className="w-full bg-gradient-to-r from-red-500 to-rose-600 text-white py-3 rounded-xl font-bold text-sm hover:opacity-95 transition-all cursor-pointer disabled:opacity-50"
-            >
-              {isSavingSection ? "Creating..." : "Create Section"}
-            </button>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+
+        {/* Add Section Modal */}
+        {showAddSection && (
+          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-3xl p-6 w-full max-w-sm space-y-5 shadow-2xl">
+              <div className="flex items-center justify-between">
+                <h3 className="font-black text-slate-900 text-lg">
+                  Add New Section
+                </h3>
+                <button
+                  onClick={() => setShowAddSection(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">
+                  Section Name
+                </label>
+                <input
+                  autoFocus
+                  value={newSectionName}
+                  onChange={(e) => setNewSectionName(e.target.value)}
+                  placeholder="e.g. AC, Non-AC, Rooftop"
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400"
+                />
+              </div>
+
+              <button
+                onClick={submitAddSection}
+                disabled={isSavingSection}
+                className="w-full bg-gradient-to-r from-red-500 to-rose-600 text-white py-3 rounded-xl font-bold text-sm hover:opacity-95 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {isSavingSection ? "Creating..." : "Create Section"}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </>
   );
 }
