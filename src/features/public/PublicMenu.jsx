@@ -910,8 +910,8 @@ export default function PublicMenu() {
 
         {/* ---------------- Reorder banner ---------------- */}
         {lastOrderSnapshot && totalItemsInCart === 0 && !confirmedOrder && (
-          <div className="mx-4 sm:mx-6 mt-4 bg-white border border-slate-200 rounded-2xl p-3.5 flex items-center gap-3 shadow-sm">
-            <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
+          <div className="mx-4 sm:mx-6 mt-4 bg-transparent rounded-2xl p-0 flex items-center gap-0">
+            {/* <div className="w-9 h-9 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
               <RotateCcw size={16} />
             </div>
             <div className="flex-1 min-w-0">
@@ -927,7 +927,7 @@ export default function PublicMenu() {
               className="shrink-0 bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-black px-3 py-2 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
             >
               {t("reorderCta")}
-            </button>
+            </button> */}
           </div>
         )}
 
@@ -1086,9 +1086,9 @@ export default function PublicMenu() {
                   <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
                     {totalItemsInCart} Item{totalItemsInCart > 1 ? "s" : ""}
                   </p>
-                  <p className="text-base font-black text-white tracking-tight">
+                  {/* <p className="text-base font-black text-white tracking-tight">
                     ₹{totalCartAmount.toLocaleString("en-IN")}
-                  </p>
+                  </p> */}
                 </div>
               </div>
               <button

@@ -13,8 +13,9 @@ import {
   ReceiptText,
   CheckCircle2,
 } from "lucide-react";
-
+import { useAuth } from "../context/AuthContext";
 export default function CounterPOS() {
+  const { user } = useAuth();
   const [items, setItems] = useState([]);
   const [combos, setCombos] = useState([]);
   const [cart, setCart] = useState([]);
@@ -256,6 +257,7 @@ export default function CounterPOS() {
       total,
     };
 
+    // Rejected items bill mein nahi aayenge
     const items = (billOrder.items || []).filter(
       (item) => item.status !== "REJECTED",
     );
@@ -290,6 +292,31 @@ export default function CounterPOS() {
       hour12: false,
     });
 
+    // Cashier
+    const cashierName =
+      user?.name || user?.username || user?.email || "Counter Staff";
+
+    // Resolve QR URL
+    const resolveUrl = (path) => {
+      if (!path) return "";
+
+      // Base64
+      if (path.startsWith("data:image/")) {
+        return path;
+      }
+
+      // Already absolute URL
+      if (path.startsWith("http://") || path.startsWith("https://")) {
+        return path;
+      }
+
+      // Relative backend path
+      return `${apiBase.replace("/api", "")}${path}`;
+    };
+
+    const upiQrUrl = resolveUrl(storeDetails.upiQrCode);
+
+    // Items
     const itemRows = items
       .map(
         (item) => `
@@ -324,7 +351,7 @@ export default function CounterPOS() {
           }
 
           body {
-            font-family: 'Courier New', monospace;
+            font-family: 'Courier New', ui-monospace, monospace;
             margin: 0;
             padding: 0;
             display: flex;
@@ -345,12 +372,15 @@ export default function CounterPOS() {
           .shop-name {
             font-size: 17px;
             font-weight: 700;
-            margin-bottom: 3px;
+            letter-spacing: 0.5px;
+            margin: 0 0 3px 0;
           }
 
           .shop-line {
             font-size: 11px;
             line-height: 1.4;
+            margin: 0;
+            color: #333;
           }
 
           .divider {
@@ -368,12 +398,18 @@ export default function CounterPOS() {
             justify-content: space-between;
             font-size: 12px;
             margin: 3px 0;
+            gap: 10px;
+          }
+
+          .row b {
+            font-weight: 700;
           }
 
           table {
             width: 100%;
             border-collapse: collapse;
             font-size: 12px;
+            margin-top: 4px;
           }
 
           thead td {
@@ -422,11 +458,37 @@ export default function CounterPOS() {
             margin-top: 7px;
           }
 
-          .footer {
+          .upi-block {
+            text-align: center;
+            margin-top: 14px;
+          }
+
+          .upi-block img {
+            width: 120px;
+            height: 120px;
+            object-fit: contain;
+          }
+
+          .upi-id {
+            font-size: 11px;
+            font-weight: 700;
+            margin-top: 6px;
+          }
+
+          .scan-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-bottom: 6px;
+            color: #333;
+          }
+
+          .footer-line {
             font-size: 10px;
             text-align: center;
             margin-top: 14px;
             line-height: 1.5;
+            color: #555;
           }
         </style>
       </head>
@@ -434,34 +496,40 @@ export default function CounterPOS() {
       <body>
         <div class="receipt">
 
-         <div class="center">
-  <p class="shop-name">
-    ${storeDetails.name || "Restaurant"}
-  </p>
+          <!-- RESTAURANT HEADER -->
+          <div class="center">
+            <p class="shop-name">
+              ${storeDetails.name || "RESTAURANT"}
+            </p>
 
-  ${
-    storeDetails.address
-      ? `<p class="shop-line">${storeDetails.address}</p>`
-      : ""
-  }
+            ${
+              storeDetails.address
+                ? `<p class="shop-line">${storeDetails.address}</p>`
+                : ""
+            }
 
-  ${
-    storeDetails.contact
-      ? `<p class="shop-line">Contact: ${storeDetails.contact}</p>`
-      : ""
-  }
+            ${
+              storeDetails.contact
+                ? `<p class="shop-line">
+                    Contact: ${storeDetails.contact}
+                  </p>`
+                : ""
+            }
 
-  ${
-    storeDetails.gstin
-      ? `<p class="shop-line">GSTIN: ${storeDetails.gstin}</p>`
-      : ""
-  }
+            ${
+              storeDetails.gstin
+                ? `<p class="shop-line">
+                    GSTIN: ${storeDetails.gstin}
+                  </p>`
+                : ""
+            }
 
-  <p class="shop-line">PARCEL BILL</p>
-</div>
+            <p class="shop-line">PARCEL BILL</p>
+          </div>
 
           <div class="divider-solid"></div>
 
+          <!-- BILL INFO -->
           <div class="row">
             <span>
               Date: ${dateStr}<br/>
@@ -476,18 +544,26 @@ export default function CounterPOS() {
 
           <div class="row">
             <span>
-              Bill No.:<br/>
-              ${billOrder.orderId || "N/A"}
+              Cashier:<br/>
+              ${cashierName}
             </span>
 
             <span>
-              Name:<br/>
-              ${billOrder.customerName || "Walk-in Customer"}
+              Bill No.:<br/>
+              ${billOrder.orderId || "N/A"}
             </span>
           </div>
 
+          <p class="row">
+            <span>Name:</span>
+            <span>
+              ${billOrder.customerName || "Walk-in Customer"}
+            </span>
+          </p>
+
           <div class="divider"></div>
 
+          <!-- ITEMS -->
           <table>
             <thead>
               <tr>
@@ -505,6 +581,7 @@ export default function CounterPOS() {
 
           <div class="divider"></div>
 
+          <!-- TOTALS -->
           <div class="totals-row">
             <span>Total Qty</span>
             <span>${totalQty}</span>
@@ -542,7 +619,36 @@ export default function CounterPOS() {
             <span>₹${Number(grandTotal).toFixed(2)}</span>
           </div>
 
-          <div class="footer">
+          <!-- UPI QR -->
+          ${
+            upiQrUrl
+              ? `
+                <div class="upi-block">
+                  <div class="divider"></div>
+
+                  <p class="scan-label">
+                    SCAN &amp; PAY
+                  </p>
+
+                  <img
+                    src="${upiQrUrl}"
+                    alt="UPI QR"
+                  />
+
+                  ${
+                    storeDetails.upiId
+                      ? `<p class="upi-id">
+                          ${storeDetails.upiId}
+                        </p>`
+                      : ""
+                  }
+                </div>
+              `
+              : ""
+          }
+
+          <!-- FOOTER -->
+          <div class="footer-line">
             Thank you for visiting!<br/>
             Visit again 🙏
           </div>
@@ -552,14 +658,35 @@ export default function CounterPOS() {
         <script>
           window.focus();
 
-          setTimeout(() => {
+          const printWhenReady = async () => {
+            const images = Array.from(document.images);
+
+            await Promise.all(
+              images.map((img) => {
+                if (img.complete) {
+                  return Promise.resolve();
+                }
+
+                return new Promise((resolve) => {
+                  img.onload = resolve;
+                  img.onerror = resolve;
+                });
+              })
+            );
+
             window.print();
-          }, 100);
+          };
+
+          window.addEventListener(
+            "load",
+            printWhenReady
+          );
 
           window.onafterprint = () => {
             window.close();
           };
         </script>
+
       </body>
     </html>
   `;

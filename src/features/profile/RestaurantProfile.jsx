@@ -155,6 +155,7 @@ export default function RestaurantProfile() {
       );
       return res.data;
     },
+
     onSuccess: (res) => {
       queryClient.invalidateQueries(["restaurant-profile"]);
 
@@ -215,6 +216,12 @@ export default function RestaurantProfile() {
   const handleSubmit = useCallback(
     (e) => {
       e.preventDefault();
+      const upiRegex = /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z]{2,64}$/;
+
+      if (upiId && !upiRegex.test(upiId.trim())) {
+        alert("Please enter a valid UPI ID, e.g. restaurant@paytm");
+        return;
+      }
       const formData = new FormData();
       formData.append("name", name);
       formData.append("slug", slug);
@@ -508,6 +515,11 @@ export default function RestaurantProfile() {
                   <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
                     Restaurant UPI ID (for Customer Payments & Orders)
                   </label>
+                  {restaurant?.upiId && (
+                    <p className="text-[10px] text-amber-600 font-semibold mt-1">
+                      🔒 UPI ID is locked. Contact platform to change it.
+                    </p>
+                  )}
                   <div className="relative flex items-center">
                     <CreditCard
                       size={16}
@@ -516,6 +528,7 @@ export default function RestaurantProfile() {
                     <input
                       type="text"
                       placeholder="restaurantname@okhdfcbank"
+                      disabled={Boolean(restaurant?.upiId)}
                       value={upiId}
                       onChange={(e) => setUpiId(e.target.value)}
                       className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm text-slate-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all shadow-xs"
