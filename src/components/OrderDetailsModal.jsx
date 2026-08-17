@@ -1,6 +1,11 @@
 import { useState } from "react";
 import { X, Printer, Phone, User, MapPin, AlertCircle } from "lucide-react";
-export default function OrderDetailsModal({ order, onClose }) {
+export default function OrderDetailsModal({
+  order,
+  onClose,
+  kotItems,
+  onPrintKOT,
+}) {
   const [showPrintPopup, setShowPrintPopup] = useState(false);
 
   if (!order) return null;
@@ -8,9 +13,16 @@ export default function OrderDetailsModal({ order, onClose }) {
   const handlePrint = () => {
     setShowPrintPopup(true);
   };
+
   const confirmPrint = () => {
     setShowPrintPopup(false);
-    window.print();
+
+    if (onPrintKOT) {
+      onPrintKOT({
+        order,
+        items: kotItems || order.items || [],
+      });
+    }
   };
 
   return (
@@ -122,27 +134,26 @@ export default function OrderDetailsModal({ order, onClose }) {
           {/* Items Table */}
           <div className="space-y-3">
             <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-              Ordered Items
+              KOT Items
             </p>
+
             <div className="max-h-48 overflow-y-auto space-y-2 pr-1 divide-y divide-slate-50">
-              {order.items
+              {(kotItems || order.items || [])
                 .filter((item) => item.status !== "REJECTED")
                 .map((item, idx) => (
                   <div
-                    key={idx}
+                    key={item._id || idx}
                     className="flex justify-between items-center pt-2 text-xs"
                   >
                     <div className="flex items-center gap-2">
                       <span className="font-bold bg-slate-100 text-slate-800 w-6 h-6 rounded-lg flex items-center justify-center text-[11px]">
                         {item.quantity}
                       </span>
+
                       <span className="font-semibold text-slate-700">
                         {item.name}
                       </span>
                     </div>
-                    <span className="font-bold text-slate-900">
-                      ₹{item.price * item.quantity}
-                    </span>
                   </div>
                 ))}
             </div>
@@ -184,9 +195,11 @@ export default function OrderDetailsModal({ order, onClose }) {
           {/* Action Button */}
           <button
             onClick={handlePrint}
-            className="no-print w-full py-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-slate-900/10 transition-all active:scale-[0.98]"
+            disabled={!kotItems || kotItems.length === 0}
+            className="no-print w-full py-3.5 bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all"
           >
-            <Printer size={16} /> Print Kitchen Ticket (KOT)
+            <Printer size={16} />
+            Print Kitchen Ticket (KOT)
           </button>
         </div>
       </div>

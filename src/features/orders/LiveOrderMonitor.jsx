@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import { useAuth } from "../../context/AuthContext";
 import { useSocket } from "../../context/SocketContext";
-import { useNotificationSound } from "../../hooks/useNotificationSound";
+// import { useNotificationSound } from "../../hooks/useNotificationSound";
 import {
   Eye,
   Check,
@@ -25,7 +25,7 @@ const OrderRow = memo(function OrderRow({
   onCancelItem,
 }) {
   const hasMergedTables = order.mergedTables && order.mergedTables.length > 0;
-
+  const [showAllItems, setShowAllItems] = useState(false);
   return (
     <tr className="hover:bg-slate-50/80 transition-all duration-150">
       <td className="px-6 py-4 font-mono font-bold text-rose-600 text-xs sm:text-sm whitespace-nowrap">
@@ -49,30 +49,43 @@ const OrderRow = memo(function OrderRow({
       </td>
       <td className="px-6 py-4 text-xs text-slate-600 font-medium">
         <div className="flex flex-col gap-0.5 max-w-[220px]">
-          {order.items.map((item) => (
-            <div key={item._id} className="flex items-center gap-1.5 group">
-              <span
-                className={`truncate ${
-                  item.status === "REJECTED"
-                    ? "line-through text-rose-400 text-[11px] opacity-50"
-                    : ""
-                }`}
-              >
-                • {item.quantity}x {item.name}
-              </span>
-              {item.status !== "REJECTED" &&
-                order.status !== "COMPLETED" &&
-                order.status !== "REJECTED" && (
-                  <button
-                    onClick={() => onCancelItem(order._id, item._id)}
-                    title="Cancel this item"
-                    className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition"
-                  >
-                    Cancel
-                  </button>
-                )}
-            </div>
-          ))}
+          {(showAllItems ? order.items : order.items.slice(0, 1)).map(
+            (item) => (
+              <div key={item._id} className="flex items-center gap-1.5 group">
+                <span
+                  className={`truncate ${
+                    item.status === "REJECTED"
+                      ? "line-through text-rose-400 text-[11px] opacity-50"
+                      : ""
+                  }`}
+                >
+                  • {item.quantity}x {item.name}
+                </span>
+                {item.status !== "REJECTED" &&
+                  order.status !== "COMPLETED" &&
+                  order.status !== "REJECTED" && (
+                    <button
+                      onClick={() => onCancelItem(order._id, item._id)}
+                      title="Cancel this item"
+                      className="opacity-0 group-hover:opacity-100 text-slate-300 hover:text-rose-500 transition"
+                    >
+                      Cancel
+                    </button>
+                  )}
+              </div>
+            ),
+          )}
+          {order.items.length > 1 && (
+            <button
+              type="button"
+              onClick={() => setShowAllItems((prev) => !prev)}
+              className="mt-1 text-[10px] font-black text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
+            >
+              {showAllItems
+                ? "Show less"
+                : `Show ${order.items.length - 1} more`}
+            </button>
+          )}
         </div>
       </td>
       <td className="px-6 py-4 text-right font-black text-slate-900 text-xs sm:text-sm whitespace-nowrap">
@@ -184,12 +197,12 @@ export default function LiveOrderMonitor() {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const queryClient = useQueryClient();
   const socket = useSocket();
-  const playAlert = useNotificationSound();
+  // const playAlert = useNotificationSound();
   const [rejectModalOrder, setRejectModalOrder] = useState(null);
   const [showStatusPopup, setShowStatusPopup] = useState(false);
   const [statusPopupType, setStatusPopupType] = useState("");
   const [statusPopupOrderId, setStatusPopupOrderId] = useState(null);
-
+  const [kotItems, setKotItems] = useState([]);
   const [cancelItemData, setCancelItemData] = useState(null);
 
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
@@ -228,6 +241,224 @@ export default function LiveOrderMonitor() {
     upiId: "",
     upiQrCode: "",
   });
+
+  const printKOT = useCallback(
+    async ({ order, items }) => {
+      if (!order || !items?.length) {
+        showError("No new items available for KOT.");
+        return;
+      }
+
+      const activeItems = items.filter((item) => item.status !== "REJECTED");
+
+      if (!activeItems.length) {
+        showError("No active items available for KOT.");
+        return;
+      }
+
+      const kotRows = activeItems
+        .map(
+          (item) => `
+          <tr>
+            <td class="item-name">${item.name}</td>
+            <td class="item-qty">${item.quantity}</td>
+          </tr>
+        `,
+        )
+        .join("");
+
+      const tableLabel = order.mergedTables?.length
+        ? `${order.tableNumber}, ${order.mergedTables.join(", ")}`
+        : order.tableNumber;
+
+      const now = new Date();
+
+      const dateStr = `${String(now.getDate()).padStart(2, "0")}/${String(
+        now.getMonth() + 1,
+      ).padStart(2, "0")}/${String(now.getFullYear()).slice(-2)}`;
+
+      const timeStr = now.toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: false,
+      });
+
+      const windowContent = `
+      <html>
+        <head>
+          <title>KOT ${order.orderId}</title>
+
+          <style>
+            @media print {
+              @page {
+                margin: 0;
+              }
+            }
+
+            * {
+              box-sizing: border-box;
+            }
+
+            body {
+              margin: 0;
+              padding: 0;
+              background: #fff;
+              font-family: "Courier New", monospace;
+            }
+
+            .kot {
+              width: 300px;
+              padding: 18px 14px;
+              color: #111;
+            }
+
+            .center {
+              text-align: center;
+            }
+
+            .title {
+              font-size: 18px;
+              font-weight: 700;
+              margin-bottom: 8px;
+            }
+
+            .order-id {
+              font-size: 14px;
+              font-weight: 700;
+            }
+
+            .meta {
+              font-size: 11px;
+              margin-top: 5px;
+              line-height: 1.5;
+            }
+
+            .divider {
+              border-top: 1px dashed #333;
+              margin: 10px 0;
+            }
+
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 14px;
+            }
+
+            td {
+              padding: 7px 0;
+              vertical-align: top;
+            }
+
+            .item-name {
+              width: 75%;
+              font-weight: 700;
+            }
+
+            .item-qty {
+              width: 25%;
+              text-align: right;
+              font-size: 16px;
+              font-weight: 700;
+            }
+
+            .footer {
+              margin-top: 12px;
+              text-align: center;
+              font-size: 10px;
+            }
+          </style>
+        </head>
+
+        <body>
+          <div class="kot">
+
+            <div class="center">
+              <div class="title">KITCHEN ORDER TICKET</div>
+
+              <div class="order-id">
+                ${order.orderId}
+              </div>
+
+              <div class="meta">
+                Table: ${tableLabel}<br/>
+                Customer: ${order.customerName || "Guest"}<br/>
+                Date: ${dateStr}<br/>
+                Time: ${timeStr}
+              </div>
+            </div>
+
+            <div class="divider"></div>
+
+            <table>
+              <tbody>
+                ${kotRows}
+              </tbody>
+            </table>
+
+            <div class="divider"></div>
+
+            <div class="footer">
+              KITCHEN COPY
+            </div>
+
+          </div>
+
+          <script>
+            window.focus();
+
+            window.addEventListener("load", () => {
+              window.print();
+            });
+
+            window.onafterprint = () => {
+              window.close();
+            };
+          </script>
+        </body>
+      </html>
+    `;
+
+      const printWindow = window.open("", "_blank", "width=380,height=680");
+
+      if (!printWindow) {
+        showError(
+          "Print window was blocked. Please allow popups for this site.",
+        );
+        return;
+      }
+
+      printWindow.document.open();
+      printWindow.document.write(windowContent);
+      printWindow.document.close();
+
+      // 🆕 Mark ONLY these newly printed items
+      try {
+        await axios.patch(
+          `${apiBase}/orders/${order._id}/kot/printed`,
+          {
+            itemIds: activeItems.map((item) => item._id),
+          },
+          {
+            withCredentials: true,
+          },
+        );
+
+        queryClient.invalidateQueries({
+          queryKey: ["live-orders"],
+        });
+
+        showSuccess("KOT Printed Successfully");
+      } catch (error) {
+        console.error("Failed to mark KOT printed:", error);
+
+        showError(
+          error.response?.data?.message ||
+            "KOT printed, but tracking update failed.",
+        );
+      }
+    },
+    [apiBase, queryClient, showError, showSuccess],
+  );
 
   useEffect(() => {
     axios
@@ -307,11 +538,11 @@ export default function LiveOrderMonitor() {
     if (!socket) return;
 
     const handleNewOrder = (newOrder) => {
-      try {
-        playAlert();
-      } catch (e) {
-        console.log("Audio play error:", e);
-      }
+      // try {
+      //   playAlert();
+      // } catch (e) {
+      //   console.log("Audio play error:", e);
+      // }
 
       queryClient.setQueryData(["live-orders"], (oldOrders) => [
         newOrder,
@@ -330,24 +561,24 @@ export default function LiveOrderMonitor() {
       queryClient.invalidateQueries({ queryKey: ["table-status"] });
     };
 
-    const handlePlaySoundOnly = () => {
-      try {
-        playAlert();
-      } catch (e) {
-        console.log("Audio play error:", e);
-      }
-    };
+    // const handlePlaySoundOnly = () => {
+    //   try {
+    //     playAlert();
+    //   } catch (e) {
+    //     console.log("Audio play error:", e);
+    //   }
+    // };
 
     socket.on("NEW_ORDER_RECEIVED", handleNewOrder);
     socket.on("ORDER_STATUS_UPDATED", handleOrderUpdated);
-    socket.on("PLAY_NOTIFICATION_SOUND", handlePlaySoundOnly);
+    // socket.on("PLAY_NOTIFICATION_SOUND", handlePlaySoundOnly);
 
     return () => {
       socket.off("NEW_ORDER_RECEIVED", handleNewOrder);
       socket.off("ORDER_STATUS_UPDATED", handleOrderUpdated);
-      socket.off("PLAY_NOTIFICATION_SOUND", handlePlaySoundOnly);
+      // socket.off("PLAY_NOTIFICATION_SOUND", handlePlaySoundOnly);
     };
-  }, [socket, queryClient, playAlert]);
+  }, [socket, queryClient]);
 
   // 🆕 Cancel a single item — hits the real backend endpoint and refreshes
   // subtotal/tax/total from the response (backend does the recalculation).
@@ -411,6 +642,21 @@ export default function LiveOrderMonitor() {
             : "Order Rejected Successfully",
         );
         const updatedOrderFromBackend = res.data.data;
+        const newKotItems = res.data.kotItems || [];
+
+        queryClient.setQueryData(["live-orders"], (oldOrders) =>
+          (oldOrders || []).map((order) =>
+            order._id === orderId ? updatedOrderFromBackend : order,
+          ),
+        );
+
+        if (targetStatus === "ACCEPTED" && newKotItems.length > 0) {
+          // 🧾 First order ka automatic KOT
+          await printKOT({
+            order: updatedOrderFromBackend,
+            items: newKotItems,
+          });
+        }
 
         queryClient.setQueryData(["live-orders"], (oldOrders) =>
           (oldOrders || []).map((order) =>
@@ -436,7 +682,7 @@ export default function LiveOrderMonitor() {
         console.error("Error transitioning state context pipeline:", err);
       }
     },
-    [queryClient, apiBase, showSuccess, showError],
+    [queryClient, apiBase, showSuccess, showError, printKOT],
   );
 
   // 🧾 Opens a thermal-receipt-style print window for a completed order
@@ -696,8 +942,28 @@ export default function LiveOrderMonitor() {
     showError,
   ]);
 
-  const handleView = useCallback((order) => setSelectedOrder(order), []);
-  const handleCloseModal = useCallback(() => setSelectedOrder(null), []);
+  const handleView = useCallback(
+    async (order) => {
+      try {
+        const res = await axios.get(`${apiBase}/orders/${order._id}/kot`, {
+          withCredentials: true,
+        });
+
+        setSelectedOrder(order);
+        setKotItems(res.data?.data?.items || []);
+      } catch (error) {
+        console.error("Failed to fetch KOT items:", error);
+
+        setSelectedOrder(order);
+        setKotItems([]);
+      }
+    },
+    [apiBase],
+  );
+  const handleCloseModal = useCallback(() => {
+    setSelectedOrder(null);
+    setKotItems([]);
+  }, []);
 
   if (isLoading) {
     return (
@@ -1023,7 +1289,12 @@ export default function LiveOrderMonitor() {
           </div>
         )}
         {selectedOrder && (
-          <OrderDetailsModal order={selectedOrder} onClose={handleCloseModal} />
+          <OrderDetailsModal
+            order={selectedOrder}
+            kotItems={kotItems}
+            onPrintKOT={printKOT}
+            onClose={handleCloseModal}
+          />
         )}
       </div>
     </>

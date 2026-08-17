@@ -20,6 +20,11 @@ const NAV_ITEMS = [
     label: "Overview",
   },
   {
+    to: "/counter",
+    icon: ScanLine,
+    label: "Counter POS",
+  },
+  {
     to: "/orders",
     icon: ClipboardList,
     label: "Live Orders",
@@ -29,11 +34,7 @@ const NAV_ITEMS = [
     icon: UtensilsCrossed,
     label: "Menu Catalog",
   },
-  {
-    to: "/table-monitor",
-    icon: QrCode,
-    label: "Table Monitor",
-  },
+
   {
     to: "/analysis",
     icon: BarChart3,
@@ -50,9 +51,9 @@ const NAV_ITEMS = [
     label: "Offers",
   },
   {
-    to: "/counter",
-    icon: ScanLine,
-    label: "Counter POS",
+    to: "/table-monitor",
+    icon: QrCode,
+    label: "Table Monitor",
   },
   {
     to: "/profile",
@@ -71,11 +72,7 @@ export default function Sidebar({ closeMobileSidebar }) {
     <aside className="w-64 bg-slate-900 text-white h-full min-h-screen flex flex-col border-r border-slate-800 font-sans select-none">
       {/* Brand Logo Header */}
       <div className="p-0 border-b border-slate-800/80 flex items-center justify-center min-h-[90px] overflow-hidden">
-        <img
-          src={logo}
-          alt="Logo"
-          className="max-h-30 w-auto object-contain"
-        />
+        <img src={logo} alt="Logo" className="max-h-30 w-auto object-contain" />
       </div>
 
       {/* Navigation Links */}

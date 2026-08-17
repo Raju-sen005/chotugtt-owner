@@ -765,8 +765,8 @@ export default function PublicMenu() {
           Menu Not Available
         </h3>
         <p className="text-xs text-slate-400 font-medium max-w-xs mt-1">
-          We couldn't load this menu right now. Please rescan the QR code or try
-          again shortly.
+          We couldn't load this menu right now. 
+          Please ask at the restaurant counter for assistance.
         </p>
       </div>
     );
