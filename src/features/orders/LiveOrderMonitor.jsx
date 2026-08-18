@@ -211,6 +211,9 @@ export default function LiveOrderMonitor() {
   const [showErrorPopup, setShowErrorPopup] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [billOrder, setBillOrder] = useState(null);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
+
+  const [isGeneratingBill, setIsGeneratingBill] = useState(false);
   const [rejectReasonDropdown, setRejectReasonDropdown] =
     useState("Item Out of Stock");
 
@@ -790,6 +793,30 @@ export default function LiveOrderMonitor() {
           .upi-block img { width: 120px; height: 120px; object-fit: contain; }
           .upi-id { font-size: 11px; font-weight: 700; margin-top: 6px; }
           .scan-label { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 6px; color: #333; }
+          .payment-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  margin-top: 8px;
+}
+
+.payment-paid {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 5px;
+}
+
+.payment-due {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 700;
+  color: #b45309;
+  margin-top: 5px;
+}
         </style>
       </head>
       <body>
@@ -835,7 +862,26 @@ export default function LiveOrderMonitor() {
           ${roundOff ? `<div class="totals-row"><span>Round off</span><span>${roundOff.toFixed(2)}</span></div>` : ""}
 
           <div class="row grand-total"><span>Grand Total</span><span>₹${grandTotal.toFixed(2)}</span></div>
+<div class="payment-row">
+  <span>Payment Mode</span>
+  <span>${order.paymentMethod || "N/A"}</span>
+</div>
 
+${
+  order.paymentMethod === "DUE"
+    ? `
+      <div class="payment-due">
+        <span>Amount Due</span>
+        <span>₹${Number(order.dueAmount || 0).toFixed(2)}</span>
+      </div>
+    `
+    : `
+      <div class="payment-paid">
+        <span>Amount Paid</span>
+        <span>₹${Number(order.paidAmount || 0).toFixed(2)}</span>
+      </div>
+    `
+}
           ${
             upiQrUrl
               ? `<div class="upi-block">
@@ -890,27 +936,41 @@ export default function LiveOrderMonitor() {
   // Bill & WhatsApp clear table handler added from TableMonitor
   const handleBillAndWhatsApp = useCallback((order) => {
     setBillOrder(order);
+    setSelectedPaymentMethod(null);
   }, []);
 
   const confirmGenerateBill = useCallback(async () => {
-    if (!billOrder) return;
+    if (!billOrder || !selectedPaymentMethod) {
+      showError("Please select a payment method.");
+      return;
+    }
+
+    if (isGeneratingBill) return;
+
+    setIsGeneratingBill(true);
 
     try {
       const res = await axios.patch(
         `${apiBase}/orders/${billOrder._id}/complete`,
-        {},
-        { withCredentials: true },
+        {
+          paymentMethod: selectedPaymentMethod,
+        },
+        {
+          withCredentials: true,
+        },
       );
 
-      // Print bill
-      printBillReceipt(res.data?.data || billOrder);
+      const completedOrder = res.data?.data;
 
-      // Remove from live orders
+      // Print bill with payment information
+      printBillReceipt(completedOrder || billOrder);
+
+      // Remove completed order from live monitor
       queryClient.setQueryData(["live-orders"], (prev) =>
         (prev || []).filter((o) => o._id !== billOrder._id),
       );
 
-      // Refresh tables and billing
+      // Refresh table status
       queryClient.invalidateQueries({
         queryKey: ["table-status"],
       });
@@ -919,22 +979,38 @@ export default function LiveOrderMonitor() {
         queryKey: ["table-monitor-orders"],
       });
 
-      setBillOrder(null);
+      // Refresh payment page data if cached
+      queryClient.invalidateQueries({
+        queryKey: ["bills"],
+      });
 
-      showSuccess("Bill Generated Successfully");
+      queryClient.invalidateQueries({
+        queryKey: ["bills-prev"],
+      });
+
+      setBillOrder(null);
+      setSelectedPaymentMethod(null);
+
+      showSuccess(
+        selectedPaymentMethod === "DUE"
+          ? "Bill generated and marked as Due"
+          : `Bill generated via ${selectedPaymentMethod}`,
+      );
     } catch (err) {
-      console.error("Failed to complete order", err);
-
-      setBillOrder(null);
+      console.error("Failed to complete order:", err);
 
       showError(err.response?.data?.message || "Failed to generate bill.");
 
       queryClient.invalidateQueries({
         queryKey: ["live-orders"],
       });
+    } finally {
+      setIsGeneratingBill(false);
     }
   }, [
     billOrder,
+    selectedPaymentMethod,
+    isGeneratingBill,
     apiBase,
     printBillReceipt,
     queryClient,
@@ -1068,47 +1144,162 @@ export default function LiveOrderMonitor() {
       )}
 
       {billOrder && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6">
-            <div className="w-12 h-12 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center mb-4">
-              <IndianRupee size={24} strokeWidth={2.5} />
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden">
+            {/* Header */}
+            <div className="p-6 border-b border-slate-100">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center">
+                  <IndianRupee size={22} strokeWidth={2.5} />
+                </div>
+
+                <div>
+                  <h3 className="text-lg font-black text-slate-900">
+                    Generate Bill
+                  </h3>
+
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Select payment method to complete the bill
+                  </p>
+                </div>
+              </div>
             </div>
 
-            <h3 className="text-lg font-black text-slate-900">
-              Generate Bill?
-            </h3>
+            {/* Order Summary */}
+            <div className="px-6 pt-5">
+              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">
+                      Order
+                    </p>
 
-            <p className="text-sm text-slate-500 mt-2 leading-relaxed">
-              Generate the bill for{" "}
-              <span className="font-bold text-slate-700">
-                {billOrder.customerName || "Guest"}
-              </span>{" "}
-              and clear{" "}
-              <span className="font-bold text-slate-700">
-                Table {billOrder.tableNumber}
-              </span>
-              ?
-            </p>
+                    <p className="text-sm font-black text-slate-800 mt-1">
+                      {billOrder.orderId}
+                    </p>
 
-            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-xl p-3 mt-3">
-              The bill will be printed and the table will be cleared.
-            </p>
+                    <p className="text-xs text-slate-500 mt-1">
+                      {billOrder.customerName || "Guest"}
+                    </p>
+                  </div>
 
-            <div className="flex gap-3 mt-6">
+                  <div className="text-right">
+                    <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">
+                      Table
+                    </p>
+
+                    <p className="text-sm font-black text-slate-800 mt-1">
+                      {billOrder.tableNumber}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-200 mt-4 pt-4 flex justify-between items-center">
+                  <span className="text-xs font-bold text-slate-500">
+                    Amount Payable
+                  </span>
+
+                  <span className="text-xl font-black text-slate-900">
+                    ₹{Number(billOrder.total || 0).toLocaleString("en-IN")}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Methods */}
+            <div className="p-6">
+              <p className="text-[10px] uppercase tracking-wider font-black text-slate-400 mb-3">
+                Payment Method
+              </p>
+
+              <div className="grid grid-cols-3 gap-3">
+                {/* CASH */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedPaymentMethod("CASH")}
+                  className={`p-4 rounded-2xl border-2 transition-all ${
+                    selectedPaymentMethod === "CASH"
+                      ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-emerald-200"
+                  }`}
+                >
+                  <div className="text-xl mb-2">💵</div>
+
+                  <p className="text-xs font-black">Cash</p>
+
+                  <p className="text-[9px] mt-1 opacity-70">Paid</p>
+                </button>
+
+                {/* UPI */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedPaymentMethod("UPI")}
+                  className={`p-4 rounded-2xl border-2 transition-all ${
+                    selectedPaymentMethod === "UPI"
+                      ? "border-blue-500 bg-blue-50 text-blue-700"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-blue-200"
+                  }`}
+                >
+                  <div className="text-xl mb-2">📱</div>
+
+                  <p className="text-xs font-black">UPI</p>
+
+                  <p className="text-[9px] mt-1 opacity-70">Paid</p>
+                </button>
+
+                {/* DUE */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedPaymentMethod("DUE")}
+                  className={`p-4 rounded-2xl border-2 transition-all ${
+                    selectedPaymentMethod === "DUE"
+                      ? "border-amber-500 bg-amber-50 text-amber-700"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-amber-200"
+                  }`}
+                >
+                  <div className="text-xl mb-2">🧾</div>
+
+                  <p className="text-xs font-black">Due</p>
+
+                  <p className="text-[9px] mt-1 opacity-70">Unpaid</p>
+                </button>
+              </div>
+
+              {selectedPaymentMethod === "DUE" && (
+                <div className="mt-4 p-3 rounded-xl bg-amber-50 border border-amber-100">
+                  <p className="text-xs text-amber-700 font-semibold">
+                    ₹{Number(billOrder.total || 0).toLocaleString("en-IN")} will
+                    be recorded as customer due.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Actions */}
+            <div className="px-6 pb-6 flex gap-3">
               <button
                 type="button"
-                onClick={() => setBillOrder(null)}
-                className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 text-sm font-bold hover:bg-slate-50 transition"
+                onClick={() => {
+                  setBillOrder(null);
+                  setSelectedPaymentMethod(null);
+                }}
+                disabled={isGeneratingBill}
+                className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 text-sm font-bold hover:bg-slate-50 transition disabled:opacity-50"
               >
                 Cancel
               </button>
 
               <button
                 type="button"
+                disabled={!selectedPaymentMethod || isGeneratingBill}
                 onClick={confirmGenerateBill}
-                className="flex-1 py-3 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 transition"
+                className="flex-1 py-3 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 transition disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Generate Bill
+                {isGeneratingBill
+                  ? "Processing..."
+                  : selectedPaymentMethod === "DUE"
+                    ? "Save as Due"
+                    : "Generate Bill"}
               </button>
             </div>
           </div>
