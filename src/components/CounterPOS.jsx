@@ -740,21 +740,11 @@ export default function CounterPOS() {
       );
 
       // Backend se created order lo
-      const createdOrder = res.data?.data ||
-        res.data?.order || {
-          ...orderPayload,
-          orderId: `PARCEL-${Date.now()}`,
-          customerName: "Walk-in Customer",
-          tableNumber: "PARCEL",
-        };
+      const createdOrder = res.data?.data || res.data?.order;
 
-      // 🧾 PRINT PARCEL BILL
-      printParcelBill(createdOrder);
-
-      // Cart clear
       setCart([]);
 
-      showSuccess("Parcel order generated & bill sent to print!");
+      showSuccess("Parcel order sent to Live Orders!");
     } catch (err) {
       console.error("Parcel order error:", err);
 

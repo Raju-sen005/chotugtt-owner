@@ -547,20 +547,38 @@ export default function LiveOrderMonitor() {
       //   console.log("Audio play error:", e);
       // }
 
-      queryClient.setQueryData(["live-orders"], (oldOrders) => [
-        newOrder,
-        ...(oldOrders || []),
-      ]);
+     queryClient.setQueryData(["live-orders"], (old = []) => {
+  const exists = old.some((o) => o._id === newOrder._id);
+
+  if (exists) {
+    return old.map((o) =>
+      o._id === newOrder._id ? newOrder : o
+    );
+  }
+
+  return [newOrder, ...old];
+});
       queryClient.invalidateQueries({ queryKey: ["table-status"] });
       setCurrentPage(1);
     };
 
     const handleOrderUpdated = (updatedOrder) => {
-      queryClient.setQueryData(["live-orders"], (oldOrders) =>
-        (oldOrders || []).map((order) =>
-          order._id === updatedOrder._id ? updatedOrder : order,
-        ),
-      );
+      queryClient.setQueryData(["live-orders"], (old = []) => {
+  if (updatedOrder.status === "COMPLETED" ||
+      updatedOrder.status === "REJECTED") {
+    return old.filter((o) => o._id !== updatedOrder._id);
+  }
+
+  const exists = old.some((o) => o._id === updatedOrder._id);
+
+  if (!exists) {
+    return [updatedOrder, ...old];
+  }
+
+  return old.map((o) =>
+    o._id === updatedOrder._id ? updatedOrder : o
+  );
+});
       queryClient.invalidateQueries({ queryKey: ["table-status"] });
     };
 
