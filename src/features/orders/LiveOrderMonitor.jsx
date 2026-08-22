@@ -194,6 +194,10 @@ const TableStatusStrip = memo(function TableStatusStrip({ tables, isLoading }) {
 
 export default function LiveOrderMonitor() {
   const { user } = useAuth();
+  const restaurantId =
+    typeof user?.restaurantId === "object"
+      ? user.restaurantId?._id
+      : user?.restaurantId;
   const [selectedOrder, setSelectedOrder] = useState(null);
   const queryClient = useQueryClient();
   const socket = useSocket();
@@ -447,7 +451,7 @@ export default function LiveOrderMonitor() {
         );
 
         queryClient.invalidateQueries({
-          queryKey: ["live-orders"],
+          queryKey: ["live-orders", restaurantId],
         });
 
         showSuccess("KOT Printed Successfully");
@@ -495,7 +499,7 @@ export default function LiveOrderMonitor() {
   }, [apiBase]);
 
   const { data: orders = [], isLoading } = useQuery({
-    queryKey: ["live-orders"],
+    queryKey: ["live-orders", restaurantId],
     queryFn: async () => {
       const res = await axios.get(`${apiBase}/orders/live`, {
         withCredentials: true,
@@ -507,7 +511,7 @@ export default function LiveOrderMonitor() {
   });
 
   const { data: tableStatus = [], isLoading: isLoadingTableStatus } = useQuery({
-    queryKey: ["table-status"],
+    queryKey: ["table-status", restaurantId],
     queryFn: async () => {
       const res = await axios.get(`${apiBase}/tables/status`, {
         withCredentials: true,
@@ -547,39 +551,41 @@ export default function LiveOrderMonitor() {
       //   console.log("Audio play error:", e);
       // }
 
-     queryClient.setQueryData(["live-orders"], (old = []) => {
-  const exists = old.some((o) => o._id === newOrder._id);
+      queryClient.setQueryData(["live-orders", restaurantId], (old = []) => {
+        const exists = old.some((o) => o._id === newOrder._id);
 
-  if (exists) {
-    return old.map((o) =>
-      o._id === newOrder._id ? newOrder : o
-    );
-  }
+        if (exists) {
+          return old.map((o) => (o._id === newOrder._id ? newOrder : o));
+        }
 
-  return [newOrder, ...old];
-});
-      queryClient.invalidateQueries({ queryKey: ["table-status"] });
+        return [newOrder, ...old];
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["table-status", restaurantId],
+      });
       setCurrentPage(1);
     };
 
     const handleOrderUpdated = (updatedOrder) => {
-      queryClient.setQueryData(["live-orders"], (old = []) => {
-  if (updatedOrder.status === "COMPLETED" ||
-      updatedOrder.status === "REJECTED") {
-    return old.filter((o) => o._id !== updatedOrder._id);
-  }
+      queryClient.setQueryData(["live-orders", restaurantId], (old = []) => {
+        if (
+          updatedOrder.status === "COMPLETED" ||
+          updatedOrder.status === "REJECTED"
+        ) {
+          return old.filter((o) => o._id !== updatedOrder._id);
+        }
 
-  const exists = old.some((o) => o._id === updatedOrder._id);
+        const exists = old.some((o) => o._id === updatedOrder._id);
 
-  if (!exists) {
-    return [updatedOrder, ...old];
-  }
+        if (!exists) {
+          return [updatedOrder, ...old];
+        }
 
-  return old.map((o) =>
-    o._id === updatedOrder._id ? updatedOrder : o
-  );
-});
-      queryClient.invalidateQueries({ queryKey: ["table-status"] });
+        return old.map((o) => (o._id === updatedOrder._id ? updatedOrder : o));
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["table-status", restaurantId],
+      });
     };
 
     // const handlePlaySoundOnly = () => {
@@ -624,10 +630,12 @@ export default function LiveOrderMonitor() {
 
       const updatedOrder = res.data.data;
 
-      queryClient.setQueryData(["live-orders"], (oldOrders = []) =>
-        oldOrders.map((order) =>
-          order._id === orderId ? updatedOrder : order,
-        ),
+      queryClient.setQueryData(
+        ["live-orders", restaurantId],
+        (oldOrders = []) =>
+          oldOrders.map((order) =>
+            order._id === orderId ? updatedOrder : order,
+          ),
       );
 
       setCancelItemData(null);
@@ -665,7 +673,7 @@ export default function LiveOrderMonitor() {
         const updatedOrderFromBackend = res.data.data;
         const newKotItems = res.data.kotItems || [];
 
-        queryClient.setQueryData(["live-orders"], (oldOrders) =>
+        queryClient.setQueryData(["live-orders", restaurantId], (oldOrders) =>
           (oldOrders || []).map((order) =>
             order._id === orderId ? updatedOrderFromBackend : order,
           ),
@@ -679,7 +687,7 @@ export default function LiveOrderMonitor() {
           });
         }
 
-        queryClient.setQueryData(["live-orders"], (oldOrders) =>
+        queryClient.setQueryData(["live-orders", restaurantId], (oldOrders) =>
           (oldOrders || []).map((order) =>
             order._id === orderId
               ? {
@@ -691,7 +699,9 @@ export default function LiveOrderMonitor() {
               : order,
           ),
         );
-        queryClient.invalidateQueries({ queryKey: ["table-status"] });
+        queryClient.invalidateQueries({
+          queryKey: ["table-status", restaurantId],
+        });
         setRejectModalOrder(null);
       } catch (err) {
         showError(
@@ -984,13 +994,13 @@ ${
       printBillReceipt(completedOrder || billOrder);
 
       // Remove completed order from live monitor
-      queryClient.setQueryData(["live-orders"], (prev) =>
+      queryClient.setQueryData(["live-orders", restaurantId], (prev) =>
         (prev || []).filter((o) => o._id !== billOrder._id),
       );
 
       // Refresh table status
       queryClient.invalidateQueries({
-        queryKey: ["table-status"],
+        queryKey: ["table-status", restaurantId],
       });
 
       queryClient.invalidateQueries({
@@ -1020,12 +1030,13 @@ ${
       showError(err.response?.data?.message || "Failed to generate bill.");
 
       queryClient.invalidateQueries({
-        queryKey: ["live-orders"],
+        queryKey: ["live-orders", restaurantId],
       });
     } finally {
       setIsGeneratingBill(false);
     }
   }, [
+    restaurantId,
     billOrder,
     selectedPaymentMethod,
     isGeneratingBill,

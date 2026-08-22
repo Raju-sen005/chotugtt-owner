@@ -11,7 +11,8 @@ import {
   Receipt,
 } from "lucide-react";
 import * as XLSX from "xlsx";
-
+import { useSocket } from "../../context/SocketContext";
+import { useQueryClient } from "@tanstack/react-query";
 const PAYMENT_TABS = [
   { key: "CASH", label: "Cash", icon: Wallet, accent: "emerald" },
   { key: "UPI", label: "UPI", icon: Smartphone, accent: "indigo" },
@@ -59,10 +60,32 @@ export default function Payment() {
   const [paymentMethod, setPaymentMethod] = React.useState("CASH");
   const [filter, setFilter] = React.useState("today");
   const [currentPage, setCurrentPage] = React.useState(1);
-
+  const socket = useSocket();
+  const queryClient = useQueryClient();
   const ITEMS_PER_PAGE = 10;
   const API_BASE = import.meta.env.VITE_APP_API_BASE;
 
+  React.useEffect(() => {
+    if (!socket) return;
+
+    const handleOrderUpdate = (order) => {
+      if (!order?._id) return;
+
+      queryClient.invalidateQueries({
+        queryKey: ["bills"],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["bills-prev"],
+      });
+    };
+
+    socket.on("ORDER_STATUS_UPDATED", handleOrderUpdate);
+
+    return () => {
+      socket.off("ORDER_STATUS_UPDATED", handleOrderUpdate);
+    };
+  }, [socket, queryClient]);
   const { data: billingData, isLoading } = useQuery({
     queryKey: ["bills", filter, paymentMethod],
     queryFn: () =>

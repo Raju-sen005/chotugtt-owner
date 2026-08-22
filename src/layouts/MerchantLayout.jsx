@@ -16,6 +16,7 @@ import logo from "../assets/cho.png";
 import CounterPOS from "../components/CounterPOS";
 import Profile from "../features/profile/RestaurantProfile";
 import AIMarketingDashboard from "../components/AIMarketingDashboard";
+import StaffManagement from "../features/profile/StaffManagement";
 
 export default function MerchantLayout() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -77,6 +78,7 @@ export default function MerchantLayout() {
             <Route path="/counter" element={<CounterPOS />} />
             <Route path="/super-admin" element={<SuperAdminPanel />} />
             <Route path="/profile" element={<Profile />} />
+            <Route path="/staff" element={<StaffManagement />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </main>

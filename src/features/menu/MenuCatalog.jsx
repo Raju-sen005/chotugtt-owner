@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import {
@@ -14,10 +14,19 @@ import {
 } from "lucide-react";
 import Input from "../../components/ui/Input";
 import Modal from "../../components/ui/Modal";
+import { useSocket } from "../../context/SocketContext";
+import { useAuth } from "../../context/AuthContext";
 
 export default function MenuCatalog() {
   const queryClient = useQueryClient();
 
+  const socket = useSocket();
+  const { user } = useAuth();
+
+  const restaurantId =
+    typeof user?.restaurantId === "object"
+      ? user.restaurantId?._id
+      : user?.restaurantId;
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [activeCategoryFilter, setActiveCategoryFilter] = useState("ALL");
@@ -60,6 +69,100 @@ export default function MenuCatalog() {
     },
     staleTime: 60_000,
   });
+
+  useEffect(() => {
+    if (!socket || !restaurantId) {
+      return;
+    }
+
+    const isOwnRestaurantEvent = (payload) => {
+      if (!payload?.restaurantId) {
+        return true;
+      }
+
+      return String(payload.restaurantId) === String(restaurantId);
+    };
+
+    const invalidateMenu = () => {
+      queryClient.invalidateQueries({
+        queryKey: ["menu-items"],
+      });
+    };
+
+    const handleMenuCreated = (payload) => {
+      if (!isOwnRestaurantEvent(payload)) {
+        return;
+      }
+
+      invalidateMenu();
+    };
+
+    const handleMenuUpdated = (payload) => {
+      if (!isOwnRestaurantEvent(payload)) {
+        return;
+      }
+
+      invalidateMenu();
+    };
+
+    const handleMenuDeleted = (payload) => {
+      if (!isOwnRestaurantEvent(payload)) {
+        return;
+      }
+
+      invalidateMenu();
+    };
+
+    const handleCatalogUpdated = (payload) => {
+      if (!isOwnRestaurantEvent(payload)) {
+        return;
+      }
+
+      invalidateMenu();
+    };
+
+    const handleReconnect = () => {
+      /*
+       * Socket recovery ke baad API se canonical
+       * state dubara sync.
+       */
+      invalidateMenu();
+    };
+
+    socket.on("MENU_ITEM_CREATED", handleMenuCreated);
+
+    socket.on("MENU_ITEM_UPDATED", handleMenuUpdated);
+
+    socket.on("MENU_ITEM_DELETED", handleMenuDeleted);
+
+    socket.on("COMBO_CREATED", handleMenuCreated);
+
+    socket.on("COMBO_UPDATED", handleMenuUpdated);
+
+    socket.on("COMBO_DELETED", handleMenuDeleted);
+
+    socket.on("MENU_CATALOG_UPDATED", handleCatalogUpdated);
+
+    socket.on("connect", handleReconnect);
+
+    return () => {
+      socket.off("MENU_ITEM_CREATED", handleMenuCreated);
+
+      socket.off("MENU_ITEM_UPDATED", handleMenuUpdated);
+
+      socket.off("MENU_ITEM_DELETED", handleMenuDeleted);
+
+      socket.off("COMBO_CREATED", handleMenuCreated);
+
+      socket.off("COMBO_UPDATED", handleMenuUpdated);
+
+      socket.off("COMBO_DELETED", handleMenuDeleted);
+
+      socket.off("MENU_CATALOG_UPDATED", handleCatalogUpdated);
+
+      socket.off("connect", handleReconnect);
+    };
+  }, [socket, restaurantId, queryClient]);
 
   const showSuccess = useCallback((message) => {
     setSuccessMessage(message);

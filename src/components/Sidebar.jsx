@@ -10,6 +10,7 @@ import {
   Wallet,
   ScanLine,
   UserRound,
+  Users
 } from "lucide-react";
 import logo from "../assets/cho.png";
 
@@ -60,6 +61,11 @@ const NAV_ITEMS = [
     icon: UserRound,
     label: "Profile",
   },
+  {
+    to: "/staff",
+  label: "Staff & Captains",
+  icon: Users,
+}
 ];
 
 export default function Sidebar({ closeMobileSidebar }) {

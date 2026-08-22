@@ -14,8 +14,15 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useSocket } from "../context/SocketContext";
 export default function CounterPOS() {
   const { user } = useAuth();
+  const socket = useSocket();
+
+  const restaurantId =
+    typeof user?.restaurantId === "object"
+      ? user.restaurantId?._id
+      : user?.restaurantId;
   const [items, setItems] = useState([]);
   const [combos, setCombos] = useState([]);
   const [cart, setCart] = useState([]);
@@ -75,50 +82,281 @@ export default function CounterPOS() {
 
   // 1. Fetch Menu Items, Combos, and Active Tables
   useEffect(() => {
+    let cancelled = false;
+
     const fetchData = async () => {
       setFetchingData(true);
+
       try {
-        const itemsRes = await axios.get(`${apiBase}/menu/admin/items`, {
-          withCredentials: true,
-        });
-        setItems(itemsRes.data?.data || itemsRes.data || []);
-
-        try {
-          const combosRes = await axios.get(`${apiBase}/menu/admin/combos`, {
+        const requests = await Promise.allSettled([
+          axios.get(`${apiBase}/menu/admin/items`, {
             withCredentials: true,
-          });
-          setCombos(combosRes.data?.data || combosRes.data || []);
-        } catch (e) {
-          console.warn("Combos fetch skipped or failed:", e.message);
+          }),
+
+          axios.get(`${apiBase}/menu/admin/combos`, {
+            withCredentials: true,
+          }),
+
+          axios.get(`${apiBase}/offers`, {
+            withCredentials: true,
+          }),
+
+          axios.get(`${apiBase}/orders/live`, {
+            withCredentials: true,
+          }),
+        ]);
+
+        if (cancelled) return;
+
+        const [itemsResult, combosResult, offersResult, ordersResult] =
+          requests;
+
+        // -----------------------------
+        // MENU ITEMS
+        // -----------------------------
+        if (itemsResult.status === "fulfilled") {
+          const data =
+            itemsResult.value?.data?.data ?? itemsResult.value?.data ?? [];
+
+          setItems(Array.isArray(data) ? data : []);
+        } else {
+          console.warn("Menu items fetch failed:", itemsResult.reason?.message);
         }
 
-        try {
-          const offersRes = await axios.get(`${apiBase}/offers`, {
-            withCredentials: true,
-          });
+        // -----------------------------
+        // COMBOS
+        // -----------------------------
+        if (combosResult.status === "fulfilled") {
+          const data =
+            combosResult.value?.data?.data ?? combosResult.value?.data ?? [];
 
-          setOffers(offersRes.data?.data || offersRes.data || []);
-        } catch (e) {
-          console.warn("Offers fetch failed:", e.message);
+          setCombos(Array.isArray(data) ? data : []);
+        } else {
+          console.warn("Combos fetch failed:", combosResult.reason?.message);
         }
 
-        const ordersRes = await axios.get(`${apiBase}/orders/live`, {
-          withCredentials: true,
-        });
-        const orders = ordersRes.data?.data || ordersRes.data || [];
-        const tables = [...new Set(orders.map((o) => o.tableNumber))].filter(
-          (t) => t && t !== "N/A" && t !== "PARCEL",
-        );
-        setActiveTables(tables);
-      } catch (err) {
-        console.error("Counter POS data load error:", err);
+        // -----------------------------
+        // OFFERS
+        // -----------------------------
+        if (offersResult.status === "fulfilled") {
+          const data =
+            offersResult.value?.data?.data ?? offersResult.value?.data ?? [];
+
+          setOffers(Array.isArray(data) ? data : []);
+        } else {
+          console.warn("Offers fetch failed:", offersResult.reason?.message);
+        }
+
+        // -----------------------------
+        // LIVE TABLES
+        // -----------------------------
+        if (ordersResult.status === "fulfilled") {
+          const orders =
+            ordersResult.value?.data?.data ?? ordersResult.value?.data ?? [];
+
+          const safeOrders = Array.isArray(orders) ? orders : [];
+
+          const tables = [
+            ...new Set(
+              safeOrders
+                .map((order) => order?.tableNumber)
+                .filter(
+                  (table) => table && table !== "N/A" && table !== "PARCEL",
+                ),
+            ),
+          ];
+
+          setActiveTables(tables);
+        } else {
+          console.warn(
+            "Live orders fetch failed:",
+            ordersResult.reason?.message,
+          );
+        }
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Counter POS data load error:", error);
+        }
       } finally {
-        setFetchingData(false);
+        if (!cancelled) {
+          setFetchingData(false);
+        }
       }
     };
 
     fetchData();
+
+    return () => {
+      cancelled = true;
+    };
   }, [apiBase]);
+
+  useEffect(() => {
+    if (!socket || !restaurantId) {
+      return;
+    }
+
+    let refreshTimer = null;
+    let refreshInProgress = false;
+
+    const getLiveTables = async () => {
+      if (refreshInProgress) return;
+
+      refreshInProgress = true;
+
+      try {
+        const response = await axios.get(`${apiBase}/orders/live`, {
+          withCredentials: true,
+        });
+
+        const orders = response.data?.data ?? response.data ?? [];
+
+        if (!Array.isArray(orders)) return;
+
+        const tables = [
+          ...new Set(
+            orders
+              .map((order) => order?.tableNumber)
+              .filter(
+                (table) => table && table !== "N/A" && table !== "PARCEL",
+              ),
+          ),
+        ];
+
+        setActiveTables(tables);
+      } catch (error) {
+        console.error(
+          "Live table sync failed:",
+          error?.response?.data?.message || error?.message,
+        );
+      } finally {
+        refreshInProgress = false;
+      }
+    };
+
+    const scheduleRefresh = () => {
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+      }
+
+      refreshTimer = setTimeout(() => {
+        getLiveTables();
+      }, 150);
+    };
+
+    // ---------------------------------------
+    // NEW ORDER
+    // ---------------------------------------
+    const handleNewOrder = (order) => {
+      console.log("⚡ Counter POS realtime order:", order);
+
+      /*
+       * Agar backend event mein restaurantId hai,
+       * tenant isolation double-check karenge.
+       */
+      const eventRestaurantId =
+        typeof order?.restaurantId === "object"
+          ? order?.restaurantId?._id
+          : order?.restaurantId;
+
+      if (
+        eventRestaurantId &&
+        String(eventRestaurantId) !== String(restaurantId)
+      ) {
+        return;
+      }
+
+      /*
+       * Immediate UI update.
+       * API ka wait nahi karna.
+       */
+      const tableNumber = order?.tableNumber;
+
+      if (tableNumber && tableNumber !== "N/A" && tableNumber !== "PARCEL") {
+        setActiveTables((prev) => {
+          if (prev.includes(tableNumber)) {
+            return prev;
+          }
+
+          return [...prev, tableNumber];
+        });
+      }
+
+      /*
+       * Backend final state ko sync karne ke liye
+       * lightweight debounced request.
+       */
+      scheduleRefresh();
+    };
+
+    // ---------------------------------------
+    // ORDER UPDATE / STATUS CHANGE
+    // ---------------------------------------
+    const handleOrderUpdate = (order) => {
+      console.log("🔄 Counter POS order updated:", order);
+
+      const eventRestaurantId =
+        typeof order?.restaurantId === "object"
+          ? order?.restaurantId?._id
+          : order?.restaurantId;
+
+      if (
+        eventRestaurantId &&
+        String(eventRestaurantId) !== String(restaurantId)
+      ) {
+        return;
+      }
+
+      scheduleRefresh();
+    };
+
+    // ---------------------------------------
+    // CONNECTION RESTORE
+    // ---------------------------------------
+    const handleConnect = () => {
+      console.log("🟢 Counter POS socket connected:", socket.id);
+
+      /*
+       * Reconnect ke baad missed orders ka final
+       * state backend se sync.
+       */
+      scheduleRefresh();
+    };
+
+    socket.on("NEW_ORDER_RECEIVED", handleNewOrder);
+
+    socket.on("ORDER_UPDATED", handleOrderUpdate);
+
+    socket.on("ORDER_STATUS_UPDATED", handleOrderUpdate);
+
+    socket.on("ORDER_CANCELLED", handleOrderUpdate);
+
+    socket.on("ORDER_REJECTED", handleOrderUpdate);
+
+    socket.on("ORDER_COMPLETED", handleOrderUpdate);
+
+    socket.on("connect", handleConnect);
+
+    return () => {
+      socket.off("NEW_ORDER_RECEIVED", handleNewOrder);
+
+      socket.off("ORDER_UPDATED", handleOrderUpdate);
+
+      socket.off("ORDER_STATUS_UPDATED", handleOrderUpdate);
+
+      socket.off("ORDER_CANCELLED", handleOrderUpdate);
+
+      socket.off("ORDER_REJECTED", handleOrderUpdate);
+
+      socket.off("ORDER_COMPLETED", handleOrderUpdate);
+
+      socket.off("connect", handleConnect);
+
+      if (refreshTimer) {
+        clearTimeout(refreshTimer);
+      }
+    };
+  }, [socket, restaurantId, apiBase]);
 
   const catalog = useMemo(() => {
     const formattedItems = items.map((i) => ({ ...i, catalogType: "ITEM" }));

@@ -1,4 +1,4 @@
-import { useState, useCallback, useMemo, memo } from "react";
+import { useState, useCallback, useMemo, memo, useEffect } from "react";
 import axios from "axios";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import {
@@ -10,13 +10,12 @@ import {
   Percent,
   CheckCircle2,
 } from "lucide-react";
+import { useSocket } from "../../context/SocketContext";
+// const api = axios.create({ baseURL: `${import.meta.env.VITE_APP_API_BASE}` });
 
-const api = axios.create({ baseURL: `${import.meta.env.VITE_APP_API_BASE}` });
-
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem("token");
-  if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
+const api = axios.create({
+  baseURL: import.meta.env.VITE_APP_API_BASE,
+  withCredentials: true,
 });
 
 // Offer Card Component
@@ -65,28 +64,50 @@ export default function Offers() {
     description: "",
     targetItems: [],
   });
+  const socket = useSocket();
+  const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleOfferCreated = () => {
+      queryClient.invalidateQueries({
+        queryKey: ["offers"],
+      });
+    };
+
+    const handleOfferDeleted = () => {
+      queryClient.invalidateQueries({
+        queryKey: ["offers"],
+      });
+    };
+
+    socket.on("OFFER_CREATED", handleOfferCreated);
+    socket.on("OFFER_DELETED", handleOfferDeleted);
+
+    return () => {
+      socket.off("OFFER_CREATED", handleOfferCreated);
+      socket.off("OFFER_DELETED", handleOfferDeleted);
+    };
+  }, [socket, queryClient]);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [offerToDelete, setOfferToDelete] = useState(null);
-  const queryClient = useQueryClient();
 
   const deleteMutation = useMutation({
     mutationFn: (offerId) => api.delete(`/offers/${offerId}`),
 
     onSuccess: () => {
-      queryClient.invalidateQueries(["offers"]);
+      queryClient.invalidateQueries({
+        queryKey: ["offers"],
+      });
 
       setSuccessMessage("Offer Deleted Successfully");
+
       setShowSuccessPopup(true);
-
-      setTimeout(() => {
-        setShowSuccessPopup(false);
-      }, 3000);
     },
-
-    onError: () => alert("Failed to delete offer"),
   });
 
   const {
@@ -128,8 +149,11 @@ export default function Offers() {
 
   const addMutation = useMutation({
     mutationFn: (data) => api.post("/offers", data),
+
     onSuccess: () => {
-      queryClient.invalidateQueries(["offers"]);
+      queryClient.invalidateQueries({
+        queryKey: ["offers"],
+      });
 
       setFormData({
         title: "",
@@ -139,13 +163,9 @@ export default function Offers() {
       });
 
       setSuccessMessage("Offer Created Successfully");
-      setShowSuccessPopup(true);
 
-      setTimeout(() => {
-        setShowSuccessPopup(false);
-      }, 3000);
+      setShowSuccessPopup(true);
     },
-    onError: () => alert("Failed to create offer"),
   });
 
   const updateField = useCallback((field, value) => {

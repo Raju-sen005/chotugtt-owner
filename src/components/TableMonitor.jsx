@@ -16,7 +16,7 @@ import {
 import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import axios from "axios";
-
+import { useSocket } from "../context/SocketContext";
 // 🔑 Extracted + memoized TableCard component
 const TableCard = memo(function TableCard({
   table,
@@ -226,6 +226,7 @@ const SectionBlock = memo(function SectionBlock({
 
 export default function TableMonitor() {
   const { user } = useAuth();
+  const socket = useSocket();
   const [copied, setCopied] = useState(null);
   const qrRefs = useRef({});
 
@@ -321,9 +322,45 @@ export default function TableMonitor() {
   }, [apiBase]);
 
   useEffect(() => {
-    fetchTables();
-    fetchSections();
+    const timeoutId = setTimeout(() => {
+      void fetchTables();
+      void fetchSections();
+    }, 0);
+
+    return () => clearTimeout(timeoutId);
   }, [fetchTables, fetchSections]);
+
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleTablesUpdated = () => {
+      fetchTables();
+      fetchSections();
+    };
+
+    const handleTableStatusUpdated = (payload) => {
+      setTables((prev) =>
+        prev.map((table) =>
+          String(table.tableNumber) === String(payload.tableNumber)
+            ? {
+                ...table,
+                isDisabled: payload.isDisabled,
+              }
+            : table,
+        ),
+      );
+    };
+
+    socket.on("TABLES_UPDATED", handleTablesUpdated);
+
+    socket.on("TABLE_STATUS_UPDATED", handleTableStatusUpdated);
+
+    return () => {
+      socket.off("TABLES_UPDATED", handleTablesUpdated);
+
+      socket.off("TABLE_STATUS_UPDATED", handleTableStatusUpdated);
+    };
+  }, [socket, fetchTables, fetchSections]);
 
   const activeRestaurantId =
     user?.restaurantId?._id ||
