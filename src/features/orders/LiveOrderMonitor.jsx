@@ -14,8 +14,17 @@ import {
   ArrowRight,
   // Receipt,
   IndianRupee,
+  Loader2,
 } from "lucide-react";
 import OrderDetailsModal from "../../components/OrderDetailsModal";
+
+// Shared status → badge style map (used by both the desktop row and mobile card
+// so ACCEPTED / COMPLETED / REJECTED are visually distinct at a glance)
+const STATUS_BADGE_STYLES = {
+  ACCEPTED: "bg-blue-50 text-blue-700 border-blue-200",
+  COMPLETED: "bg-emerald-50 text-emerald-700 border-emerald-200",
+  REJECTED: "bg-rose-50 text-rose-600 border-rose-200",
+};
 
 const OrderRow = memo(function OrderRow({
   order,
@@ -33,7 +42,7 @@ const OrderRow = memo(function OrderRow({
       </td>
       <td className="px-6 py-4 font-bold text-slate-800 text-xs sm:text-sm whitespace-nowrap">
         <span className="inline-flex items-center gap-2">
-          Table {order.tableNumber}
+           {order.tableNumber}
           {hasMergedTables && (
             <span
               title={`Merged with Table ${order.mergedTables.join(", ")}`}
@@ -88,7 +97,7 @@ const OrderRow = memo(function OrderRow({
           )}
         </div>
       </td>
-      <td className="px-6 py-4 text-right font-black text-slate-900 text-xs sm:text-sm whitespace-nowrap">
+      <td className="px-6 py-4 text-right font-black text-slate-900 text-xs sm:text-sm whitespace-nowrap font-mono">
         ₹{order.total?.toLocaleString("en-IN")}
       </td>
       <td className="px-6 py-4">
@@ -111,7 +120,12 @@ const OrderRow = memo(function OrderRow({
               </button>
             </>
           ) : (
-            <span className="text-[10px] font-black uppercase tracking-wider bg-slate-100 text-slate-600 border border-slate-200/60 px-3 py-1.5 rounded-xl">
+            <span
+              className={`text-[10px] font-black uppercase tracking-wider border px-3 py-1.5 rounded-xl ${
+                STATUS_BADGE_STYLES[order.status] ||
+                "bg-slate-100 text-slate-600 border-slate-200"
+              }`}
+            >
               {order.status}
             </span>
           )}
@@ -137,6 +151,139 @@ const OrderRow = memo(function OrderRow({
         </div>
       </td>
     </tr>
+  );
+});
+
+// Mobile-only card presentation of the exact same order data + handlers as
+// OrderRow — tables scroll poorly on phones, so below the `lg` breakpoint
+// orders render as cards instead of a horizontally-scrolling table.
+const OrderCard = memo(function OrderCard({
+  order,
+  onStatusChange,
+  onView,
+  onClear,
+  onCancelItem,
+}) {
+  const hasMergedTables = order.mergedTables && order.mergedTables.length > 0;
+  const [showAllItems, setShowAllItems] = useState(false);
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
+      <div className="flex justify-between items-start gap-2">
+        <div className="min-w-0">
+          <p className="font-mono font-bold text-rose-600 text-xs">
+            {order.orderId}
+          </p>
+          <p className="text-sm font-black text-slate-900 mt-0.5 flex items-center gap-1.5 flex-wrap">
+            Table {order.tableNumber}
+            {hasMergedTables && (
+              <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200/60 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider">
+                <Users size={9} /> +{order.mergedTables.join(", ")}
+              </span>
+            )}
+          </p>
+          <p className="text-xs text-slate-500 font-semibold mt-0.5 truncate">
+            {order.customerName}
+          </p>
+        </div>
+        <span className="font-black text-slate-900 text-sm whitespace-nowrap font-mono shrink-0">
+          ₹{order.total?.toLocaleString("en-IN")}
+        </span>
+      </div>
+
+      <div className="text-xs text-slate-600 font-medium border-t border-dashed border-slate-200 pt-2.5">
+        <div className="flex flex-col gap-1">
+          {(showAllItems ? order.items : order.items.slice(0, 2)).map(
+            (item) => (
+              <div
+                key={item._id}
+                className="flex items-center justify-between gap-2"
+              >
+                <span
+                  className={`truncate ${
+                    item.status === "REJECTED"
+                      ? "line-through text-rose-400 opacity-50"
+                      : ""
+                  }`}
+                >
+                  • {item.quantity}x {item.name}
+                </span>
+                {item.status !== "REJECTED" &&
+                  order.status !== "COMPLETED" &&
+                  order.status !== "REJECTED" && (
+                    <button
+                      onClick={() => onCancelItem(order._id, item._id)}
+                      className="text-[10px] text-slate-300 active:text-rose-500 shrink-0"
+                    >
+                      Cancel
+                    </button>
+                  )}
+              </div>
+            ),
+          )}
+          {order.items.length > 2 && (
+            <button
+              type="button"
+              onClick={() => setShowAllItems((prev) => !prev)}
+              className="mt-0.5 text-left text-[10px] font-black text-rose-600"
+            >
+              {showAllItems
+                ? "Show less"
+                : `Show ${order.items.length - 2} more`}
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-100">
+        {order.status === "PENDING" ? (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onStatusChange(order._id, "ACCEPTED")}
+              className="p-2 bg-emerald-50 text-emerald-600 border border-emerald-200/80 rounded-xl active:bg-emerald-100 transition"
+              title="Accept Order"
+            >
+              <Check size={16} strokeWidth={2.5} />
+            </button>
+            <button
+              onClick={() => onStatusChange(order._id, "REJECTED")}
+              className="p-2 bg-rose-50 text-rose-600 border border-rose-200/80 rounded-xl active:bg-rose-100 transition"
+              title="Reject Order"
+            >
+              <X size={16} strokeWidth={2.5} />
+            </button>
+          </div>
+        ) : (
+          <span
+            className={`text-[10px] font-black uppercase tracking-wider border px-2.5 py-1.5 rounded-xl ${
+              STATUS_BADGE_STYLES[order.status] ||
+              "bg-slate-100 text-slate-600 border-slate-200"
+            }`}
+          >
+            {order.status}
+          </span>
+        )}
+
+        <div className="flex items-center gap-2">
+          {order.status === "ACCEPTED" && order.tableNumber !== "N/A" && (
+            <button
+              onClick={() => onClear(order)}
+              className="p-2 bg-slate-900 text-white rounded-xl active:bg-slate-800 transition"
+              title="Generate Bill & Clear Table"
+            >
+              <IndianRupee size={16} strokeWidth={2.5} />
+            </button>
+          )}
+          <button
+            onClick={() => onView(order)}
+            className="p-2 bg-white text-slate-600 border border-slate-200/80 rounded-xl active:bg-slate-50 transition"
+            title="View Order Details"
+          >
+            <Eye size={16} strokeWidth={2.5} />
+          </button>
+        </div>
+      </div>
+    </div>
   );
 });
 
@@ -182,7 +329,9 @@ const TableStatusStrip = memo(function TableStatusStrip({ tables, isLoading }) {
               : "bg-emerald-50/80 border-emerald-200 text-emerald-700 shadow-2xs"
           }`}
         >
-          <p className="text-xs font-black tracking-tight">{t.tableNumber}</p>
+          <p className="text-xs font-black tracking-tight font-mono">
+            {t.tableNumber}
+          </p>
           <p className="text-[9px] font-black uppercase tracking-wider mt-0.5 opacity-90">
             {t.isOccupied ? "Occupied" : "Free"}
           </p>
@@ -263,15 +412,32 @@ export default function LiveOrderMonitor() {
         return;
       }
 
-      const kotRows = activeItems
-        .map(
-          (item) => `
-          <tr>
-            <td class="item-name">${item.name}</td>
-            <td class="item-qty">${item.quantity}</td>
-          </tr>
-        `,
-        )
+      const kotRows = order.items
+        .map((item) => {
+          return `
+      <tr>
+        <td class="item-col">
+          <div class="item-name">
+            ${item.name}
+          </div>
+
+          ${
+            item.variant
+              ? `<div class="item-meta">Variant: ${item.variant}</div>`
+              : ""
+          }
+
+          ${
+            item.notes ? `<div class="item-meta">Note: ${item.notes}</div>` : ""
+          }
+        </td>
+
+        <td class="qty-col">
+          ${item.quantity}
+        </td>
+      </tr>
+    `;
+        })
         .join("");
 
       const tableLabel = order.mergedTables?.length
@@ -291,139 +457,305 @@ export default function LiveOrderMonitor() {
       });
 
       const windowContent = `
-      <html>
-        <head>
-          <title>KOT ${order.orderId}</title>
+  <html>
+    <head>
+      <title>KOT ${order.orderId}</title>
 
-          <style>
-            @media print {
-              @page {
-                margin: 0;
-              }
-            }
+      <style>
+        @media print {
+          @page {
+            margin: 0;
+            size: 80mm auto;
+          }
 
-            * {
-              box-sizing: border-box;
-            }
+          html,
+          body {
+            width: 80mm;
+            margin: 0;
+            padding: 0;
+          }
+        }
 
-            body {
-              margin: 0;
-              padding: 0;
-              background: #fff;
-              font-family: "Courier New", monospace;
-            }
+        * {
+          box-sizing: border-box;
+        }
 
-            .kot {
-              width: 300px;
-              padding: 18px 14px;
-              color: #111;
-            }
+        html,
+        body {
+          margin: 0;
+          padding: 0;
+          background: #fff;
+        }
 
-            .center {
-              text-align: center;
-            }
+        body {
+          font-family: "Courier New", Courier, monospace;
+          color: #111;
+          font-size: 12px;
+          font-weight: 600;
+        }
 
-            .title {
-              font-size: 18px;
-              font-weight: 700;
-              margin-bottom: 8px;
-            }
+        .kot {
+          width: 80mm;
+          max-width: 80mm;
+          padding: 12px 10px 18px;
+        }
 
-            .order-id {
-              font-size: 14px;
-              font-weight: 700;
-            }
+        .center {
+          text-align: center;
+        }
 
-            .meta {
-              font-size: 11px;
-              margin-top: 5px;
-              line-height: 1.5;
-            }
+        .title {
+          font-size: 17px;
+          font-weight: 900;
+          letter-spacing: 0.5px;
+          margin-bottom: 6px;
+        }
 
-            .divider {
-              border-top: 1px dashed #333;
-              margin: 10px 0;
-            }
+        .order-id {
+          font-size: 15px;
+          font-weight: 900;
+          margin-bottom: 5px;
+        }
 
-            table {
-              width: 100%;
-              border-collapse: collapse;
-              font-size: 14px;
-            }
+        .order-type {
+          display: inline-block;
+          border: 1.5px solid #111;
+          padding: 3px 8px;
+          font-size: 11px;
+          font-weight: 900;
+          margin-bottom: 7px;
+          letter-spacing: 0.4px;
+        }
 
-            td {
-              padding: 7px 0;
-              vertical-align: top;
-            }
+        .meta {
+          font-size: 11px;
+          line-height: 1.55;
+          text-align: left;
+        }
 
-            .item-name {
-              width: 75%;
-              font-weight: 700;
-            }
+        .meta-row {
+          display: flex;
+          justify-content: space-between;
+          gap: 8px;
+        }
 
-            .item-qty {
-              width: 25%;
-              text-align: right;
-              font-size: 16px;
-              font-weight: 700;
-            }
+        .meta-label {
+          font-weight: 700;
+        }
 
-            .footer {
-              margin-top: 12px;
-              text-align: center;
-              font-size: 10px;
-            }
-          </style>
-        </head>
+        .meta-value {
+          font-weight: 900;
+          text-align: right;
+        }
 
-        <body>
-          <div class="kot">
+        .divider {
+          border-top: 1.5px dashed #111;
+          margin: 9px 0;
+        }
 
-            <div class="center">
-              <div class="title">KITCHEN ORDER TICKET</div>
+        .section-title {
+          font-size: 11px;
+          font-weight: 900;
+          text-transform: uppercase;
+          margin-bottom: 5px;
+        }
 
-              <div class="order-id">
-                ${order.orderId}
-              </div>
+        table {
+          width: 100%;
+          border-collapse: collapse;
+          table-layout: fixed;
+        }
 
-              <div class="meta">
-                Table: ${tableLabel}<br/>
-                Customer: ${order.customerName || "Guest"}<br/>
-                Date: ${dateStr}<br/>
-                Time: ${timeStr}
-              </div>
-            </div>
+        th {
+          font-size: 11px;
+          font-weight: 900;
+          padding: 5px 0;
+          border-bottom: 1.5px solid #111;
+          text-transform: uppercase;
+        }
 
-            <div class="divider"></div>
+        td {
+          padding: 6px 0;
+          vertical-align: top;
+          font-size: 13px;
+          font-weight: 700;
+          line-height: 1.35;
+        }
 
-            <table>
-              <tbody>
-                ${kotRows}
-              </tbody>
-            </table>
+        .item-col {
+          width: 76%;
+          padding-right: 5px;
+          text-align: left;
+        }
 
-            <div class="divider"></div>
+        .qty-col {
+          width: 24%;
+          text-align: right;
+          font-size: 14px;
+          font-weight: 900;
+        }
 
-            <div class="footer">
-              KITCHEN COPY
-            </div>
+        .item-name {
+          font-weight: 900;
+        }
 
+        .item-meta {
+          font-size: 10px;
+          font-weight: 600;
+          margin-top: 2px;
+          line-height: 1.3;
+        }
+
+        .notes {
+          border: 1.5px solid #111;
+          padding: 7px;
+          margin-top: 4px;
+        }
+
+        .notes-title {
+          font-size: 10px;
+          font-weight: 900;
+          text-transform: uppercase;
+          margin-bottom: 4px;
+        }
+
+        .note {
+          font-size: 11px;
+          font-weight: 700;
+          line-height: 1.45;
+        }
+
+        .footer {
+          text-align: center;
+          margin-top: 10px;
+          font-size: 10px;
+          font-weight: 900;
+          letter-spacing: 0.6px;
+        }
+
+        .kitchen-copy {
+          font-size: 11px;
+          font-weight: 900;
+          margin-top: 4px;
+        }
+      </style>
+    </head>
+
+    <body>
+      <div class="kot">
+
+        <!-- HEADER -->
+        <div class="center">
+          <div class="title">
+            KITCHEN ORDER TICKET
           </div>
 
-          <script>
-            window.focus();
+          <div class="order-id">
+            ${order.orderId}
+          </div>
 
-            window.addEventListener("load", () => {
-              window.print();
-            });
+          <div class="order-type">
+            ${order.orderType || "DINE IN"}
+          </div>
+        </div>
 
-            window.onafterprint = () => {
-              window.close();
-            };
-          </script>
-        </body>
-      </html>
-    `;
+        <div class="divider"></div>
+
+        <!-- ORDER INFORMATION -->
+        <div class="meta">
+
+          <div class="meta-row">
+            <span class="meta-label">TABLE</span>
+            <span class="meta-value">${tableLabel}</span>
+          </div>
+
+          <div class="meta-row">
+            <span class="meta-label">CUSTOMER</span>
+            <span class="meta-value">
+              ${order.customerName || "Guest"}
+            </span>
+          </div>
+
+          <div class="meta-row">
+            <span class="meta-label">DATE</span>
+            <span class="meta-value">${dateStr}</span>
+          </div>
+
+          <div class="meta-row">
+            <span class="meta-label">TIME</span>
+            <span class="meta-value">${timeStr}</span>
+          </div>
+
+        </div>
+
+        <div class="divider"></div>
+
+        <!-- ITEMS -->
+        <div class="section-title">
+          Order Items
+        </div>
+
+        <table>
+          <thead>
+            <tr>
+              <th class="item-col">
+                ITEM
+              </th>
+
+              <th class="qty-col">
+                QTY
+              </th>
+            </tr>
+          </thead>
+
+          <tbody>
+            ${kotRows}
+          </tbody>
+        </table>
+
+        <div class="divider"></div>
+
+        ${
+          order.notes
+            ? `
+              <div class="notes">
+                <div class="notes-title">
+                  Special Instructions
+                </div>
+
+                <div class="note">
+                  ${order.notes}
+                </div>
+              </div>
+
+              <div class="divider"></div>
+            `
+            : ""
+        }
+
+        <!-- FOOTER -->
+        <div class="footer">
+          KITCHEN COPY
+        </div>
+
+      </div>
+
+      <script>
+        window.focus();
+
+        window.addEventListener("load", () => {
+          setTimeout(() => {
+            window.print();
+          }, 150);
+        });
+
+        window.onafterprint = () => {
+          window.close();
+        };
+      </script>
+    </body>
+  </html>
+`;
 
       const printWindow = window.open("", "_blank", "width=380,height=680");
 
@@ -1102,7 +1434,7 @@ ${
                   setShowStatusPopup(false);
                   setStatusPopupOrderId(null);
                 }}
-                className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 text-sm font-bold hover:bg-slate-50"
+                className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 text-sm font-bold hover:bg-slate-50 transition"
               >
                 Cancel
               </button>
@@ -1115,7 +1447,7 @@ ${
 
                   setStatusPopupOrderId(null);
                 }}
-                className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700"
+                className="flex-1 py-3 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition shadow-sm shadow-emerald-200"
               >
                 Accept
               </button>
@@ -1141,14 +1473,14 @@ ${
             <div className="flex gap-3 mt-6">
               <button
                 onClick={() => setCancelItemData(null)}
-                className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 text-sm font-bold hover:bg-slate-50"
+                className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 text-sm font-bold hover:bg-slate-50 transition"
               >
                 Keep Item
               </button>
 
               <button
                 onClick={confirmCancelItem}
-                className="flex-1 py-3 rounded-xl bg-rose-600 text-white text-sm font-bold hover:bg-rose-700"
+                className="flex-1 py-3 rounded-xl bg-rose-600 text-white text-sm font-bold hover:bg-rose-700 transition shadow-sm shadow-rose-200"
               >
                 Cancel Item
               </button>
@@ -1158,16 +1490,26 @@ ${
       )}
 
       {showSuccessPopup && (
-        <div className="fixed top-6 right-6 z-[10001]">
-          <div className="bg-white border border-emerald-200 shadow-2xl rounded-2xl px-5 py-4 flex items-start gap-3 min-w-[320px]">
-            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+        <div className="fixed top-6 right-6 z-[10001] animate-in slide-in-from-right-5 fade-in duration-300">
+          <div className="bg-white border border-slate-200 border-l-4 border-l-emerald-500 shadow-2xl rounded-2xl px-5 py-4 flex items-start gap-3 min-w-[320px] max-w-[400px]">
+            <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
               <Check size={20} strokeWidth={2.5} />
             </div>
 
-            <div>
+            <div className="flex-1">
               <p className="text-sm font-black text-slate-900">Success</p>
-              <p className="text-xs text-slate-500 mt-1">{successMessage}</p>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                {successMessage}
+              </p>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setShowSuccessPopup(false)}
+              className="text-slate-400 hover:text-slate-700 transition-colors shrink-0"
+            >
+              <X size={16} />
+            </button>
           </div>
         </div>
       )}
@@ -1203,7 +1545,7 @@ ${
                       Order
                     </p>
 
-                    <p className="text-sm font-black text-slate-800 mt-1">
+                    <p className="text-sm font-black text-slate-800 mt-1 font-mono">
                       {billOrder.orderId}
                     </p>
 
@@ -1217,7 +1559,7 @@ ${
                       Table
                     </p>
 
-                    <p className="text-sm font-black text-slate-800 mt-1">
+                    <p className="text-sm font-black text-slate-800 mt-1 font-mono">
                       {billOrder.tableNumber}
                     </p>
                   </div>
@@ -1228,7 +1570,7 @@ ${
                     Amount Payable
                   </span>
 
-                  <span className="text-xl font-black text-slate-900">
+                  <span className="text-xl font-black text-slate-900 font-mono">
                     ₹{Number(billOrder.total || 0).toLocaleString("en-IN")}
                   </span>
                 </div>
@@ -1269,7 +1611,7 @@ ${
                       : "border-slate-200 bg-white text-slate-600 hover:border-blue-200"
                   }`}
                 >
-                  <div className="text-xl mb-2">📱</div>
+                  <div className="text-xl mb-2">🏦</div>
 
                   <p className="text-xs font-black">UPI</p>
 
@@ -1286,7 +1628,7 @@ ${
                       : "border-slate-200 bg-white text-slate-600 hover:border-amber-200"
                   }`}
                 >
-                  <div className="text-xl mb-2">🧾</div>
+                  <div className="text-xl mb-2">⏳</div>
 
                   <p className="text-xs font-black">Due</p>
 
@@ -1322,8 +1664,11 @@ ${
                 type="button"
                 disabled={!selectedPaymentMethod || isGeneratingBill}
                 onClick={confirmGenerateBill}
-                className="flex-1 py-3 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 transition disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex-1 py-3 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
+                {isGeneratingBill && (
+                  <Loader2 size={16} className="animate-spin" />
+                )}
                 {isGeneratingBill
                   ? "Processing..."
                   : selectedPaymentMethod === "DUE"
@@ -1336,22 +1681,32 @@ ${
       )}
 
       {showErrorPopup && (
-        <div className="fixed top-6 right-6 z-[10002]">
-          <div className="bg-white border border-rose-200 shadow-2xl rounded-2xl px-5 py-4 flex items-start gap-3 min-w-[320px]">
-            <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center">
+        <div className="fixed top-6 right-6 z-[10002] animate-in slide-in-from-right-5 fade-in duration-300">
+          <div className="bg-white border border-slate-200 border-l-4 border-l-rose-500 shadow-2xl rounded-2xl px-5 py-4 flex items-start gap-3 min-w-[320px] max-w-[400px]">
+            <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
               <X size={20} strokeWidth={2.5} />
             </div>
 
-            <div>
+            <div className="flex-1">
               <p className="text-sm font-black text-slate-900">Error</p>
-              <p className="text-xs text-slate-500 mt-1">{errorMessage}</p>
+              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
+                {errorMessage}
+              </p>
             </div>
+
+            <button
+              type="button"
+              onClick={() => setShowErrorPopup(false)}
+              className="text-slate-400 hover:text-slate-700 transition-colors shrink-0"
+            >
+              <X size={16} />
+            </button>
           </div>
         </div>
       )}
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-10 space-y-8 font-sans bg-[#F8F9FA] min-h-screen">
+      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-10 space-y-6 sm:space-y-8 font-sans bg-[#F8F9FA] min-h-screen">
         {/* Header Banner */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-5 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs">
           <div>
             <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
               Live Kitchen Monitor
@@ -1361,20 +1716,35 @@ ${
               execution queue.
             </p>
           </div>
-          <div className="flex items-center gap-2.5 bg-rose-50/80 border border-rose-100 px-4 py-2 rounded-2xl self-start sm:self-center shadow-2xs">
-            <Radio size={16} className="text-rose-600 animate-pulse" />
-            <span className="text-[11px] font-black tracking-wider uppercase text-rose-600">
-              Stream Active
-            </span>
+          <div className="flex items-center gap-2.5 flex-wrap">
+            {orders.length > 0 && (
+              <span className="text-[11px] font-black tracking-wider uppercase text-slate-500 bg-slate-100 px-3 py-2 rounded-2xl font-mono">
+                {orders.length} live
+              </span>
+            )}
+            <div className="flex items-center gap-2.5 bg-rose-50/80 border border-rose-100 px-4 py-2 rounded-2xl shadow-2xs">
+              <Radio size={16} className="text-rose-600 animate-pulse" />
+              <span className="text-[11px] font-black tracking-wider uppercase text-rose-600">
+                Stream Active
+              </span>
+            </div>
           </div>
         </div>
 
         {/* Table Occupancy Strip */}
-        <div className="bg-white rounded-3xl border border-slate-200/80 p-6 shadow-xs space-y-3">
-          <div className="flex items-center justify-between">
+        <div className="bg-white rounded-3xl border border-slate-200/80 p-5 sm:p-6 shadow-xs space-y-3">
+          <div className="flex items-center justify-between flex-wrap gap-2">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">
               Table Live Status Grid
             </p>
+            <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500">
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400" /> Free
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-rose-400" /> Occupied
+              </span>
+            </div>
           </div>
           <TableStatusStrip
             tables={tableStatus}
@@ -1384,7 +1754,10 @@ ${
 
         {/* Orders Section */}
         {orders.length === 0 ? (
-          <div className="bg-white rounded-3xl border border-slate-200/80 p-16 text-center shadow-xs flex flex-col items-center justify-center max-w-xl mx-auto space-y-3">
+          <div className="bg-white rounded-3xl border border-slate-200/80 p-12 sm:p-16 text-center shadow-xs flex flex-col items-center justify-center max-w-xl mx-auto space-y-3">
+            <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-dashed border-slate-200 flex items-center justify-center text-slate-300 mb-1">
+              <Radio size={24} />
+            </div>
             <p className="text-sm font-bold text-slate-800">
               No live orders right now
             </p>
@@ -1395,11 +1768,22 @@ ${
           </div>
         ) : (
           <div className="bg-white rounded-3xl border border-slate-200/80 shadow-xs overflow-hidden">
-            <div className="sm:hidden text-[10px] font-bold text-slate-400 uppercase tracking-wider px-6 pt-4">
-              ← Swipe horizontally to see table details →
+            {/* Mobile / tablet: card list — tables don't work well on small touch screens */}
+            <div className="lg:hidden p-4 sm:p-5 space-y-3">
+              {currentOrders.map((order) => (
+                <OrderCard
+                  key={order._id}
+                  order={order}
+                  onStatusChange={handleStatusClick}
+                  onView={handleView}
+                  onClear={handleBillAndWhatsApp}
+                  onCancelItem={handleCancelItem}
+                />
+              ))}
             </div>
 
-            <div className="overflow-x-auto">
+            {/* Desktop: table */}
+            <div className="hidden lg:block overflow-x-auto">
               <table className="w-full text-left border-collapse min-w-[680px]">
                 <thead>
                   <tr className="bg-slate-50/70 border-b border-slate-200/80 text-slate-400 text-[10px] sm:text-xs font-bold uppercase tracking-wider">
@@ -1434,7 +1818,7 @@ ${
 
             {/* Pagination Footer inside card container */}
             {totalPages > 1 && (
-              <div className="flex flex-col sm:flex-row gap-4 justify-between items-center px-6 py-4 bg-slate-50/50 border-t border-slate-100">
+              <div className="flex flex-col sm:flex-row gap-4 justify-between items-center px-4 sm:px-6 py-4 bg-slate-50/50 border-t border-slate-100">
                 <p className="text-xs text-slate-500 font-medium">
                   Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
                   {Math.min(indexOfLastOrder, orders.length)} of {orders.length}{" "}
@@ -1463,17 +1847,23 @@ ${
         {rejectModalOrder && (
           <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-3xl w-full max-w-sm p-6 space-y-4 shadow-2xl border border-slate-100">
-              <h3 className="text-base font-black text-slate-900">
-                Select Rejection Reason
-              </h3>
-              <p className="text-xs text-slate-500">
-                Please choose a reason why this order is being rejected:
-              </p>
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center">
+                <X size={22} strokeWidth={2.5} />
+              </div>
+
+              <div>
+                <h3 className="text-base font-black text-slate-900">
+                  Select Rejection Reason
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Please choose a reason why this order is being rejected:
+                </p>
+              </div>
 
               <select
                 value={rejectReasonDropdown}
                 onChange={(e) => setRejectReasonDropdown(e.target.value)}
-                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none cursor-pointer"
+                className="w-full p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100 cursor-pointer"
               >
                 <option value="Item Out of Stock">Item Out of Stock</option>
                 <option value="Kitchen Closed / Overloaded">
@@ -1488,7 +1878,7 @@ ${
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   onClick={() => setRejectModalOrder(null)}
-                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs cursor-pointer hover:bg-slate-200"
+                  className="px-4 py-2 bg-slate-100 text-slate-700 rounded-xl font-bold text-xs cursor-pointer hover:bg-slate-200 transition"
                 >
                   Cancel
                 </button>
@@ -1500,7 +1890,7 @@ ${
                       rejectReasonDropdown,
                     )
                   }
-                  className="px-4 py-2 bg-rose-600 text-white rounded-xl font-bold text-xs cursor-pointer hover:bg-rose-700 shadow-lg shadow-rose-600/20"
+                  className="px-4 py-2 bg-rose-600 text-white rounded-xl font-bold text-xs cursor-pointer hover:bg-rose-700 transition shadow-lg shadow-rose-600/20"
                 >
                   Confirm Reject
                 </button>

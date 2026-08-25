@@ -930,15 +930,44 @@ export default function MenuCatalog() {
               <button
                 type="button"
                 onClick={closeAndResetModal}
-                className="px-5 py-3 rounded-2xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition cursor-pointer"
+                disabled={
+                  upsertMutation.isPending ||
+                  comboMutation.isPending ||
+                  updateComboMutation.isPending
+                }
+                className="px-5 py-3 rounded-2xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Cancel
               </button>
+
               <button
                 type="submit"
-                className="px-6 py-3 rounded-2xl bg-red-500 text-white font-bold text-xs hover:bg-red-600 transition cursor-pointer shadow-sm shadow-red-500/20"
+                disabled={
+                  upsertMutation.isPending ||
+                  comboMutation.isPending ||
+                  updateComboMutation.isPending
+                }
+                className="min-w-[130px] flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-red-500 text-white font-bold text-xs hover:bg-red-600 transition cursor-pointer shadow-sm shadow-red-500/20 disabled:opacity-60 disabled:cursor-not-allowed"
               >
-                Publish {formMode === "COMBO" ? "Combo" : "Dish"} Live
+                {upsertMutation.isPending ||
+                comboMutation.isPending ||
+                updateComboMutation.isPending ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+
+                    {editingItem
+                      ? "Updating..."
+                      : formMode === "COMBO"
+                        ? "Adding Combo..."
+                        : "Adding Dish..."}
+                  </>
+                ) : (
+                  <>
+                    {editingItem
+                      ? `Update ${formMode === "COMBO" ? "Combo" : "Dish"}`
+                      : `Add ${formMode === "COMBO" ? "Combo" : "Dish"}`}
+                  </>
+                )}
               </button>
             </div>
           </form>

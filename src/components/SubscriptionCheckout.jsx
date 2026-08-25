@@ -45,7 +45,7 @@ export default function SubscriptionCheckout() {
       <div className="max-w-7xl mx-auto w-full flex items-center justify-between pb-8 border-b border-slate-200/80">
         <div className="flex items-center gap-3">
           <img src={logo} alt="Logo" className="h-10 object-contain" />
-          <span className="font-black text-xl tracking-tight">Chotu</span>
+          <span className="font-black text-xl tracking-tight">ChotuGTT</span>
         </div>
         <div className="bg-rose-50 text-rose-600 px-4 py-2 rounded-xl text-xs font-bold border border-rose-100 flex items-center gap-2">
           <ShieldAlert size={16} /> Subscription Expired / Action Required
@@ -235,7 +235,7 @@ export default function SubscriptionCheckout() {
 
       {/* Footer Info */}
       <div className="max-w-7xl mx-auto w-full text-center pt-8 border-t border-slate-200/80 text-xs text-slate-400 font-medium">
-        Secure SSL 256-bit Encrypted Checkout • Powered by Chotu Billing Gateway
+        Secure SSL 256-bit Encrypted Checkout • Powered by ChotuGTT Billing Gateway
       </div>
     </div>
   );

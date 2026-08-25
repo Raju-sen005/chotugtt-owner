@@ -226,6 +226,10 @@ function Analysis() {
                 />
                 <Tooltip
                   cursor={{ fill: "#f8fafc" }}
+                  formatter={(value) => [
+                    `₹${Number(value || 0).toFixed(2)}`,
+                    "Sales",
+                  ]}
                   contentStyle={{
                     borderRadius: "12px",
                     border: "1px solid #e2e8f0",

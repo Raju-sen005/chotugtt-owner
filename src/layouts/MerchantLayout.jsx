@@ -58,7 +58,7 @@ export default function MerchantLayout() {
               <Menu size={20} />
             </button>
             <h2 className="text-sm font-black text-slate-900 tracking-tight lg:hidden">
-              <img src={logo} alt="Chotu" style={{ height: "100px" }} />
+              <img src={logo} alt="ChotuGTT" style={{ height: "100px" }} />
             </h2>
           </div>
           <Navbar />
