@@ -389,12 +389,22 @@ export default function PublicMenu() {
   // 🔑 tableToken mein table number encoded hai (StoreSettings jaisa btoa
   // `${restaurantId}-TABLE-${tableNo}` format) — isse current table number
   // nikaal lete hain taaki merge list mein khud ka table na dikhe.
+  function decodeBase64Url(str) {
+    const base64 = str.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64.padEnd(
+      base64.length + ((4 - (base64.length % 4)) % 4),
+      "=",
+    );
+    return atob(padded);
+  }
+
   const currentTableNumber = useMemo(() => {
     if (!tableToken) return null;
     try {
-      const decoded = atob(tableToken);
-      const match = decoded.match(/-TABLE-(.+)$/);
-      return match ? match[1] : null;
+      const [payloadB64] = tableToken.split(".");
+      const decoded = decodeBase64Url(payloadB64);
+      const [, tableNumber] = decoded.split(":");
+      return tableNumber || null;
     } catch {
       return null;
     }
@@ -765,8 +775,8 @@ export default function PublicMenu() {
           Menu Not Available
         </h3>
         <p className="text-xs text-slate-400 font-medium max-w-xs mt-1">
-          We couldn't load this menu right now. 
-          Please ask at the restaurant counter for assistance.
+          We couldn't load this menu right now. Please ask at the restaurant
+          counter for assistance.
         </p>
       </div>
     );

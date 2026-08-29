@@ -369,94 +369,228 @@ export default function TableMonitor() {
     storeDetails.id;
 
   const printQRCode = useCallback(
-    (tableNo) => {
-      const canvas = qrRefs.current[tableNo];
-      if (!canvas) return;
-      const dataUrl = canvas.toDataURL("image/png");
+  (tableNo) => {
+    const canvas = qrRefs.current[tableNo];
+    if (!canvas) return;
+    const dataUrl = canvas.toDataURL("image/png");
 
-      const restaurantName = storeDetails.name || "OUR RESTAURANT";
+    const restaurantName = storeDetails.name || "OUR RESTAURANT";
 
-      let restaurantLogo = storeDetails.logo || "";
-      if (restaurantLogo && restaurantLogo.startsWith("/")) {
-        try {
-          const urlObj = new URL(apiBase);
-          restaurantLogo = `${urlObj.origin}${restaurantLogo}`;
-        } catch {
-          restaurantLogo = `${window.location.origin}${restaurantLogo}`;
-        }
+    let restaurantLogo = storeDetails.logo || "";
+    if (restaurantLogo && restaurantLogo.startsWith("/")) {
+      try {
+        const urlObj = new URL(apiBase);
+        restaurantLogo = `${urlObj.origin}${restaurantLogo}`;
+      } catch {
+        restaurantLogo = `${window.location.origin}${restaurantLogo}`;
       }
+    }
 
-      const windowContent = `
-      <html>
-        <head>
-          <title>Table ${tableNo} - ${restaurantName} Standee</title>
-          <style>
-            @import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
-            body { 
-              font-family: 'Plus Jakarta Sans', sans-serif; 
-              display: flex; align-items: center; justify-content: center; 
-              height: 100vh; margin: 0; background: #ffffff; 
-              -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    const windowContent = `
+    <html>
+      <head>
+        <title>Table ${tableNo} - ${restaurantName} Standee</title>
+        <style>
+          @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
+
+          * { box-sizing: border-box; }
+
+          body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: #ffffff;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+
+          .standee-card {
+            width: 340px;
+            background: #ffffff;
+            border: 1px solid #E5E7EB;
+            border-radius: 24px;
+            padding: 36px 28px 28px;
+            text-align: center;
+            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
+            box-sizing: border-box;
+            position: relative;
+          }
+
+          .brand-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 22px;
+          }
+
+          .logo-img {
+            width: 56px;
+            height: 56px;
+            object-fit: cover;
+            border-radius: 16px;
+            border: 1px solid #E5E7EB;
+            background: #fff;
+            margin-bottom: 12px;
+          }
+
+          .logo-fallback {
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
+            background: #0F172A;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            font-weight: 800;
+            margin-bottom: 12px;
+          }
+
+          .brand-name {
+            font-size: 17px;
+            font-weight: 800;
+            letter-spacing: -0.2px;
+            color: #0F172A;
+            margin: 0;
+            line-height: 1.3;
+            max-width: 260px;
+          }
+
+          .brand-tagline {
+            font-size: 10px;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: #94A3B8;
+            margin: 4px 0 0 0;
+          }
+
+          .qr-box {
+            background: #ffffff;
+            padding: 18px;
+            border-radius: 20px;
+            display: inline-block;
+            border: 1.5px solid #F1F5F9;
+            margin-bottom: 20px;
+            box-shadow: inset 0 0 0 1px #fff;
+          }
+
+          img.qr-image {
+            width: 168px;
+            height: 168px;
+            display: block;
+            border-radius: 6px;
+          }
+
+          .scan-subtitle {
+            font-size: 10.5px;
+            font-weight: 700;
+            color: #94A3B8;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            margin: 0 0 6px 0;
+          }
+
+          .menu-title {
+            color: #0F172A;
+            margin: 0 0 22px 0;
+            font-size: 25px;
+            font-weight: 800;
+            letter-spacing: -0.5px;
+          }
+
+          .table-footer {
+            background: #0F172A;
+            color: #ffffff;
+            padding: 9px 22px;
+            border-radius: 999px;
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+          }
+
+          .powered-by {
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 1px dashed #E2E8F0;
+            font-size: 9.5px;
+            font-weight: 600;
+            color: #CBD5E1;
+            letter-spacing: 0.5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+          }
+
+          .powered-by .brand-tag {
+            font-weight: 800;
+            color: #64748B;
+            letter-spacing: 0.2px;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="standee-card">
+          <div class="brand-container">
+            ${
+              restaurantLogo
+                ? `<img id="print-logo" src="${restaurantLogo}" class="logo-img" />`
+                : `<div class="logo-fallback">${restaurantName.charAt(0).toUpperCase()}</div>`
             }
-            .standee-card { 
-              width: 340px; background: linear-gradient(135deg, #FAF8F5 0%, #F3EFEA 100%);
-              border: 1.5px solid #D4AF37; border-radius: 16px; padding: 32px 24px; 
-              text-align: center; box-shadow: 0 12px 30px rgba(0,0,0,0.08); box-sizing: border-box;
-            }
-            .brand-container { display: flex; flex-direction: column; align-items: center; margin-bottom: 20px; }
-            .logo-img { width: 52px; height: 52px; object-fit: contain; border-radius: 50%; border: 1px solid #D4AF37; padding: 2px; background: #fff; margin-bottom: 8px; }
-            .brand-name { font-family: 'Cinzel', serif; font-size: 13px; font-weight: 700; letter-spacing: 2px; color: #2C2C2C; text-transform: uppercase; margin: 0; }
-            .divider-gold { width: 40px; height: 1.5px; background-color: #D4AF37; margin: 10px auto 16px auto; }
-            .qr-box { background: #ffffff; padding: 14px; border-radius: 12px; display: inline-block; border: 1px solid #E6E0D5; margin-bottom: 18px; }
-            img.qr-image { width: 170px; height: 170px; display: block; }
-            .scan-subtitle { font-size: 11px; font-weight: 600; color: #7A756D; text-transform: uppercase; letter-spacing: 2px; margin: 0 0 4px 0; }
-            .menu-title { font-family: 'Cinzel', serif; color: #1A1A1A; margin: 0; font-size: 28px; font-weight: 800; letter-spacing: 1.5px; }
-            .table-footer { margin-top: 20px; background: #1A1A1A; color: #F3EFEA; padding: 8px 16px; border-radius: 30px; display: inline-block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; }
-          </style>
-        </head>
-        <body>
-          <div class="standee-card">
-            <div class="brand-container">
-              ${restaurantLogo ? `<img id="print-logo" src="${restaurantLogo}" class="logo-img" />` : ""}
-              <h2 class="brand-name">${restaurantName}</h2>
-              <div class="divider-gold"></div>
-            </div>
-            <div class="qr-box">
-              <img src="${dataUrl}" class="qr-image" />
-            </div>
-            <div class="scan-subtitle">Please Scan To View</div>
-            <h1 class="menu-title">DIGITAL MENU</h1>
-            <div class="table-footer">Table ${tableNo}</div>
+            <h2 class="brand-name">${restaurantName}</h2>
+            <p class="brand-tagline">Digital Menu</p>
           </div>
-          <script>
-            const logo = document.getElementById('print-logo');
-            function triggerPrint() {
-              window.focus();
-              window.print();
-              window.close();
-            }
-            if (logo) {
-              if (logo.complete) {
-                triggerPrint();
-              } else {
-                logo.onload = triggerPrint;
-                logo.onerror = triggerPrint;
-              }
-            } else {
-              triggerPrint();
-            }
-          </script>
-        </body>
-      </html>`;
 
-      const printWindow = window.open("", "_blank");
-      if (!printWindow) return;
-      printWindow.document.open();
-      printWindow.document.write(windowContent);
-      printWindow.document.close();
-    },
-    [storeDetails, apiBase],
-  );
+          <div class="qr-box">
+            <img src="${dataUrl}" class="qr-image" />
+          </div>
+
+          <div class="scan-subtitle">Scan to view menu</div>
+          <h1 class="menu-title">Order Here</h1>
+
+          <div class="table-footer">Table ${tableNo}</div>
+
+          <div class="powered-by">
+            <span>Powered by</span>
+            <span class="brand-tag">ChotuGTT</span>
+          </div>
+        </div>
+        <script>
+          const logo = document.getElementById('print-logo');
+          function triggerPrint() {
+            window.focus();
+            window.print();
+            window.close();
+          }
+          if (logo) {
+            if (logo.complete) {
+              triggerPrint();
+            } else {
+              logo.onload = triggerPrint;
+              logo.onerror = triggerPrint;
+            }
+          } else {
+            triggerPrint();
+          }
+        </script>
+      </body>
+    </html>`;
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    printWindow.document.open();
+    printWindow.document.write(windowContent);
+    printWindow.document.close();
+  },
+  [storeDetails, apiBase],
+);
 
   // 🔑 Add Table modal open — defaults reset
   const openAddTableModal = useCallback(() => {
@@ -676,22 +810,25 @@ export default function TableMonitor() {
     [apiBase, showSuccess],
   );
 
-  const generateTableUrl = useCallback(
-    (tableNo) => {
-      if (!activeRestaurantId) return "";
-      const token = btoa(`${activeRestaurantId}-TABLE-${tableNo}`);
-      return `${window.location.origin}/catalog/${activeRestaurantId}?t=${token}`;
-    },
-    [activeRestaurantId],
-  );
+  // const generateTableUrl = useCallback(
+  //   (tableNo) => {
+  //     if (!activeRestaurantId) return "";
+  //     const token = btoa(`${activeRestaurantId}-TABLE-${tableNo}`);
+  //     return `${window.location.origin}/catalog/${activeRestaurantId}?t=${token}`;
+  //   },
+  //   [activeRestaurantId],
+  // );
 
   const tableUrls = useMemo(() => {
     const map = {};
     tables.forEach((t) => {
-      map[t.tableNumber] = generateTableUrl(t.tableNumber);
+      if (t.token) {
+        map[t.tableNumber] =
+          `${window.location.origin}/catalog/${activeRestaurantId}?t=${t.token}`;
+      }
     });
     return map;
-  }, [tables, generateTableUrl]);
+  }, [tables, activeRestaurantId]);
 
   const handleCopyLink = useCallback(async (url, tableNo) => {
     if (!url) return;

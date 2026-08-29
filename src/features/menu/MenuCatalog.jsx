@@ -51,6 +51,21 @@ export default function MenuCatalog() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
 
+  // MenuCatalog.jsx ke top pe — restaurant approval status fetch karo
+  const { data: restaurantProfile } = useQuery({
+    queryKey: ["restaurant-profile"],
+    queryFn: async () => {
+      const res = await axios.get(
+        `${import.meta.env.VITE_APP_API_BASE}/restaurant/profile`,
+        { withCredentials: true },
+      );
+      return res.data.data;
+    },
+    staleTime: 60_000,
+  });
+
+  const isApproved = restaurantProfile?.isApproved === true;
+
   const { data: menuItems = { items: [], combos: [] }, isLoading } = useQuery({
     queryKey: ["menu-items"],
     queryFn: async () => {
@@ -630,6 +645,14 @@ export default function MenuCatalog() {
         </div>
       )}
 
+      {!isApproved && (
+        <div className="bg-amber-50 border border-amber-200 text-amber-700 text-xs font-bold px-5 py-3.5 rounded-2xl">
+          ⚠️ Your restaurant is currently under review. You will be able to add
+          and edit your menu items as soon as your profile is verified and
+          approved.
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-10 space-y-8 font-sans bg-[#F8F9FA] min-h-screen">
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs">
@@ -649,14 +672,18 @@ export default function MenuCatalog() {
           </div>
           <button
             onClick={handleOpenAddModal}
-            className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-6 py-3.5 rounded-2xl transition-all shadow-xs shrink-0 cursor-pointer"
+            disabled={!isApproved}
+            title={!isApproved ? "Restaurant pending verification" : undefined}
+            className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-6 py-3.5 rounded-2xl transition-all shadow-xs shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus size={16} strokeWidth={3} /> Add New Dish
           </button>
 
           <button
             onClick={() => setIsAiModalOpen(true)}
-            className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs px-5 py-3.5 rounded-2xl transition-all shadow-xs shrink-0 cursor-pointer"
+            disabled={!isApproved}
+            title={!isApproved ? "Restaurant pending verification" : undefined}
+            className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs px-5 py-3.5 rounded-2xl transition-all shadow-xs shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Sparkles size={16} strokeWidth={2.5} /> Upload Menu Image via AI
           </button>

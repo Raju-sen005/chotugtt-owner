@@ -14,6 +14,7 @@ export default function RegisterTenant({ onSwitchToLogin }) {
   const [phone, setPhone] = useState("");
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
+  const [legalAccepted, setLegalAccepted] = useState(false);
 
   const [error, setError] = useState("");
   const [successData, setSuccessData] = useState(null);
@@ -37,6 +38,12 @@ export default function RegisterTenant({ onSwitchToLogin }) {
   const handleRegister = async (e) => {
     e.preventDefault();
     try {
+      if (!legalAccepted) {
+        alert.error(
+          "Please read and agree to the Terms & Conditions, Privacy Policy, and Owner Agreement.",
+        );
+        return;
+      }
       setError("");
       setIsRegistering(true);
 
@@ -53,6 +60,14 @@ export default function RegisterTenant({ onSwitchToLogin }) {
       formData.append("email", email);
       formData.append("password", password);
       formData.append("phone", phone);
+      formData.append(
+        "legalAgreement",
+        JSON.stringify({
+          termsAccepted: legalAccepted,
+          privacyPolicyAccepted: legalAccepted,
+          ownerAgreementAccepted: legalAccepted,
+        }),
+      );
       if (logoFile) {
         formData.append("logo", logoFile);
       }
@@ -135,7 +150,7 @@ export default function RegisterTenant({ onSwitchToLogin }) {
             alt="ChotuGTT"
             className="h-44 xl:h-52 m-auto object-contain brightness-0 invert"
           /> */}
-           <div className="m-auto object-contain brightness-0 invert relative left-[101px]">
+          <div className="m-auto object-contain brightness-0 invert relative left-[101px]">
             <svg
               version="1.0"
               xmlns="http://www.w3.org/2000/svg"
@@ -201,7 +216,7 @@ export default function RegisterTenant({ onSwitchToLogin }) {
               </div>
               <div className="flex-1">
                 <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                  Restaurant Logo
+                  Restaurant Logo (Optional)
                 </label>
                 <input
                   type="file"
@@ -295,9 +310,51 @@ export default function RegisterTenant({ onSwitchToLogin }) {
               />
             </div>
 
+            <div className="mt-5">
+              <label className="flex items-start gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={legalAccepted}
+                  onChange={(e) => setLegalAccepted(e.target.checked)}
+                  className="mt-1 h-4 w-4 cursor-pointer"
+                />
+
+                <span className="text-sm text-gray-600 leading-5">
+                  I confirm that I have read, understood, and agree to the{" "}
+                  <a
+                    href="/terms-and-conditions"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    Terms & Conditions
+                  </a>
+                  ,{" "}
+                  <a
+                    href="/privacy-policy"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    Privacy Policy
+                  </a>
+                  , and{" "}
+                  <a
+                    href="/owner-agreement"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:underline"
+                  >
+                    Owner Agreement
+                  </a>
+                  .
+                </span>
+              </label>
+            </div>
+
             <button
               type="submit"
-              disabled={isRegistering}
+              disabled={isRegistering || !legalAccepted}
               className="w-full bg-gradient-to-r from-red-500 to-rose-600 text-white py-3.5 rounded-xl font-bold hover:opacity-95 active:scale-[0.99] transition-all shadow-md shadow-red-500/20 text-sm mt-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isRegistering ? (

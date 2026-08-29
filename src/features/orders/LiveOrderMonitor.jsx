@@ -42,7 +42,7 @@ const OrderRow = memo(function OrderRow({
       </td>
       <td className="px-6 py-4 font-bold text-slate-800 text-xs sm:text-sm whitespace-nowrap">
         <span className="inline-flex items-center gap-2">
-           {order.tableNumber}
+          {order.tableNumber}
           {hasMergedTables && (
             <span
               title={`Merged with Table ${order.mergedTables.join(", ")}`}
@@ -370,6 +370,18 @@ export default function LiveOrderMonitor() {
   const [rejectReasonDropdown, setRejectReasonDropdown] =
     useState("Item Out of Stock");
 
+  // 🔒 XSS-safe interpolation — customer-controlled data (name, notes, variant, etc.)
+  // ko HTML mein daalne se pehle escape karo taaki koi injected <script>/onerror na chal sake
+  const escapeHtml = (value) => {
+    if (value === null || value === undefined) return "";
+    return String(value)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+  };
+
   const apiBase = import.meta.env.VITE_APP_API_BASE;
   const showSuccess = useCallback((message) => {
     setSuccessMessage(message);
@@ -415,28 +427,30 @@ export default function LiveOrderMonitor() {
       const kotRows = order.items
         .map((item) => {
           return `
-      <tr>
-        <td class="item-col">
-          <div class="item-name">
-            ${item.name}
-          </div>
+    <tr>
+      <td class="item-col">
+        <div class="item-name">
+          ${escapeHtml(item.name)}
+        </div>
 
-          ${
-            item.variant
-              ? `<div class="item-meta">Variant: ${item.variant}</div>`
-              : ""
-          }
+        ${
+          item.variant
+            ? `<div class="item-meta">Variant: ${escapeHtml(item.variant)}</div>`
+            : ""
+        }
 
-          ${
-            item.notes ? `<div class="item-meta">Note: ${item.notes}</div>` : ""
-          }
-        </td>
+        ${
+          item.notes
+            ? `<div class="item-meta">Note: ${escapeHtml(item.notes)}</div>`
+            : ""
+        }
+      </td>
 
-        <td class="qty-col">
-          ${item.quantity}
-        </td>
-      </tr>
-    `;
+      <td class="qty-col">
+        ${escapeHtml(item.quantity)}
+      </td>
+    </tr>
+  `;
         })
         .join("");
 
@@ -457,304 +471,324 @@ export default function LiveOrderMonitor() {
       });
 
       const windowContent = `
-  <html>
-    <head>
-      <title>KOT ${order.orderId}</title>
+<html>
+  <head>
+    <title>KOT ${escapeHtml(order.orderId)}</title>
 
-      <style>
-        @media print {
-          @page {
-            margin: 0;
-            size: 80mm auto;
-          }
-
-          html,
-          body {
-            width: 80mm;
-            margin: 0;
-            padding: 0;
-          }
-        }
-
-        * {
-          box-sizing: border-box;
+    <style>
+      @media print {
+        @page {
+          margin: 0;
+          size: 80mm auto;
         }
 
         html,
         body {
+          width: 80mm;
           margin: 0;
           padding: 0;
-          background: #fff;
         }
+      }
 
-        body {
-          font-family: "Courier New", Courier, monospace;
-          color: #111;
-          font-size: 12px;
-          font-weight: 600;
-        }
+      * {
+        box-sizing: border-box;
+      }
 
-        .kot {
-          width: 80mm;
-          max-width: 80mm;
-          padding: 12px 10px 18px;
-        }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        background: #fff;
+      }
 
-        .center {
-          text-align: center;
-        }
+      body {
+        font-family: "Courier New", Courier, monospace;
+        color: #111;
+        font-size: 12px;
+        font-weight: 600;
+      }
 
-        .title {
-          font-size: 17px;
-          font-weight: 900;
-          letter-spacing: 0.5px;
-          margin-bottom: 6px;
-        }
+      .kot {
+        width: 80mm;
+        max-width: 80mm;
+        padding: 14px 10px 16px;
+      }
 
-        .order-id {
-          font-size: 15px;
-          font-weight: 900;
-          margin-bottom: 5px;
-        }
+      .center {
+        text-align: center;
+      }
 
-        .order-type {
-          display: inline-block;
-          border: 1.5px solid #111;
-          padding: 3px 8px;
-          font-size: 11px;
-          font-weight: 900;
-          margin-bottom: 7px;
-          letter-spacing: 0.4px;
-        }
+      .title {
+        font-size: 17px;
+        font-weight: 900;
+        letter-spacing: 0.5px;
+        margin-bottom: 6px;
+      }
 
-        .meta {
-          font-size: 11px;
-          line-height: 1.55;
-          text-align: left;
-        }
+      .order-id {
+        font-size: 15px;
+        font-weight: 900;
+        margin-bottom: 6px;
+      }
 
-        .meta-row {
-          display: flex;
-          justify-content: space-between;
-          gap: 8px;
-        }
+      .order-type {
+        display: inline-block;
+        border: 1.5px solid #111;
+        padding: 3px 10px;
+        font-size: 11px;
+        font-weight: 900;
+        margin-bottom: 8px;
+        letter-spacing: 0.4px;
+        border-radius: 3px;
+      }
 
-        .meta-label {
-          font-weight: 700;
-        }
+      .meta {
+        font-size: 11px;
+        line-height: 1.6;
+        text-align: left;
+      }
 
-        .meta-value {
-          font-weight: 900;
-          text-align: right;
-        }
+      .meta-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+      }
 
-        .divider {
-          border-top: 1.5px dashed #111;
-          margin: 9px 0;
-        }
+      .meta-label {
+        font-weight: 700;
+        color: #444;
+      }
 
-        .section-title {
-          font-size: 11px;
-          font-weight: 900;
-          text-transform: uppercase;
-          margin-bottom: 5px;
-        }
+      .meta-value {
+        font-weight: 900;
+        text-align: right;
+      }
 
-        table {
-          width: 100%;
-          border-collapse: collapse;
-          table-layout: fixed;
-        }
+      .divider {
+        border-top: 1.5px dashed #111;
+        margin: 10px 0;
+      }
 
-        th {
-          font-size: 11px;
-          font-weight: 900;
-          padding: 5px 0;
-          border-bottom: 1.5px solid #111;
-          text-transform: uppercase;
-        }
+      .section-title {
+        font-size: 11px;
+        font-weight: 900;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        margin-bottom: 6px;
+      }
 
-        td {
-          padding: 6px 0;
-          vertical-align: top;
-          font-size: 13px;
-          font-weight: 700;
-          line-height: 1.35;
-        }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+      }
 
-        .item-col {
-          width: 76%;
-          padding-right: 5px;
-          text-align: left;
-        }
+      th {
+        font-size: 11px;
+        font-weight: 900;
+        padding: 5px 0 6px;
+        border-bottom: 1.5px solid #111;
+        text-transform: uppercase;
+      }
 
-        .qty-col {
-          width: 24%;
-          text-align: right;
-          font-size: 14px;
-          font-weight: 900;
-        }
+      td {
+        padding: 7px 0;
+        vertical-align: top;
+        font-size: 13px;
+        font-weight: 700;
+        line-height: 1.35;
+      }
 
-        .item-name {
-          font-weight: 900;
-        }
+      .item-col {
+        width: 76%;
+        padding-right: 6px;
+        text-align: left;
+      }
 
-        .item-meta {
-          font-size: 10px;
-          font-weight: 600;
-          margin-top: 2px;
-          line-height: 1.3;
-        }
+      .qty-col {
+        width: 24%;
+        text-align: right;
+        font-size: 14px;
+        font-weight: 900;
+      }
 
-        .notes {
-          border: 1.5px solid #111;
-          padding: 7px;
-          margin-top: 4px;
-        }
+      .item-name {
+        font-weight: 900;
+      }
 
-        .notes-title {
-          font-size: 10px;
-          font-weight: 900;
-          text-transform: uppercase;
-          margin-bottom: 4px;
-        }
+      .item-meta {
+        font-size: 10px;
+        font-weight: 600;
+        margin-top: 2px;
+        line-height: 1.3;
+        color: #333;
+      }
 
-        .note {
-          font-size: 11px;
-          font-weight: 700;
-          line-height: 1.45;
-        }
+      .notes {
+        border: 1.5px solid #111;
+        padding: 8px;
+        margin-top: 5px;
+        border-radius: 3px;
+      }
 
-        .footer {
-          text-align: center;
-          margin-top: 10px;
-          font-size: 10px;
-          font-weight: 900;
-          letter-spacing: 0.6px;
-        }
+      .notes-title {
+        font-size: 10px;
+        font-weight: 900;
+        text-transform: uppercase;
+        margin-bottom: 4px;
+        letter-spacing: 0.3px;
+      }
 
-        .kitchen-copy {
-          font-size: 11px;
-          font-weight: 900;
-          margin-top: 4px;
-        }
-      </style>
-    </head>
+      .note {
+        font-size: 11px;
+        font-weight: 700;
+        line-height: 1.45;
+      }
 
-    <body>
-      <div class="kot">
+      .footer {
+        text-align: center;
+        margin-top: 12px;
+        font-size: 10px;
+        font-weight: 900;
+        letter-spacing: 0.6px;
+      }
 
-        <!-- HEADER -->
-        <div class="center">
-          <div class="title">
-            KITCHEN ORDER TICKET
-          </div>
+      .powered-by {
+        text-align: center;
+        margin-top: 10px;
+        padding-top: 8px;
+        border-top: 1px dashed #999;
+        font-size: 8.5px;
+        font-weight: 600;
+        color: #999;
+        letter-spacing: 0.3px;
+      }
 
-          <div class="order-id">
-            ${order.orderId}
-          </div>
+      .powered-by b {
+        font-weight: 900;
+        color: #555;
+      }
+    </style>
+  </head>
 
-          <div class="order-type">
-            ${order.orderType || "DINE IN"}
-          </div>
+  <body>
+    <div class="kot">
+
+      <!-- HEADER -->
+      <div class="center">
+        <div class="title">
+          KITCHEN ORDER TICKET
         </div>
 
-        <div class="divider"></div>
-
-        <!-- ORDER INFORMATION -->
-        <div class="meta">
-
-          <div class="meta-row">
-            <span class="meta-label">TABLE</span>
-            <span class="meta-value">${tableLabel}</span>
-          </div>
-
-          <div class="meta-row">
-            <span class="meta-label">CUSTOMER</span>
-            <span class="meta-value">
-              ${order.customerName || "Guest"}
-            </span>
-          </div>
-
-          <div class="meta-row">
-            <span class="meta-label">DATE</span>
-            <span class="meta-value">${dateStr}</span>
-          </div>
-
-          <div class="meta-row">
-            <span class="meta-label">TIME</span>
-            <span class="meta-value">${timeStr}</span>
-          </div>
-
+        <div class="order-id">
+          ${escapeHtml(order.orderId)}
         </div>
 
-        <div class="divider"></div>
+        <div class="order-type">
+          ${escapeHtml(order.orderType || "DINE IN")}
+        </div>
+      </div>
 
-        <!-- ITEMS -->
-        <div class="section-title">
-          Order Items
+      <div class="divider"></div>
+
+      <!-- ORDER INFORMATION -->
+      <div class="meta">
+
+        <div class="meta-row">
+          <span class="meta-label">TABLE</span>
+          <span class="meta-value">${escapeHtml(tableLabel)}</span>
         </div>
 
-        <table>
-          <thead>
-            <tr>
-              <th class="item-col">
-                ITEM
-              </th>
+        <div class="meta-row">
+          <span class="meta-label">CUSTOMER</span>
+          <span class="meta-value">
+            ${escapeHtml(order.customerName || "Guest")}
+          </span>
+        </div>
 
-              <th class="qty-col">
-                QTY
-              </th>
-            </tr>
-          </thead>
+        <div class="meta-row">
+          <span class="meta-label">DATE</span>
+          <span class="meta-value">${dateStr}</span>
+        </div>
 
-          <tbody>
-            ${kotRows}
-          </tbody>
-        </table>
-
-        <div class="divider"></div>
-
-        ${
-          order.notes
-            ? `
-              <div class="notes">
-                <div class="notes-title">
-                  Special Instructions
-                </div>
-
-                <div class="note">
-                  ${order.notes}
-                </div>
-              </div>
-
-              <div class="divider"></div>
-            `
-            : ""
-        }
-
-        <!-- FOOTER -->
-        <div class="footer">
-          KITCHEN COPY
+        <div class="meta-row">
+          <span class="meta-label">TIME</span>
+          <span class="meta-value">${timeStr}</span>
         </div>
 
       </div>
 
-      <script>
-        window.focus();
+      <div class="divider"></div>
 
-        window.addEventListener("load", () => {
-          setTimeout(() => {
-            window.print();
-          }, 150);
-        });
+      <!-- ITEMS -->
+      <div class="section-title">
+        Order Items
+      </div>
 
-        window.onafterprint = () => {
-          window.close();
-        };
-      </script>
-    </body>
-  </html>
+      <table>
+        <thead>
+          <tr>
+            <th class="item-col">
+              ITEM
+            </th>
+
+            <th class="qty-col">
+              QTY
+            </th>
+          </tr>
+        </thead>
+
+        <tbody>
+          ${kotRows}
+        </tbody>
+      </table>
+
+      <div class="divider"></div>
+
+      ${
+        order.notes
+          ? `
+            <div class="notes">
+              <div class="notes-title">
+                Special Instructions
+              </div>
+
+              <div class="note">
+                ${escapeHtml(order.notes)}
+              </div>
+            </div>
+
+            <div class="divider"></div>
+          `
+          : ""
+      }
+
+      <!-- FOOTER -->
+      <div class="footer">
+        KITCHEN COPY
+      </div>
+
+      <div class="powered-by">
+        Powered by <b>ChotuGPT</b>
+      </div>
+
+    </div>
+
+    <script>
+      window.focus();
+
+      window.addEventListener("load", () => {
+        setTimeout(() => {
+          window.print();
+        }, 150);
+      });
+
+      window.onafterprint = () => {
+        window.close();
+      };
+    </script>
+  </body>
+</html>
 `;
 
       const printWindow = window.open("", "_blank", "width=380,height=680");
@@ -1080,21 +1114,12 @@ export default function LiveOrderMonitor() {
       const cashierName =
         user?.name || user?.username || user?.email || "Staff";
 
-      // 🔑 image ko absolute URL  (relative path ho to base attach karo)
+      // 🔑 image ko absolute URL (relative path ho to base attach karo)
       const resolveUrl = (path) => {
         if (!path) return "";
-
-        // Base64/data URL ko directly use karo
-        if (path.startsWith("data:image/")) {
+        if (path.startsWith("data:image/")) return path;
+        if (path.startsWith("http://") || path.startsWith("https://"))
           return path;
-        }
-
-        // Already absolute URL
-        if (path.startsWith("http://") || path.startsWith("https://")) {
-          return path;
-        }
-
-        // Relative backend path
         return `${apiBase.replace("/api", "")}${path}`;
       };
 
@@ -1103,158 +1128,173 @@ export default function LiveOrderMonitor() {
       const itemRows = items
         .map(
           (i) => `
-      <tr>
-        <td class="col-item">${i.name}</td>
-        <td class="col-qty">${i.quantity}</td>
-        <td class="col-price">${(i.price || 0).toFixed(2)}</td>
-        <td class="col-amount">${((i.price || 0) * (i.quantity || 0)).toFixed(2)}</td>
-      </tr>`,
+    <tr>
+      <td class="col-item">${escapeHtml(i.name)}</td>
+      <td class="col-qty">${escapeHtml(i.quantity)}</td>
+      <td class="col-price">${(i.price || 0).toFixed(2)}</td>
+      <td class="col-amount">${((i.price || 0) * (i.quantity || 0)).toFixed(2)}</td>
+    </tr>`,
         )
         .join("");
 
       const windowContent = `
-    <html>
-      <head>
-        <title>Bill - Table ${tableLabel}</title>
-        <style>
-          @media print {
-            @page { margin: 0; }
-          }
-          * { box-sizing: border-box; }
-          body {
-            font-family: 'Courier New', ui-monospace, monospace;
-            margin: 0; padding: 0;
-            display: flex; justify-content: center;
-            background: #fff;
-          }
-          .receipt {
-            width: 300px;
-            padding: 18px 14px;
-            color: #111;
-          }
-          .center { text-align: center; }
-          .shop-name { font-size: 17px; font-weight: 700; letter-spacing: 0.5px; margin: 0 0 3px 0; }
-          .shop-line { font-size: 11px; line-height: 1.4; margin: 0; color: #333; }
-          .divider { border-top: 1px dashed #444; margin: 10px 0; }
-          .divider-solid { border-top: 2px solid #111; margin: 10px 0; }
-          .row { display: flex; justify-content: space-between; font-size: 12px; margin: 2px 0; }
-          .row b { font-weight: 700; }
-          table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 4px; }
-          thead td { font-weight: 700; font-size: 11px; padding-bottom: 5px; border-bottom: 1px solid #333; }
-          td { padding: 4px 0; vertical-align: top; }
-          .col-item { width: 46%; }
-          .col-qty { width: 14%; text-align: center; }
-          .col-price { width: 20%; text-align: right; }
-          .col-amount { width: 20%; text-align: right; }
-          .totals-row { display: flex; justify-content: space-between; font-size: 12px; margin: 3px 0; }
-          .grand-total { font-size: 16px; font-weight: 700; border-top: 1px dashed #444; padding-top: 7px; margin-top: 7px; }
-          .footer-line { font-size: 10px; text-align: center; margin-top: 14px; line-height: 1.5; color: #555; }
-          .upi-block { text-align: center; margin-top: 14px; }
-          .upi-block img { width: 120px; height: 120px; object-fit: contain; }
-          .upi-id { font-size: 11px; font-weight: 700; margin-top: 6px; }
-          .scan-label { font-size: 10px; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 6px; color: #333; }
-          .payment-row {
-  display: flex;
-  justify-content: space-between;
-  font-size: 12px;
-  font-weight: 700;
-  margin-top: 8px;
-}
-
-.payment-paid {
-  display: flex;
-  justify-content: space-between;
-  font-size: 13px;
-  font-weight: 700;
-  margin-top: 5px;
-}
-
-.payment-due {
-  display: flex;
-  justify-content: space-between;
-  font-size: 13px;
-  font-weight: 700;
-  color: #b45309;
-  margin-top: 5px;
-}
-        </style>
-      </head>
-      <body>
-        <div class="receipt">
-          <div class="center">
-            <p class="shop-name">${storeDetails.name || "OUR RESTAURANT"}</p>
-            ${storeDetails.address ? `<p class="shop-line">${storeDetails.address}</p>` : ""}
-            ${storeDetails.contact ? `<p class="shop-line">Contact: ${storeDetails.contact}</p>` : ""}
-            ${storeDetails.gstin ? `<p class="shop-line">GSTIN: ${storeDetails.gstin}</p>` : ""}
-          </div>
-
-          <div class="divider-solid"></div>
-
-          <div class="row">
-            <span>Date: ${dateStr}<br/>Time: ${timeStr}</span>
-            <span>Dine In: ${tableLabel}</span>
-          </div>
-          <div class="row">
-            <span>Cashier:<br/>${cashierName}</span>
-            <span>Bill No.:<br/>${order.orderId}</span>
-          </div>
-          <p class="row"><span>Name:</span><span>${order.customerName || "Guest"}</span></p>
-
-          <div class="divider"></div>
-          <table>
-            <thead>
-              <tr>
-                <td class="col-item">Item</td>
-                <td class="col-qty">Qty.</td>
-                <td class="col-price">Price</td>
-                <td class="col-amount">Amount</td>
-              </tr>
-            </thead>
-            <tbody>
-              ${itemRows}
-            </tbody>
-          </table>
-
-          <div class="divider"></div>
-          <div class="totals-row"><span>Total Qty: ${totalQty}</span><span>Sub Total  ${subtotal.toFixed(2)}</span></div>
-          ${discount ? `<div class="totals-row"><span>Discount</span><span>-${discount.toFixed(2)}</span></div>` : ""}
-          ${tax ? `<div class="totals-row"><span>Tax</span><span>${tax.toFixed(2)}</span></div>` : ""}
-          ${roundOff ? `<div class="totals-row"><span>Round off</span><span>${roundOff.toFixed(2)}</span></div>` : ""}
-
-          <div class="row grand-total"><span>Grand Total</span><span>₹${grandTotal.toFixed(2)}</span></div>
-<div class="payment-row">
-  <span>Payment Mode</span>
-  <span>${order.paymentMethod || "N/A"}</span>
-</div>
-
-${
-  order.paymentMethod === "DUE"
-    ? `
-      <div class="payment-due">
-        <span>Amount Due</span>
-        <span>₹${Number(order.dueAmount || 0).toFixed(2)}</span>
-      </div>
-    `
-    : `
-      <div class="payment-paid">
-        <span>Amount Paid</span>
-        <span>₹${Number(order.paidAmount || 0).toFixed(2)}</span>
-      </div>
-    `
-}
-          ${
-            upiQrUrl
-              ? `<div class="upi-block">
-                  <div class="divider"></div>
-                  <p class="scan-label">SCAN &amp; PAY</p>
-                  <img src="${upiQrUrl}" alt="UPI QR" />
-                  ${storeDetails.upiId ? `<p class="upi-id">${storeDetails.upiId}</p>` : ""}
-                </div>`
-              : ""
-          }
-
-          <div class="footer-line">Thank you for visiting!<br/>Visit again 🙏</div>
+  <html>
+    <head>
+      <title>Bill - Table ${escapeHtml(tableLabel)}</title>
+      <style>
+        @media print {
+          @page { margin: 0; }
+        }
+        * { box-sizing: border-box; }
+        body {
+          font-family: 'Courier New', ui-monospace, monospace;
+          margin: 0; padding: 0;
+          display: flex; justify-content: center;
+          background: #fff;
+        }
+        .receipt {
+          width: 300px;
+          padding: 20px 16px 16px;
+          color: #111;
+        }
+        .center { text-align: center; }
+        .shop-name { font-size: 17px; font-weight: 700; letter-spacing: 0.3px; margin: 0 0 4px 0; }
+        .shop-line { font-size: 11px; line-height: 1.45; margin: 0; color: #333; }
+        .divider { border-top: 1px dashed #444; margin: 11px 0; }
+        .divider-solid { border-top: 2px solid #111; margin: 12px 0 10px; }
+        .row { display: flex; justify-content: space-between; font-size: 12px; margin: 3px 0; gap: 10px; }
+        .row span { line-height: 1.4; }
+        .row b { font-weight: 700; }
+        table { width: 100%; border-collapse: collapse; font-size: 12px; margin-top: 6px; }
+        thead td { font-weight: 700; font-size: 10.5px; padding-bottom: 6px; border-bottom: 1.5px solid #111; text-transform: uppercase; letter-spacing: 0.3px; }
+        td { padding: 5px 0; vertical-align: top; }
+        .col-item { width: 46%; }
+        .col-qty { width: 14%; text-align: center; }
+        .col-price { width: 20%; text-align: right; }
+        .col-amount { width: 20%; text-align: right; font-weight: 600; }
+        .totals-row { display: flex; justify-content: space-between; font-size: 12px; margin: 4px 0; }
+        .grand-total { font-size: 16px; font-weight: 700; border-top: 1.5px dashed #444; padding-top: 9px; margin-top: 9px; }
+        .payment-row {
+          display: flex;
+          justify-content: space-between;
+          font-size: 11.5px;
+          font-weight: 600;
+          color: #555;
+          margin-top: 10px;
+        }
+        .payment-paid {
+          display: flex;
+          justify-content: space-between;
+          font-size: 13px;
+          font-weight: 700;
+          margin-top: 4px;
+        }
+        .payment-due {
+          display: flex;
+          justify-content: space-between;
+          font-size: 13px;
+          font-weight: 700;
+          color: #b45309;
+          margin-top: 4px;
+        }
+        .upi-block { text-align: center; margin-top: 14px; }
+        .upi-block img { width: 118px; height: 118px; object-fit: contain; }
+        .upi-id { font-size: 11px; font-weight: 700; margin-top: 7px; letter-spacing: 0.2px; }
+        .scan-label { font-size: 10px; font-weight: 700; letter-spacing: 0.6px; margin-bottom: 8px; color: #333; text-transform: uppercase; }
+        .footer-line { font-size: 10.5px; text-align: center; margin-top: 16px; line-height: 1.6; color: #555; }
+        .powered-by {
+          margin-top: 14px;
+          padding-top: 12px;
+          border-top: 1px dashed #ccc;
+          text-align: center;
+          font-size: 9px;
+          font-weight: 600;
+          color: #aaa;
+          letter-spacing: 0.4px;
+        }
+        .powered-by b { color: #666; font-weight: 800; letter-spacing: 0.2px; }
+      </style>
+    </head>
+    <body>
+      <div class="receipt">
+        <div class="center">
+          <p class="shop-name">${escapeHtml(storeDetails.name || "OUR RESTAURANT")}</p>
+          ${storeDetails.address ? `<p class="shop-line">${escapeHtml(storeDetails.address)}</p>` : ""}
+          ${storeDetails.contact ? `<p class="shop-line">Contact: ${escapeHtml(storeDetails.contact)}</p>` : ""}
+          ${storeDetails.gstin ? `<p class="shop-line">GSTIN: ${escapeHtml(storeDetails.gstin)}</p>` : ""}
         </div>
+
+        <div class="divider-solid"></div>
+
+        <div class="row">
+          <span>Date: ${dateStr}<br/>Time: ${timeStr}</span>
+          <span>Dine In: ${escapeHtml(tableLabel)}</span>
+        </div>
+        <div class="row">
+          <span>Cashier:<br/>${escapeHtml(cashierName)}</span>
+          <span>Bill No.:<br/>${escapeHtml(order.orderId)}</span>
+        </div>
+        <p class="row"><span>Name:</span><span>${escapeHtml(order.customerName || "Guest")}</span></p>
+
+        <div class="divider"></div>
+        <table>
+          <thead>
+            <tr>
+              <td class="col-item">Item</td>
+              <td class="col-qty">Qty.</td>
+              <td class="col-price">Price</td>
+              <td class="col-amount">Amount</td>
+            </tr>
+          </thead>
+          <tbody>
+            ${itemRows}
+          </tbody>
+        </table>
+
+        <div class="divider"></div>
+        <div class="totals-row"><span>Total Qty: ${totalQty}</span><span>Sub Total ${subtotal.toFixed(2)}</span></div>
+        ${discount ? `<div class="totals-row"><span>Discount</span><span>-${discount.toFixed(2)}</span></div>` : ""}
+        ${tax ? `<div class="totals-row"><span>Tax</span><span>${tax.toFixed(2)}</span></div>` : ""}
+        ${roundOff ? `<div class="totals-row"><span>Round off</span><span>${roundOff.toFixed(2)}</span></div>` : ""}
+
+        <div class="row grand-total"><span>Grand Total</span><span>₹${grandTotal.toFixed(2)}</span></div>
+
+        <div class="payment-row">
+          <span>Payment Mode</span>
+          <span>${escapeHtml(order.paymentMethod || "N/A")}</span>
+        </div>
+
+        ${
+          order.paymentMethod === "DUE"
+            ? `
+              <div class="payment-due">
+                <span>Amount Due</span>
+                <span>₹${Number(order.dueAmount || 0).toFixed(2)}</span>
+              </div>
+            `
+            : `
+              <div class="payment-paid">
+                <span>Amount Paid</span>
+                <span>₹${Number(order.paidAmount || 0).toFixed(2)}</span>
+              </div>
+            `
+        }
+
+        ${
+          upiQrUrl
+            ? `<div class="upi-block">
+                <div class="divider"></div>
+                <p class="scan-label">Scan &amp; Pay</p>
+                <img src="${escapeHtml(upiQrUrl)}" alt="UPI QR" />
+                ${storeDetails.upiId ? `<p class="upi-id">${escapeHtml(storeDetails.upiId)}</p>` : ""}
+              </div>`
+            : ""
+        }
+
+        <div class="footer-line">Thank you for visiting!<br/>Visit again 🙏</div>
+
+        <div class="powered-by">Powered by <b>ChotuGPT</b></div>
+      </div>
 <script>
   window.focus();
 
@@ -1281,16 +1321,21 @@ ${
 
   window.onafterprint = () => window.close();
 </script>
-      </body>
-    </html>`;
+    </body>
+  </html>`;
 
       const printWindow = window.open("", "_blank", "width=380,height=680");
-      if (!printWindow) return;
+      if (!printWindow) {
+        showError?.(
+          "Print window was blocked. Please allow popups for this site.",
+        );
+        return;
+      }
       printWindow.document.open();
       printWindow.document.write(windowContent);
       printWindow.document.close();
     },
-    [storeDetails, user, apiBase],
+    [storeDetails, user, apiBase, showError],
   );
 
   // Bill & WhatsApp clear table handler added from TableMonitor
