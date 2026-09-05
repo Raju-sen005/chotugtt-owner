@@ -11,6 +11,8 @@ import {
   Layers,
   Sparkles,
   Upload,
+  Leaf,
+  Beef,
 } from "lucide-react";
 import Input from "../../components/ui/Input";
 import Modal from "../../components/ui/Modal";
@@ -39,6 +41,7 @@ export default function MenuCatalog() {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("");
+  const [isVeg, setIsVeg] = useState(true); // 🆕 Veg/Non-Veg toggle state
 
   // 🔑 File state and image preview state
   const [imageFile, setImageFile] = useState(null);
@@ -274,6 +277,7 @@ export default function MenuCatalog() {
       "price",
       formMode === "COMBO" ? comboCalculatedPrice : price,
     );
+    formData.append("isVeg", isVeg ? "true" : "false"); // 🆕
 
     if (formMode === "DISH") {
       formData.append("category", category);
@@ -432,6 +436,7 @@ export default function MenuCatalog() {
 
   const handleOpenAddModal = useCallback(() => {
     setEditingItem(null);
+    setIsVeg(true); // 🆕 default veg for a fresh item
     setIsModalOpen(true);
   }, []);
 
@@ -443,6 +448,7 @@ export default function MenuCatalog() {
     setCategory(item.category || "");
     setImagePreview(item.image || "");
     setImageFile(null);
+    setIsVeg(item.isVeg !== false); // 🆕 populate existing veg/non-veg value
 
     if (item.isCombo) {
       setFormMode("COMBO");
@@ -465,6 +471,7 @@ export default function MenuCatalog() {
     setImagePreview("");
     setSelectedItems([]);
     setFormMode("DISH");
+    setIsVeg(true); // 🆕
   }, []);
 
   const handleFileChange = (e) => {
@@ -758,9 +765,28 @@ export default function MenuCatalog() {
                   </div>
 
                   <div className="space-y-1.5 flex-1 min-w-0 pr-6">
-                    <span className="text-[9px] bg-slate-100 text-slate-600 font-black px-2.5 py-0.5 rounded-lg uppercase tracking-wider inline-block">
-                      {item.category}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      {/* 🆕 Veg/Non-Veg indicator dot (standard square marker) */}
+                      <span
+                        title={item.isVeg !== false ? "Veg" : "Non-Veg"}
+                        className={`w-3 h-3 shrink-0 border-2 flex items-center justify-center rounded-[3px] ${
+                          item.isVeg !== false
+                            ? "border-emerald-600"
+                            : "border-red-600"
+                        }`}
+                      >
+                        <span
+                          className={`w-1.5 h-1.5 rounded-full ${
+                            item.isVeg !== false
+                              ? "bg-emerald-600"
+                              : "bg-red-600"
+                          }`}
+                        />
+                      </span>
+                      <span className="text-[9px] bg-slate-100 text-slate-600 font-black px-2.5 py-0.5 rounded-lg uppercase tracking-wider inline-block">
+                        {item.category}
+                      </span>
+                    </div>
                     <h3 className="font-black text-slate-900 text-base tracking-tight truncate">
                       {item.name}
                     </h3>
@@ -878,6 +904,37 @@ export default function MenuCatalog() {
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
+
+            {/* 🆕 Veg / Non-Veg toggle */}
+            <div className="space-y-1.5">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                Food Type
+              </label>
+              <div className="flex bg-slate-100 p-1.5 rounded-2xl">
+                <button
+                  type="button"
+                  onClick={() => setIsVeg(true)}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    isVeg
+                      ? "bg-white text-emerald-700 shadow-xs"
+                      : "text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  <Leaf size={13} /> Veg
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsVeg(false)}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    !isVeg
+                      ? "bg-white text-red-700 shadow-xs"
+                      : "text-slate-500 hover:text-slate-900"
+                  }`}
+                >
+                  <Beef size={13} /> Non-Veg
+                </button>
+              </div>
+            </div>
 
             {formMode === "DISH" && (
               <Input

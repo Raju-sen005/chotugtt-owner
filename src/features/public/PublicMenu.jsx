@@ -264,8 +264,14 @@ const ItemCard = memo(function ItemCard({
         )}
         <div className="space-y-0.5 min-w-0">
           <span
-            className={`w-2.5 h-2.5 rounded-full inline-block border border-white shadow-xs ${item.isVeg === false ? "bg-red-500" : "bg-emerald-500"}`}
-          />
+            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black border ${
+              item.isVeg === false
+                ? "bg-red-50 text-red-600 border-red-200"
+                : "bg-emerald-50 text-emerald-600 border-emerald-200"
+            }`}
+          >
+            {item.isVeg === false ? "Non-Veg" : "Veg"}
+          </span>
           <h3 className="font-black text-sm text-slate-900 tracking-tight truncate">
             {item.name}
           </h3>
@@ -552,10 +558,16 @@ export default function PublicMenu() {
 
   const filteredCombos = useMemo(
     () =>
-      combos?.filter((c) =>
-        c.name.toLowerCase().includes(searchQuery.toLowerCase()),
-      ) || [],
-    [combos, searchQuery],
+      combos?.filter((c) => {
+        const matchesSearch = c.name
+          ?.toLowerCase()
+          .includes(searchQuery.toLowerCase());
+
+        const matchesVeg = !vegOnly || c.isVeg !== false;
+
+        return matchesSearch && matchesVeg;
+      }) || [],
+    [combos, searchQuery, vegOnly],
   );
 
   const filteredCategoryItems = useMemo(() => {
@@ -706,6 +718,7 @@ export default function PublicMenu() {
       deliveryAddress,
       cart,
       totalCartAmount,
+      itemDiscountMap,
       appliedDiscount,
       finalPayableAmount,
       isValidName,
@@ -820,13 +833,13 @@ export default function PublicMenu() {
               </p>
             </div>
             <div className="flex items-center gap-1 shrink-0">
-              <button
+              {/* <button
                 onClick={() => setLanguage((l) => (l === "EN" ? "HI" : "EN"))}
                 aria-label="Toggle language"
                 className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
               >
                 <Globe size={15} />
-              </button>
+              </button> */}
               {/* <button
                 onClick={() => refetch()}
                 aria-label="Refresh menu"
@@ -992,6 +1005,15 @@ export default function PublicMenu() {
                       className="bg-white p-4 rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-between gap-3 shrink-0 w-[240px]"
                     >
                       <div className="space-y-1">
+                        <span
+                          className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black border ${
+                            combo.isVeg === false
+                              ? "bg-red-50 text-red-600 border-red-200"
+                              : "bg-emerald-50 text-emerald-600 border-emerald-200"
+                          }`}
+                        >
+                          {combo.isVeg === false ? "Non-Veg" : "Veg"}
+                        </span>
                         <h3 className="font-black text-sm text-slate-900 tracking-tight truncate">
                           {combo.name}
                         </h3>

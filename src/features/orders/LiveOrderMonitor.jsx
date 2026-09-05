@@ -769,7 +769,7 @@ export default function LiveOrderMonitor() {
       </div>
 
       <div class="powered-by">
-        Powered by <b>ChotuGPT</b>
+        Powered by <b>ChotuGTT</b>
       </div>
 
     </div>
@@ -1293,7 +1293,7 @@ export default function LiveOrderMonitor() {
 
         <div class="footer-line">Thank you for visiting!<br/>Visit again 🙏</div>
 
-        <div class="powered-by">Powered by <b>ChotuGPT</b></div>
+        <div class="powered-by">Powered by <b>ChotuGTT</b></div>
       </div>
 <script>
   window.focus();
