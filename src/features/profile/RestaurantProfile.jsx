@@ -37,6 +37,8 @@ export default function RestaurantProfile() {
   const [zip, setZip] = useState("");
   const [upiId, setUpiId] = useState("");
   const [upiQrCode, setUpiQrCode] = useState("");
+  const [fssaiNumber, setFssaiNumber] = useState("");
+  const [gstNumber, setGstNumber] = useState("");
 
   // Logo Upload State
   const [logoFile, setLogoFile] = useState(null);
@@ -131,6 +133,17 @@ export default function RestaurantProfile() {
       setUpiQrCode((prev) =>
         prev !== (restaurant.upiQrCode || "")
           ? restaurant.upiQrCode || ""
+          : prev,
+      );
+      setFssaiNumber((prev) =>
+        prev !== (restaurant.fssaiNumber || "")
+          ? restaurant.fssaiNumber || ""
+          : prev,
+      );
+
+      setGstNumber((prev) =>
+        prev !== (restaurant.gstNumber || "")
+          ? restaurant.gstNumber || ""
           : prev,
       );
       setLogoPreview((prev) =>
@@ -229,6 +242,8 @@ export default function RestaurantProfile() {
       formData.append("email", email);
       formData.append("themeColor", themeColor);
       formData.append("upiId", upiId);
+      formData.append("fssaiNumber", fssaiNumber);
+      formData.append("gstNumber", gstNumber);
 
       formData.append("address[street]", street);
       formData.append("address[city]", city);
@@ -534,6 +549,67 @@ export default function RestaurantProfile() {
                       className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm text-slate-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all shadow-xs"
                     />
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="sm:col-span-2 pt-4 mt-2 border-t border-slate-100">
+              <div className="flex items-center gap-2 mb-4">
+                <Building size={14} className="text-blue-500" />
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
+                  Business Compliance
+                </h3>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    FSSAI Number
+                  </label>
+
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={14}
+                    placeholder="e.g. 12345678901234"
+                    value={fssaiNumber}
+                    onChange={(e) =>
+                      setFssaiNumber(
+                        e.target.value.replace(/\D/g, "").slice(0, 14),
+                      )
+                    }
+                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm text-slate-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all shadow-xs"
+                  />
+
+                  <p className="text-[10px] text-slate-400">
+                    14-digit FSSAI license/registration number
+                  </p>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    GST Number
+                  </label>
+
+                  <input
+                    type="text"
+                    maxLength={15}
+                    placeholder="e.g. 08ABCDE1234F1Z5"
+                    value={gstNumber}
+                    onChange={(e) =>
+                      setGstNumber(
+                        e.target.value
+                          .toUpperCase()
+                          .replace(/\s/g, "")
+                          .slice(0, 15),
+                      )
+                    }
+                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm text-slate-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all shadow-xs"
+                  />
+
+                  <p className="text-[10px] text-slate-400">
+                    15-character GSTIN
+                  </p>
                 </div>
               </div>
             </div>

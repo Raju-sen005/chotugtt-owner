@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, memo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
+import QRCode from "qrcode";
 import { useAuth } from "../../context/AuthContext";
 import { useSocket } from "../../context/SocketContext";
 // import { useNotificationSound } from "../../hooks/useNotificationSound";
@@ -365,7 +366,10 @@ export default function LiveOrderMonitor() {
   const [errorMessage, setErrorMessage] = useState("");
   const [billOrder, setBillOrder] = useState(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
-
+  const [splitMode, setSplitMode] = useState(false);
+  const [splitCollectMethod, setSplitCollectMethod] = useState("CASH");
+  const [splitAmount, setSplitAmount] = useState("");
+  const [isSplitSubmitting, setIsSplitSubmitting] = useState(false);
   const [isGeneratingBill, setIsGeneratingBill] = useState(false);
   const [rejectReasonDropdown, setRejectReasonDropdown] =
     useState("Item Out of Stock");
@@ -403,8 +407,10 @@ export default function LiveOrderMonitor() {
   // 🧾 Restaurant profile — needed for the printed bill header (name, address, contact)
   const [storeDetails, setStoreDetails] = useState({
     name: "",
+    logo: "",
     address: "",
     contact: "",
+    fssaiNumber: "",
     gstin: "",
     upiId: "",
     upiQrCode: "",
@@ -848,8 +854,12 @@ export default function LiveOrderMonitor() {
 
           setStoreDetails({
             name: d.name || "",
+            logo: d.logo || "",
+
             address: formattedAddress,
             contact: d.phone || d.contactNumber || d.contact || "",
+            fssaiNumber: d.fssaiNumber || "",
+
             gstin: d.gstin || d.gstNumber || "",
             upiId: d.upiId || "",
             upiQrCode: d.upiQrCode || d.qrCodeUrl || "",
@@ -1084,7 +1094,7 @@ export default function LiveOrderMonitor() {
 
   // 🧾 Opens a thermal-receipt-style print window for a completed order
   const printBillReceipt = useCallback(
-    (order) => {
+    async (order) => {
       // 🔑 FIX: cancelled/rejected items bill par
       const items = (order.items || []).filter((i) => i.status !== "REJECTED");
 
@@ -1115,15 +1125,30 @@ export default function LiveOrderMonitor() {
         user?.name || user?.username || user?.email || "Staff";
 
       // 🔑 image ko absolute URL (relative path ho to base attach karo)
-      const resolveUrl = (path) => {
-        if (!path) return "";
-        if (path.startsWith("data:image/")) return path;
-        if (path.startsWith("http://") || path.startsWith("https://"))
-          return path;
-        return `${apiBase.replace("/api", "")}${path}`;
-      };
+      const upiQrUrl = await (async () => {
+        if (!storeDetails.upiId || Number(grandTotal) <= 0) {
+          return "";
+        }
 
-      const upiQrUrl = resolveUrl(storeDetails.upiQrCode);
+        const amount = Number(grandTotal).toFixed(2);
+
+        const upiString =
+          `upi://pay?pa=${encodeURIComponent(storeDetails.upiId)}` +
+          `&pn=${encodeURIComponent(storeDetails.name || "Restaurant")}` +
+          `&am=${amount}` +
+          `&cu=INR`;
+
+        try {
+          return await QRCode.toDataURL(upiString, {
+            errorCorrectionLevel: "H",
+            margin: 2,
+            width: 300,
+          });
+        } catch (error) {
+          console.error("Failed to generate bill UPI QR:", error);
+          return "";
+        }
+      })();
 
       const itemRows = items
         .map(
@@ -1158,6 +1183,27 @@ export default function LiveOrderMonitor() {
           color: #111;
         }
         .center { text-align: center; }
+        .shop-logo {
+  width: 55px;
+  height: 55px;
+  object-fit: contain;
+  display: block;
+  margin: 0 auto 6px;
+}
+
+.shop-name {
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  margin: 0 0 4px 0;
+}
+
+.shop-line {
+  font-size: 11px;
+  line-height: 1.45;
+  margin: 0;
+  color: #333;
+}
         .shop-name { font-size: 17px; font-weight: 700; letter-spacing: 0.3px; margin: 0 0 4px 0; }
         .shop-line { font-size: 11px; line-height: 1.45; margin: 0; color: #333; }
         .divider { border-top: 1px dashed #444; margin: 11px 0; }
@@ -1218,11 +1264,54 @@ export default function LiveOrderMonitor() {
     <body>
       <div class="receipt">
         <div class="center">
-          <p class="shop-name">${escapeHtml(storeDetails.name || "OUR RESTAURANT")}</p>
-          ${storeDetails.address ? `<p class="shop-line">${escapeHtml(storeDetails.address)}</p>` : ""}
-          ${storeDetails.contact ? `<p class="shop-line">Contact: ${escapeHtml(storeDetails.contact)}</p>` : ""}
-          ${storeDetails.gstin ? `<p class="shop-line">GSTIN: ${escapeHtml(storeDetails.gstin)}</p>` : ""}
-        </div>
+
+  ${
+    storeDetails.logo
+      ? `<img
+           class="shop-logo"
+           src="${escapeHtml(storeDetails.logo)}"
+           alt="Restaurant Logo"
+         />`
+      : ""
+  }
+
+  <p class="shop-name">
+    ${escapeHtml(storeDetails.name || "OUR RESTAURANT")}
+  </p>
+
+  ${
+    storeDetails.address
+      ? `<p class="shop-line">
+           ${escapeHtml(storeDetails.address)}
+         </p>`
+      : ""
+  }
+
+  ${
+    storeDetails.contact
+      ? `<p class="shop-line">
+           Contact: ${escapeHtml(storeDetails.contact)}
+         </p>`
+      : ""
+  }
+
+  ${
+    storeDetails.fssaiNumber
+      ? `<p class="shop-line">
+           FSSAI: ${escapeHtml(storeDetails.fssaiNumber)}
+         </p>`
+      : ""
+  }
+
+  ${
+    storeDetails.gstin
+      ? `<p class="shop-line">
+           GSTIN: ${escapeHtml(storeDetails.gstin)}
+         </p>`
+      : ""
+  }
+
+</div>
 
         <div class="divider-solid"></div>
 
@@ -1265,21 +1354,31 @@ export default function LiveOrderMonitor() {
         </div>
 
         ${
-          order.paymentMethod === "DUE"
+          order.isSplitBill
             ? `
-              <div class="payment-due">
-                <span>Amount Due</span>
-                <span>₹${Number(order.dueAmount || 0).toFixed(2)}</span>
-              </div>
-            `
-            : `
-              <div class="payment-paid">
-                <span>Amount Paid</span>
-                <span>₹${Number(order.paidAmount || 0).toFixed(2)}</span>
-              </div>
-            `
+      <div class="payment-paid">
+        <span>Paid Now (${escapeHtml(order.splitPaymentMethod || "")})</span>
+        <span>₹${Number(order.paidAmount || 0).toFixed(2)}</span>
+      </div>
+      <div class="payment-due">
+        <span>Remaining Due</span>
+        <span>₹${Number(order.dueAmount || 0).toFixed(2)}</span>
+      </div>
+    `
+            : order.paymentMethod === "DUE"
+              ? `
+      <div class="payment-due">
+        <span>Amount Due</span>
+        <span>₹${Number(order.dueAmount || 0).toFixed(2)}</span>
+      </div>
+    `
+              : `
+      <div class="payment-paid">
+        <span>Amount Paid</span>
+        <span>₹${Number(order.paidAmount || 0).toFixed(2)}</span>
+      </div>
+    `
         }
-
         ${
           upiQrUrl
             ? `<div class="upi-block">
@@ -1342,7 +1441,86 @@ export default function LiveOrderMonitor() {
   const handleBillAndWhatsApp = useCallback((order) => {
     setBillOrder(order);
     setSelectedPaymentMethod(null);
+    setSplitMode(false); // 🆕
+    setSplitCollectMethod("CASH"); // 🆕
+    setSplitAmount(""); // 🆕
   }, []);
+
+  const confirmSplitBill = useCallback(async () => {
+    if (!billOrder) return;
+
+    const total = Number(billOrder.total || 0);
+    const amount = Number(splitAmount);
+
+    if (!Number.isFinite(amount) || amount <= 0) {
+      showError("Enter a valid amount to collect now.");
+      return;
+    }
+
+    if (amount >= total) {
+      showError("Split amount must be less than the total bill.");
+      return;
+    }
+
+    if (isSplitSubmitting) return;
+    setIsSplitSubmitting(true);
+
+    try {
+      const res = await axios.patch(
+        `${apiBase}/orders/${billOrder._id}/split-complete`,
+        {
+          paymentMethod: splitCollectMethod,
+          paidAmount: amount,
+        },
+        { withCredentials: true },
+      );
+
+      const completedOrder = res.data?.data;
+
+      await printBillReceipt(completedOrder || billOrder);
+
+      queryClient.setQueryData(["live-orders", restaurantId], (prev) =>
+        (prev || []).filter((o) => o._id !== billOrder._id),
+      );
+
+      queryClient.invalidateQueries({
+        queryKey: ["table-status", restaurantId],
+      });
+      queryClient.invalidateQueries({ queryKey: ["table-monitor-orders"] });
+      queryClient.invalidateQueries({ queryKey: ["bills"] });
+      queryClient.invalidateQueries({ queryKey: ["bills-prev"] });
+
+      setBillOrder(null);
+      setSelectedPaymentMethod(null);
+      setSplitMode(false);
+      setSplitAmount("");
+
+      showSuccess(
+        `₹${amount.toFixed(2)} collected via ${splitCollectMethod}. Remaining ₹${(total - amount).toFixed(2)} saved as Due.`,
+      );
+    } catch (err) {
+      console.error("Failed to split bill:", err);
+      showError(
+        err.response?.data?.message || "Failed to process split payment.",
+      );
+      queryClient.invalidateQueries({
+        queryKey: ["live-orders", restaurantId],
+      });
+    } finally {
+      setIsSplitSubmitting(false);
+    }
+  }, [
+    billOrder,
+    splitAmount,
+    splitCollectMethod,
+    isSplitSubmitting,
+    apiBase,
+    printBillReceipt,
+    queryClient,
+    restaurantId,
+    showSuccess,
+    showError,
+  ]);
 
   const confirmGenerateBill = useCallback(async () => {
     if (!billOrder || !selectedPaymentMethod) {
@@ -1368,7 +1546,7 @@ export default function LiveOrderMonitor() {
       const completedOrder = res.data?.data;
 
       // Print bill with payment information
-      printBillReceipt(completedOrder || billOrder);
+      await printBillReceipt(completedOrder || billOrder);
 
       // Remove completed order from live monitor
       queryClient.setQueryData(["live-orders", restaurantId], (prev) =>
@@ -1560,166 +1738,478 @@ export default function LiveOrderMonitor() {
       )}
 
       {billOrder && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="w-full max-w-md bg-white rounded-3xl shadow-2xl overflow-hidden">
-            {/* Header */}
-            <div className="p-6 border-b border-slate-100">
-              <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center">
-                  <IndianRupee size={22} strokeWidth={2.5} />
+        <div className="fixed inset-0 z-[10000] bg-black/50 backdrop-blur-sm p-3 sm:p-4 overflow-y-auto">
+          <div className="min-h-full flex items-center justify-center">
+            {/* BILL MODAL */}
+            <div className="w-full max-w-md max-h-[calc(100vh-1.5rem)] sm:max-h-[calc(100vh-2rem)] bg-white rounded-3xl shadow-2xl flex flex-col overflow-hidden">
+              {/* =========================================================
+            HEADER
+        ========================================================== */}
+              <div className="px-5 py-5 sm:p-6 border-b border-slate-100 shrink-0 bg-white">
+                <div className="flex items-center gap-3">
+                  {/* Icon */}
+                  <div className="w-11 h-11 rounded-2xl bg-slate-100 text-slate-700 flex items-center justify-center shrink-0">
+                    <IndianRupee size={22} strokeWidth={2.5} />
+                  </div>
+
+                  {/* Title */}
+                  <div className="min-w-0">
+                    <h3 className="text-lg font-black text-slate-900">
+                      Generate Bill
+                    </h3>
+
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Select payment method to complete the bill
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* =========================================================
+            SCROLLABLE BODY
+        ========================================================== */}
+              <div
+                className="
+            flex-1
+            min-h-0
+            overflow-y-auto
+            overscroll-contain
+            scrollbar-thin
+            scrollbar-thumb-slate-300
+            scrollbar-track-transparent
+          "
+              >
+                {/* =======================================================
+              ORDER SUMMARY
+          ======================================================== */}
+                <div className="px-5 pt-5 sm:px-6 sm:pt-5">
+                  <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
+                    <div className="flex justify-between items-start gap-4">
+                      {/* Order */}
+                      <div className="min-w-0">
+                        <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">
+                          Order
+                        </p>
+
+                        <p className="text-sm font-black text-slate-800 mt-1 font-mono truncate">
+                          {billOrder.orderId}
+                        </p>
+
+                        <p className="text-xs text-slate-500 mt-1 truncate">
+                          {billOrder.customerName || "Guest"}
+                        </p>
+                      </div>
+
+                      {/* Table */}
+                      <div className="text-right shrink-0">
+                        <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">
+                          Table
+                        </p>
+
+                        <p className="text-sm font-black text-slate-800 mt-1 font-mono">
+                          {billOrder.tableNumber}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Amount */}
+                    <div className="border-t border-slate-200 mt-4 pt-4 flex justify-between items-center">
+                      <span className="text-xs font-bold text-slate-500">
+                        Amount Payable
+                      </span>
+
+                      <span className="text-xl font-black text-slate-900 font-mono">
+                        ₹{Number(billOrder.total || 0).toLocaleString("en-IN")}
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
-                <div>
-                  <h3 className="text-lg font-black text-slate-900">
-                    Generate Bill
-                  </h3>
-
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Select payment method to complete the bill
+                {/* =======================================================
+              PAYMENT METHODS
+          ======================================================== */}
+                <div className="p-5 sm:p-6">
+                  <p className="text-[10px] uppercase tracking-wider font-black text-slate-400 mb-3">
+                    Payment Method
                   </p>
-                </div>
-              </div>
-            </div>
 
-            {/* Order Summary */}
-            <div className="px-6 pt-5">
-              <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">
-                      Order
-                    </p>
-
-                    <p className="text-sm font-black text-slate-800 mt-1 font-mono">
-                      {billOrder.orderId}
-                    </p>
-
-                    <p className="text-xs text-slate-500 mt-1">
-                      {billOrder.customerName || "Guest"}
-                    </p>
-                  </div>
-
-                  <div className="text-right">
-                    <p className="text-[10px] uppercase tracking-wider font-black text-slate-400">
-                      Table
-                    </p>
-
-                    <p className="text-sm font-black text-slate-800 mt-1 font-mono">
-                      {billOrder.tableNumber}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="border-t border-slate-200 mt-4 pt-4 flex justify-between items-center">
-                  <span className="text-xs font-bold text-slate-500">
-                    Amount Payable
-                  </span>
-
-                  <span className="text-xl font-black text-slate-900 font-mono">
-                    ₹{Number(billOrder.total || 0).toLocaleString("en-IN")}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Payment Methods */}
-            <div className="p-6">
-              <p className="text-[10px] uppercase tracking-wider font-black text-slate-400 mb-3">
-                Payment Method
-              </p>
-
-              <div className="grid grid-cols-3 gap-3">
-                {/* CASH */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedPaymentMethod("CASH")}
-                  className={`p-4 rounded-2xl border-2 transition-all ${
+                  {/* PAYMENT GRID */}
+                  <div className="grid grid-cols-2 gap-3">
+                    {/* =================================================
+                  CASH
+              ================================================== */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPaymentMethod("CASH");
+                        setSplitMode(false);
+                      }}
+                      className={`
+                  p-4 rounded-2xl border-2 transition-all
+                  active:scale-[0.98]
+                  ${
                     selectedPaymentMethod === "CASH"
-                      ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-emerald-200"
-                  }`}
-                >
-                  <div className="text-xl mb-2">💵</div>
+                      ? "border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-emerald-200 hover:bg-emerald-50/30"
+                  }
+                `}
+                    >
+                      <div className="text-xl mb-2">💵</div>
 
-                  <p className="text-xs font-black">Cash</p>
+                      <p className="text-xs font-black">Cash</p>
 
-                  <p className="text-[9px] mt-1 opacity-70">Paid</p>
-                </button>
+                      <p className="text-[9px] mt-1 opacity-70">Paid</p>
+                    </button>
 
-                {/* UPI */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedPaymentMethod("UPI")}
-                  className={`p-4 rounded-2xl border-2 transition-all ${
+                    {/* =================================================
+                  UPI
+              ================================================== */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPaymentMethod("UPI");
+                        setSplitMode(false);
+                      }}
+                      className={`
+                  p-4 rounded-2xl border-2 transition-all
+                  active:scale-[0.98]
+                  ${
                     selectedPaymentMethod === "UPI"
-                      ? "border-blue-500 bg-blue-50 text-blue-700"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-blue-200"
-                  }`}
-                >
-                  <div className="text-xl mb-2">🏦</div>
+                      ? "border-blue-500 bg-blue-50 text-blue-700 shadow-sm"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50/30"
+                  }
+                `}
+                    >
+                      <div className="text-xl mb-2">🏦</div>
 
-                  <p className="text-xs font-black">UPI</p>
+                      <p className="text-xs font-black">UPI</p>
 
-                  <p className="text-[9px] mt-1 opacity-70">Paid</p>
-                </button>
+                      <p className="text-[9px] mt-1 opacity-70">Paid</p>
+                    </button>
 
-                {/* DUE */}
-                <button
-                  type="button"
-                  onClick={() => setSelectedPaymentMethod("DUE")}
-                  className={`p-4 rounded-2xl border-2 transition-all ${
+                    {/* =================================================
+                  DUE
+              ================================================== */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPaymentMethod("DUE");
+                        setSplitMode(false);
+                      }}
+                      className={`
+                  p-4 rounded-2xl border-2 transition-all
+                  active:scale-[0.98]
+                  ${
                     selectedPaymentMethod === "DUE"
-                      ? "border-amber-500 bg-amber-50 text-amber-700"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-amber-200"
-                  }`}
-                >
-                  <div className="text-xl mb-2">⏳</div>
+                      ? "border-amber-500 bg-amber-50 text-amber-700 shadow-sm"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-amber-200 hover:bg-amber-50/30"
+                  }
+                `}
+                    >
+                      <div className="text-xl mb-2">⏳</div>
 
-                  <p className="text-xs font-black">Due</p>
+                      <p className="text-xs font-black">Due</p>
 
-                  <p className="text-[9px] mt-1 opacity-70">Unpaid</p>
-                </button>
+                      <p className="text-[9px] mt-1 opacity-70">Unpaid</p>
+                    </button>
+
+                    {/* =================================================
+                  SPLIT BILL
+              ================================================== */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedPaymentMethod("SPLIT");
+                        setSplitMode(true);
+
+                        setSplitAmount(
+                          billOrder
+                            ? (Number(billOrder.total || 0) / 2).toFixed(2)
+                            : "",
+                        );
+                      }}
+                      className={`
+                  p-4 rounded-2xl border-2 transition-all
+                  active:scale-[0.98]
+                  ${
+                    selectedPaymentMethod === "SPLIT"
+                      ? "border-purple-500 bg-purple-50 text-purple-700 shadow-sm"
+                      : "border-slate-200 bg-white text-slate-600 hover:border-purple-200 hover:bg-purple-50/30"
+                  }
+                `}
+                    >
+                      <div className="text-xl mb-2">🔀</div>
+
+                      <p className="text-xs font-black">Split Bill</p>
+
+                      <p className="text-[9px] mt-1 opacity-70">Pay part now</p>
+                    </button>
+                  </div>
+
+                  {/* =====================================================
+                DUE INFORMATION
+            ====================================================== */}
+                  {selectedPaymentMethod === "DUE" && (
+                    <div className="mt-4 p-3.5 rounded-xl bg-amber-50 border border-amber-100">
+                      <div className="flex items-start gap-2">
+                        <span className="text-sm">⏳</span>
+
+                        <p className="text-xs text-amber-700 font-semibold leading-relaxed">
+                          ₹
+                          {Number(billOrder.total || 0).toLocaleString("en-IN")}{" "}
+                          will be recorded as customer due.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* =====================================================
+                SPLIT BILL PANEL
+            ====================================================== */}
+                  {splitMode && selectedPaymentMethod === "SPLIT" && (
+                    <div className="mt-4 p-4 rounded-2xl bg-purple-50 border border-purple-100">
+                      {/* Header */}
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <p className="text-sm font-black text-purple-900">
+                            Split Payment
+                          </p>
+
+                          <p className="text-[10px] text-purple-600 mt-0.5">
+                            Collect part of the bill now
+                          </p>
+                        </div>
+
+                        <div className="w-8 h-8 rounded-xl bg-purple-100 flex items-center justify-center text-sm">
+                          🔀
+                        </div>
+                      </div>
+
+                      {/* =================================================
+                    COLLECT VIA
+                ================================================== */}
+                      <div>
+                        <label className="block text-[10px] font-black uppercase tracking-wider text-purple-700 mb-2">
+                          Collect via
+                        </label>
+
+                        <div className="grid grid-cols-2 gap-2">
+                          {/* CASH */}
+                          <button
+                            type="button"
+                            onClick={() => setSplitCollectMethod("CASH")}
+                            className={`
+                        py-2.5 rounded-xl text-xs font-bold border-2 transition-all
+                        active:scale-[0.98]
+                        ${
+                          splitCollectMethod === "CASH"
+                            ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-emerald-200"
+                        }
+                      `}
+                          >
+                            💵 Cash
+                          </button>
+
+                          {/* UPI */}
+                          <button
+                            type="button"
+                            onClick={() => setSplitCollectMethod("UPI")}
+                            className={`
+                        py-2.5 rounded-xl text-xs font-bold border-2 transition-all
+                        active:scale-[0.98]
+                        ${
+                          splitCollectMethod === "UPI"
+                            ? "border-blue-500 bg-blue-50 text-blue-700"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-blue-200"
+                        }
+                      `}
+                          >
+                            🏦 UPI
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* =================================================
+                    AMOUNT
+                ================================================== */}
+                      <div className="mt-4">
+                        <label className="block text-[10px] font-black uppercase tracking-wider text-purple-700 mb-2">
+                          Amount to collect now
+                        </label>
+
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-500 pointer-events-none">
+                            ₹
+                          </span>
+
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            max={Number(billOrder.total || 0)}
+                            value={splitAmount}
+                            onChange={(e) => setSplitAmount(e.target.value)}
+                            className="
+                        w-full
+                        pl-8
+                        pr-4
+                        py-3
+                        rounded-xl
+                        border
+                        border-purple-200
+                        bg-white
+                        text-sm
+                        font-bold
+                        text-slate-900
+                        focus:outline-none
+                        focus:border-purple-500
+                        focus:ring-4
+                        focus:ring-purple-500/10
+                      "
+                          />
+                        </div>
+
+                        {/* 50% BUTTON */}
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setSplitAmount(
+                              (Number(billOrder.total || 0) / 2).toFixed(2),
+                            )
+                          }
+                          className="mt-2 text-[10px] font-bold text-purple-600 hover:text-purple-800 hover:underline"
+                        >
+                          Set to 50%
+                        </button>
+                      </div>
+
+                      {/* =================================================
+                    PAYMENT BREAKDOWN
+                ================================================== */}
+                      <div className="mt-4 pt-3 border-t border-purple-200">
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="font-bold text-slate-500">
+                            Total Bill
+                          </span>
+
+                          <span className="font-black text-slate-800">
+                            ₹{Number(billOrder.total || 0).toFixed(2)}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between items-center text-xs mt-2">
+                          <span className="font-bold text-slate-500">
+                            Collect Now
+                          </span>
+
+                          <span className="font-black text-emerald-600">
+                            ₹{Number(splitAmount || 0).toFixed(2)}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between items-center mt-3 pt-3 border-t border-purple-200">
+                          <span className="text-xs font-bold text-slate-600">
+                            Remaining Due
+                          </span>
+
+                          <span className="text-sm font-black text-purple-700">
+                            ₹
+                            {Math.max(
+                              0,
+                              Number(billOrder.total || 0) -
+                                Number(splitAmount || 0),
+                            ).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {selectedPaymentMethod === "DUE" && (
-                <div className="mt-4 p-3 rounded-xl bg-amber-50 border border-amber-100">
-                  <p className="text-xs text-amber-700 font-semibold">
-                    ₹{Number(billOrder.total || 0).toLocaleString("en-IN")} will
-                    be recorded as customer due.
-                  </p>
-                </div>
-              )}
-            </div>
+              {/* =========================================================
+            FIXED ACTION FOOTER
+        ========================================================== */}
+              <div className="px-5 pb-5 pt-3 sm:px-6 sm:pb-6 flex gap-3 shrink-0 bg-white border-t border-slate-100">
+                {/* CANCEL */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBillOrder(null);
+                    setSelectedPaymentMethod(null);
+                    setSplitMode(false);
+                  }}
+                  disabled={isGeneratingBill || isSplitSubmitting}
+                  className="
+              flex-1
+              py-3
+              rounded-xl
+              border
+              border-slate-200
+              text-slate-700
+              text-sm
+              font-bold
+              hover:bg-slate-50
+              transition
+              disabled:opacity-50
+              disabled:cursor-not-allowed
+            "
+                >
+                  Cancel
+                </button>
 
-            {/* Actions */}
-            <div className="px-6 pb-6 flex gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  setBillOrder(null);
-                  setSelectedPaymentMethod(null);
-                }}
-                disabled={isGeneratingBill}
-                className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 text-sm font-bold hover:bg-slate-50 transition disabled:opacity-50"
-              >
-                Cancel
-              </button>
+                {/* CONFIRM */}
+                <button
+                  type="button"
+                  disabled={
+                    selectedPaymentMethod === "SPLIT"
+                      ? isSplitSubmitting ||
+                        !splitAmount ||
+                        Number(splitAmount) <= 0 ||
+                        Number(splitAmount) > Number(billOrder.total || 0)
+                      : !selectedPaymentMethod || isGeneratingBill
+                  }
+                  onClick={
+                    selectedPaymentMethod === "SPLIT"
+                      ? confirmSplitBill
+                      : confirmGenerateBill
+                  }
+                  className="
+              flex-1
+              py-3
+              rounded-xl
+              bg-slate-900
+              text-white
+              text-sm
+              font-bold
+              hover:bg-slate-800
+              transition
+              disabled:opacity-40
+              disabled:cursor-not-allowed
+              flex
+              items-center
+              justify-center
+              gap-2
+            "
+                >
+                  {(selectedPaymentMethod === "SPLIT"
+                    ? isSplitSubmitting
+                    : isGeneratingBill) && (
+                    <Loader2 size={16} className="animate-spin" />
+                  )}
 
-              <button
-                type="button"
-                disabled={!selectedPaymentMethod || isGeneratingBill}
-                onClick={confirmGenerateBill}
-                className="flex-1 py-3 rounded-xl bg-slate-900 text-white text-sm font-bold hover:bg-slate-800 transition disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {isGeneratingBill && (
-                  <Loader2 size={16} className="animate-spin" />
-                )}
-                {isGeneratingBill
-                  ? "Processing..."
-                  : selectedPaymentMethod === "DUE"
-                    ? "Save as Due"
-                    : "Generate Bill"}
-              </button>
+                  {selectedPaymentMethod === "SPLIT"
+                    ? isSplitSubmitting
+                      ? "Processing..."
+                      : "Collect & Save Rest as Due"
+                    : isGeneratingBill
+                      ? "Processing..."
+                      : selectedPaymentMethod === "DUE"
+                        ? "Save as Due"
+                        : "Generate Bill"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

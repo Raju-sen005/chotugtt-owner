@@ -656,6 +656,11 @@ export default function Payment() {
 
                       <td className="p-4 sm:p-5 text-slate-700 font-semibold">
                         {bill.customerName || "Walk-in Customer"}
+                        {bill.isSplitBill && (
+                          <span className="ml-2 text-[9px] font-black bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-md uppercase align-middle">
+                            Split
+                          </span>
+                        )}
                       </td>
 
                       {paymentMethod === "DUE" && (

@@ -49,6 +49,9 @@ export default function CounterPOS() {
     upiId: "",
     upiQrCode: "",
   });
+  const [showNewTableModal, setShowNewTableModal] = useState(false);
+  const [newTableNumber, setNewTableNumber] = useState("");
+  const [tableStatusList, setTableStatusList] = useState([]);
   const apiBase =
     import.meta.env.VITE_APP_API_BASE || "http://localhost:5000/api/v1";
 
@@ -195,6 +198,80 @@ export default function CounterPOS() {
       cancelled = true;
     };
   }, [apiBase]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const fetchTableStatus = async () => {
+      try {
+        const res = await axios.get(`${apiBase}/tables/status`, {
+          withCredentials: true,
+        });
+
+        if (cancelled) return;
+
+        const data = res.data?.data ?? res.data ?? [];
+
+        setTableStatusList(Array.isArray(data) ? data : []);
+      } catch (error) {
+        if (!cancelled) {
+          console.error(
+            "Failed to fetch table status:",
+            error?.response?.data?.message || error?.message,
+          );
+        }
+      }
+    };
+
+    fetchTableStatus();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [apiBase]);
+
+  const getTableNumber = (table) => {
+    if (!table) return "";
+
+    return String(
+      table.tableNumber ?? table.number ?? table.name ?? table.table ?? "",
+    ).trim();
+  };
+
+  const getTableRunningStatus = (table) => {
+    const value = String(
+      table?.status ?? table?.orderStatus ?? "",
+    ).toUpperCase();
+
+    return (
+      value === "RUNNING" ||
+      value === "OCCUPIED" ||
+      value === "BUSY" ||
+      value === "PENDING" ||
+      value === "ACCEPTED"
+    );
+  };
+
+  const freeTables = useMemo(() => {
+    return tableStatusList.filter((table) => {
+      const tableNumber = getTableNumber(table);
+
+      if (!tableNumber) return false;
+
+      // Table API ke status se occupied check
+      if (getTableRunningStatus(table)) {
+        return false;
+      }
+
+      // Live orders se bhi double-check
+      // Agar kisi active order mein table hai to free nahi hai
+      if (activeTables.includes(tableNumber)) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [tableStatusList, activeTables]);
 
   useEffect(() => {
     if (!socket || !restaurantId) {
@@ -1046,6 +1123,84 @@ export default function CounterPOS() {
     }
   };
 
+  const handleNewTableOrderSubmit = async () => {
+    if (!newTableNumber) {
+      return alert("Please select a table!");
+    }
+
+    if (cart.length === 0) {
+      return alert("Cart is empty!");
+    }
+
+    setLoading(true);
+
+    try {
+      const payload = {
+        tableNumber: newTableNumber,
+
+        // 🔒 Backend price/name/discount verify karega.
+        // Client totals sirf UI ke liye hain.
+        items: cart.map((i) => ({
+          menuItem: i.catalogType === "ITEM" ? i._id : undefined,
+
+          combo: i.catalogType === "COMBO" ? i._id : undefined,
+
+          catalogType: i.catalogType,
+
+          name: i.name,
+          price: i.price,
+          quantity: i.quantity,
+
+          itemModel: i.itemModel,
+
+          discount: itemDiscountMap[i._id] || 0,
+        })),
+      };
+
+      const res = await axios.post(
+        `${apiBase}/orders/counter-new-table`,
+        payload,
+        {
+          withCredentials: true,
+          timeout: 15000,
+        },
+      );
+
+      const createdOrder = res.data?.order ?? res.data?.data;
+
+      if (!createdOrder) {
+        throw new Error("Server did not return the created order");
+      }
+
+      setCart([]);
+
+      setNewTableNumber("");
+
+      setShowNewTableModal(false);
+
+      showSuccess(`New order created for Table ${createdOrder.tableNumber}!`);
+    } catch (err) {
+      console.error("New table order error:", err);
+
+      const status = err?.response?.status;
+
+      if (status === 409) {
+        alert(
+          err?.response?.data?.message ||
+            "This table already has a running order. Use Add to Table.",
+        );
+      } else {
+        alert(
+          err?.response?.data?.message ||
+            err?.message ||
+            "Failed to create new table order",
+        );
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const cartItemCount = cart.reduce((acc, i) => acc + i.quantity, 0);
 
   return (
@@ -1395,7 +1550,7 @@ export default function CounterPOS() {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2.5 sm:gap-3">
+            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
               <button
                 onClick={handleParcelOrder}
                 disabled={loading || cart.length === 0}
@@ -1417,6 +1572,22 @@ export default function CounterPOS() {
                 className="py-3 lg:py-3.5 bg-slate-900 text-white rounded-xl font-bold text-xs hover:bg-slate-800 transition-all cursor-pointer shadow-sm shadow-slate-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
               >
                 <UtensilsCrossed className="w-4 h-4" /> Add to Table
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (cart.length === 0) {
+                    return alert("Cart is empty!");
+                  }
+
+                  setNewTableNumber("");
+                  setShowNewTableModal(true);
+                }}
+                disabled={loading || cart.length === 0}
+                className="col-span-2 sm:col-span-1 py-3 lg:py-3.5 bg-emerald-600 text-white rounded-xl font-bold text-xs hover:bg-emerald-700 transition-all cursor-pointer shadow-sm shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
+              >
+                <Plus className="w-4 h-4" />
+                New Table Order
               </button>
             </div>
           </div>
@@ -1486,6 +1657,163 @@ export default function CounterPOS() {
                 >
                   {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
                   {loading ? "Pushing..." : "Confirm & Push"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+        {showNewTableModal && (
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-[2px] flex items-center justify-center z-[60] p-4 animate-in fade-in duration-200">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-md space-y-5 shadow-2xl border border-slate-100">
+              {/* HEADER */}
+              <div className="flex items-start justify-between">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                      <UtensilsCrossed className="w-4 h-4" />
+                    </div>
+
+                    <h3 className="font-black text-slate-900 text-base tracking-tight">
+                      New Table Order
+                    </h3>
+                  </div>
+
+                  <p className="text-xs text-slate-500 mt-2">
+                    Select a free table to create a completely new order.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!loading) {
+                      setShowNewTableModal(false);
+                      setNewTableNumber("");
+                    }
+                  }}
+                  disabled={loading}
+                  className="text-slate-400 hover:text-slate-700 transition-colors p-1 disabled:opacity-40"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* INFO */}
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                <p className="text-[11px] text-emerald-800 font-semibold leading-relaxed">
+                  🟢 Only a free table can be selected.
+                  <br />
+                  Running tables must use <b>Add to Table</b>.
+                </p>
+              </div>
+
+              {/* TABLE LIST */}
+              {freeTables.length === 0 ? (
+                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center">
+                  <p className="text-xs font-bold text-slate-600">
+                    No tables available
+                  </p>
+
+                  <p className="text-[11px] text-slate-400 mt-1">
+                    Please check your table configuration.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
+                  {freeTables.map((table, index) => {
+                    const tableNumber = getTableNumber(table);
+
+                    if (!tableNumber) {
+                      return null;
+                    }
+
+                    const running = getTableRunningStatus(table);
+
+                    const isSelected = newTableNumber === tableNumber;
+
+                    return (
+                      <button
+                        key={table._id || table.id || tableNumber || index}
+                        type="button"
+                        disabled={loading || running}
+                        onClick={() => {
+                          if (!running) {
+                            setNewTableNumber(tableNumber);
+                          }
+                        }}
+                        className={`relative aspect-square rounded-xl text-xs font-black flex flex-col items-center justify-center gap-1 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 ${
+                          running
+                            ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
+                            : isSelected
+                              ? "bg-emerald-600 text-white border border-emerald-600 shadow-md shadow-emerald-200"
+                              : "bg-white text-slate-700 border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 cursor-pointer"
+                        }`}
+                      >
+                        <span className="text-[9px] uppercase tracking-wide opacity-70">
+                          Table
+                        </span>
+
+                        <span className="text-sm font-mono">{tableNumber}</span>
+
+                        <span
+                          className={`text-[8px] uppercase font-black ${
+                            running
+                              ? "text-slate-400"
+                              : isSelected
+                                ? "text-emerald-100"
+                                : "text-emerald-600"
+                          }`}
+                        >
+                          {running ? "RUNNING" : "FREE"}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+
+              {/* SELECTED TABLE */}
+              {newTableNumber && (
+                <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-slate-400">
+                      Selected Table
+                    </p>
+
+                    <p className="text-sm font-black text-slate-900 font-mono mt-0.5">
+                      Table {newTableNumber}
+                    </p>
+                  </div>
+
+                  <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-lg">
+                    NEW ORDER
+                  </span>
+                </div>
+              )}
+
+              {/* ACTIONS */}
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => {
+                    setShowNewTableModal(false);
+                    setNewTableNumber("");
+                  }}
+                  className="flex-1 py-3 border border-slate-200 rounded-xl font-bold text-xs text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  disabled={loading || !newTableNumber || cart.length === 0}
+                  onClick={handleNewTableOrderSubmit}
+                  className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold text-xs hover:bg-emerald-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+
+                  {loading ? "Creating..." : "Create New Order"}
                 </button>
               </div>
             </div>
