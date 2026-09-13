@@ -859,6 +859,7 @@ export default function LiveOrderMonitor() {
             address: formattedAddress,
             contact: d.phone || d.contactNumber || d.contact || "",
             fssaiNumber: d.fssaiNumber || "",
+            taxRate: Number(d.taxRate || 0),
 
             gstin: d.gstin || d.gstNumber || "",
             upiId: d.upiId || "",
@@ -1102,9 +1103,9 @@ export default function LiveOrderMonitor() {
         order.subtotal ??
         items.reduce((sum, i) => sum + (i.price || 0) * (i.quantity || 0), 0);
       const discount = order.discount || 0;
-      const tax = order.tax || 0;
-      const grandTotal = order.total ?? subtotal - discount + tax;
-      const roundOff = grandTotal - (subtotal - discount + tax);
+      const taxRate = Number(order.taxRate || 0);
+      const grandTotal = order.total ?? subtotal - discount + taxRate;
+      const roundOff = grandTotal - (subtotal - discount + taxRate);
       const totalQty = items.reduce((sum, i) => sum + (i.quantity || 0), 0);
 
       const tableLabel = order.mergedTables?.length
@@ -1341,13 +1342,43 @@ export default function LiveOrderMonitor() {
         </table>
 
         <div class="divider"></div>
-        <div class="totals-row"><span>Total Qty: ${totalQty}</span><span>Sub Total ${subtotal.toFixed(2)}</span></div>
-        ${discount ? `<div class="totals-row"><span>Discount</span><span>-${discount.toFixed(2)}</span></div>` : ""}
-        ${tax ? `<div class="totals-row"><span>Tax</span><span>${tax.toFixed(2)}</span></div>` : ""}
-        ${roundOff ? `<div class="totals-row"><span>Round off</span><span>${roundOff.toFixed(2)}</span></div>` : ""}
 
-        <div class="row grand-total"><span>Grand Total</span><span>₹${grandTotal.toFixed(2)}</span></div>
+<div class="totals-row">
+  <span>Total Qty: ${totalQty}</span>
+  <span>Sub Total ₹${subtotal.toFixed(2)}</span>
+</div>
 
+${
+  discount
+    ? `<div class="totals-row">
+       <span>Discount</span>
+       <span>-₹${discount.toFixed(2)}</span>
+     </div>`
+    : ""
+}
+
+${
+  taxRate
+    ? `<div class="totals-row">
+       <span>Tax${taxRate ? ` @ ${taxRate.toFixed(2)}%` : ""}</span>
+       <span>₹${taxRate.toFixed(2)}</span>
+     </div>`
+    : ""
+}
+
+${
+  roundOff
+    ? `<div class="totals-row">
+       <span>Round off</span>
+       <span>${roundOff.toFixed(2)}</span>
+     </div>`
+    : ""
+}
+
+<div class="row grand-total">
+  <span>Grand Total</span>
+  <span>₹${grandTotal.toFixed(2)}</span>
+</div>
         <div class="payment-row">
           <span>Payment Mode</span>
           <span>${escapeHtml(order.paymentMethod || "N/A")}</span>

@@ -39,37 +39,29 @@ export default function RestaurantProfile() {
   const [upiQrCode, setUpiQrCode] = useState("");
   const [fssaiNumber, setFssaiNumber] = useState("");
   const [gstNumber, setGstNumber] = useState("");
-
+  const [taxRate, setTaxRate] = useState("");
   // Logo Upload State
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState("");
 
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
-  const [showUpiOtpModal, setShowUpiOtpModal] =
-  useState(false);
+  const [showUpiOtpModal, setShowUpiOtpModal] = useState(false);
 
-const [upiOtp, setUpiOtp] = useState("");
+  const [upiOtp, setUpiOtp] = useState("");
 
-const [upiVerificationToken, setUpiVerificationToken] =
-  useState("");
+  const [upiVerificationToken, setUpiVerificationToken] = useState("");
 
-const [upiChangeMode, setUpiChangeMode] =
-  useState(false);
+  const [upiChangeMode, setUpiChangeMode] = useState(false);
 
-const [upiOtpLoading, setUpiOtpLoading] =
-  useState(false);
+  const [upiOtpLoading, setUpiOtpLoading] = useState(false);
 
-const [upiVerifyLoading, setUpiVerifyLoading] =
-  useState(false);
+  const [upiVerifyLoading, setUpiVerifyLoading] = useState(false);
 
-const [upiChangeLoading, setUpiChangeLoading] =
-  useState(false);
+  const [upiChangeLoading, setUpiChangeLoading] = useState(false);
 
-const [upiOtpError, setUpiOtpError] =
-  useState("");
+  const [upiOtpError, setUpiOtpError] = useState("");
 
-const [upiOtpInfo, setUpiOtpInfo] =
-  useState("");
+  const [upiOtpInfo, setUpiOtpInfo] = useState("");
 
   // Staff Management Local States
   //   const [staffList, setStaffList] = useState([]);
@@ -171,6 +163,11 @@ const [upiOtpInfo, setUpiOtpInfo] =
           ? restaurant.gstNumber || ""
           : prev,
       );
+      setTaxRate(
+        restaurant.taxRate !== undefined && restaurant.taxRate !== null
+          ? String(restaurant.taxRate)
+          : "",
+      );
       setLogoPreview((prev) =>
         prev !== (restaurant.logo || "") ? restaurant.logo || "" : prev,
       );
@@ -250,272 +247,217 @@ const [upiOtpInfo, setUpiOtpInfo] =
     }
   };
 
-
   const handleRequestUpiOtp = async () => {
-  try {
-    setUpiOtpLoading(true);
-    setUpiOtpError("");
-    setUpiOtpInfo("");
+    try {
+      setUpiOtpLoading(true);
+      setUpiOtpError("");
+      setUpiOtpInfo("");
 
-    const res = await axios.post(
-      `${import.meta.env.VITE_APP_API_BASE}/restaurant/profile/upi/request-otp`,
-      {},
-      {
-        withCredentials: true,
-      }
-    );
-
-    setUpiOtpInfo(
-      res.data?.message ||
-        "OTP sent to your registered email."
-    );
-
-    setShowUpiOtpModal(true);
-  } catch (error) {
-    setUpiOtpError(
-      error.response?.data?.message ||
-        "Unable to send OTP."
-    );
-  } finally {
-    setUpiOtpLoading(false);
-  }
-};
-
-
-const handleVerifyUpiOtp = async () => {
-  if (!/^\d{6}$/.test(upiOtp)) {
-    setUpiOtpError(
-      "Please enter a valid 6-digit OTP."
-    );
-    return;
-  }
-
-  try {
-    setUpiVerifyLoading(true);
-    setUpiOtpError("");
-
-    const res = await axios.post(
-      `${import.meta.env.VITE_APP_API_BASE}/restaurant/profile/upi/verify-otp`,
-      {
-        otp: upiOtp,
-      },
-      {
-        withCredentials: true,
-      }
-    );
-
-    const token =
-      res.data?.verificationToken;
-
-    if (!token) {
-      throw new Error(
-        "Verification token missing"
+      const res = await axios.post(
+        `${import.meta.env.VITE_APP_API_BASE}/restaurant/profile/upi/request-otp`,
+        {},
+        {
+          withCredentials: true,
+        },
       );
+
+      setUpiOtpInfo(res.data?.message || "OTP sent to your registered email.");
+
+      setShowUpiOtpModal(true);
+    } catch (error) {
+      setUpiOtpError(error.response?.data?.message || "Unable to send OTP.");
+    } finally {
+      setUpiOtpLoading(false);
     }
+  };
 
-    setUpiVerificationToken(token);
-
-    /*
-     * Now frontend can unlock the field.
-     */
-    setUpiChangeMode(true);
-
-    setShowUpiOtpModal(false);
-    setUpiOtp("");
-
-    setUpiOtpInfo(
-      "OTP verified. You can now change your UPI ID."
-    );
-  } catch (error) {
-    setUpiOtpError(
-      error.response?.data?.message ||
-        "Invalid OTP."
-    );
-  } finally {
-    setUpiVerifyLoading(false);
-  }
-};
-
-  // Handle Form Submission
-  const handleSubmit = useCallback(
-  async (e) => {
-    e.preventDefault();
-
-    const upiRegex =
-      /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z]{2,64}$/;
-
-    if (upiId && !upiRegex.test(upiId.trim())) {
-      alert(
-        "Please enter a valid UPI ID, e.g. restaurant@paytm"
-      );
+  const handleVerifyUpiOtp = async () => {
+    if (!/^\d{6}$/.test(upiOtp)) {
+      setUpiOtpError("Please enter a valid 6-digit OTP.");
       return;
     }
 
-    /*
-     * Existing UPI + unlocked mode means
-     * user is trying to change UPI.
-     *
-     * Do NOT send it through normal profile API.
-     */
-    if (
-      restaurant?.upiId &&
-      upiChangeMode &&
-      upiVerificationToken
-    ) {
-      try {
-        setUpiChangeLoading(true);
+    try {
+      setUpiVerifyLoading(true);
+      setUpiOtpError("");
 
-        const response = await axios.patch(
-          `${import.meta.env.VITE_APP_API_BASE}/restaurant/profile/upi`,
-          {
-            upiId: upiId.trim().toLowerCase(),
-          },
-          {
-            withCredentials: true,
-            headers: {
-              "X-UPI-Verification-Token":
-                upiVerificationToken,
-            },
-          }
-        );
+      const res = await axios.post(
+        `${import.meta.env.VITE_APP_API_BASE}/restaurant/profile/upi/verify-otp`,
+        {
+          otp: upiOtp,
+        },
+        {
+          withCredentials: true,
+        },
+      );
 
-        const updatedUpi =
-          response.data?.data?.upiId;
+      const token = res.data?.verificationToken;
 
-        const updatedQr =
-          response.data?.data?.upiQrCode;
-
-        if (updatedUpi) {
-          setUpiId(updatedUpi);
-        }
-
-        if (updatedQr) {
-          setUpiQrCode(updatedQr);
-        }
-
-        /*
-         * Consume local verification state.
-         */
-        setUpiVerificationToken("");
-        setUpiChangeMode(false);
-
-        /*
-         * Refresh restaurant profile.
-         */
-        await queryClient.invalidateQueries({
-          queryKey: ["restaurant-profile"],
-        });
-
-        setShowSuccessPopup(true);
-
-        setTimeout(() => {
-          setShowSuccessPopup(false);
-        }, 3000);
-
-        return;
-      } catch (error) {
-        alert(
-          error.response?.data?.message ||
-            "Failed to update UPI ID."
-        );
-
-        return;
-      } finally {
-        setUpiChangeLoading(false);
+      if (!token) {
+        throw new Error("Verification token missing");
       }
+
+      setUpiVerificationToken(token);
+
+      /*
+       * Now frontend can unlock the field.
+       */
+      setUpiChangeMode(true);
+
+      setShowUpiOtpModal(false);
+      setUpiOtp("");
+
+      setUpiOtpInfo("OTP verified. You can now change your UPI ID.");
+    } catch (error) {
+      setUpiOtpError(error.response?.data?.message || "Invalid OTP.");
+    } finally {
+      setUpiVerifyLoading(false);
     }
+  };
 
-    /*
-     * Normal profile update.
-     */
-    const formData = new FormData();
+  // Handle Form Submission
+  const handleSubmit = useCallback(
+    async (e) => {
+      e.preventDefault();
 
-    formData.append("name", name);
-    formData.append("slug", slug);
-    formData.append("phone", phone);
-    formData.append("email", email);
-    formData.append("themeColor", themeColor);
+      const upiRegex = /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z]{2,64}$/;
 
-    /*
-     * Only send UPI during first-time setup.
-     *
-     * Existing UPI should remain controlled
-     * by dedicated endpoint.
-     */
-    if (!restaurant?.upiId) {
-      formData.append(
-        "upiId",
-        upiId
-      );
-    }
+      if (upiId && !upiRegex.test(upiId.trim())) {
+        alert("Please enter a valid UPI ID, e.g. restaurant@paytm");
+        return;
+      }
 
-    formData.append(
-      "fssaiNumber",
-      fssaiNumber
-    );
+      /*
+       * Existing UPI + unlocked mode means
+       * user is trying to change UPI.
+       *
+       * Do NOT send it through normal profile API.
+       */
+      if (restaurant?.upiId && upiChangeMode && upiVerificationToken) {
+        try {
+          setUpiChangeLoading(true);
 
-    formData.append(
-      "gstNumber",
-      gstNumber
-    );
+          const response = await axios.patch(
+            `${import.meta.env.VITE_APP_API_BASE}/restaurant/profile/upi`,
+            {
+              upiId: upiId.trim().toLowerCase(),
+            },
+            {
+              withCredentials: true,
+              headers: {
+                "X-UPI-Verification-Token": upiVerificationToken,
+              },
+            },
+          );
 
-    formData.append(
-      "address[street]",
-      street
-    );
+          const updatedUpi = response.data?.data?.upiId;
 
-    formData.append(
-      "address[city]",
-      city
-    );
+          const updatedQr = response.data?.data?.upiQrCode;
 
-    formData.append(
-      "address[state]",
-      state
-    );
+          if (updatedUpi) {
+            setUpiId(updatedUpi);
+          }
 
-    formData.append(
-      "address[zip]",
-      zip
-    );
+          if (updatedQr) {
+            setUpiQrCode(updatedQr);
+          }
 
-    if (logoFile) {
-      formData.append(
-        "logo",
-        logoFile
-      );
-    }
+          /*
+           * Consume local verification state.
+           */
+          setUpiVerificationToken("");
+          setUpiChangeMode(false);
 
-    updateProfileMutation.mutate(
-      formData
-    );
-  },
-  [
-    restaurant,
-    upiId,
-    upiChangeMode,
-    upiVerificationToken,
+          /*
+           * Refresh restaurant profile.
+           */
+          await queryClient.invalidateQueries({
+            queryKey: ["restaurant-profile"],
+          });
 
-    name,
-    slug,
-    phone,
-    email,
-    themeColor,
+          setShowSuccessPopup(true);
 
-    fssaiNumber,
-    gstNumber,
+          setTimeout(() => {
+            setShowSuccessPopup(false);
+          }, 3000);
 
-    street,
-    city,
-    state,
-    zip,
+          return;
+        } catch (error) {
+          alert(error.response?.data?.message || "Failed to update UPI ID.");
 
-    logoFile,
+          return;
+        } finally {
+          setUpiChangeLoading(false);
+        }
+      }
 
-    queryClient,
-    updateProfileMutation,
-  ]
-);
+      /*
+       * Normal profile update.
+       */
+      const formData = new FormData();
+
+      formData.append("name", name);
+      formData.append("slug", slug);
+      formData.append("phone", phone);
+      formData.append("email", email);
+      formData.append("themeColor", themeColor);
+
+      /*
+       * Only send UPI during first-time setup.
+       *
+       * Existing UPI should remain controlled
+       * by dedicated endpoint.
+       */
+      if (!restaurant?.upiId) {
+        formData.append("upiId", upiId);
+      }
+
+      formData.append("fssaiNumber", fssaiNumber);
+
+      formData.append("gstNumber", gstNumber);
+
+      formData.append("taxRate", taxRate === "" ? "0" : taxRate);
+
+      formData.append("address[street]", street);
+
+      formData.append("address[city]", city);
+
+      formData.append("address[state]", state);
+
+      formData.append("address[zip]", zip);
+
+      if (logoFile) {
+        formData.append("logo", logoFile);
+      }
+
+      updateProfileMutation.mutate(formData);
+    },
+    [
+      restaurant,
+      upiId,
+      upiChangeMode,
+      upiVerificationToken,
+
+      name,
+      slug,
+      phone,
+      email,
+      themeColor,
+
+      fssaiNumber,
+      gstNumber,
+      taxRate,
+      street,
+      city,
+      state,
+      zip,
+
+      logoFile,
+
+      queryClient,
+      updateProfileMutation,
+    ],
+  );
 
   //   const handleAddStaffSubmit = (e) => {
   //     e.preventDefault();
@@ -588,67 +530,61 @@ const handleVerifyUpiOtp = async () => {
         </div>
       )}
       {showUpiOtpModal && (
-  <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
-    <div
-      className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
-      onClick={() => {
-        if (!upiVerifyLoading) {
-          setShowUpiOtpModal(false);
-        }
-      }}
-    />
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
+            onClick={() => {
+              if (!upiVerifyLoading) {
+                setShowUpiOtpModal(false);
+              }
+            }}
+          />
 
-    <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 sm:p-8">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mb-4">
-            <Mail size={22} />
-          </div>
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-slate-200 p-6 sm:p-8">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="w-12 h-12 rounded-2xl bg-red-50 text-red-600 flex items-center justify-center mb-4">
+                  <Mail size={22} />
+                </div>
 
-          <h2 className="text-lg font-black text-slate-900">
-            Verify UPI Change
-          </h2>
+                <h2 className="text-lg font-black text-slate-900">
+                  Verify UPI Change
+                </h2>
 
-          <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-            We've sent a 6-digit OTP to your
-            registered owner email address.
-          </p>
-        </div>
+                <p className="text-xs text-slate-500 mt-2 leading-relaxed">
+                  We've sent a 6-digit OTP to your registered owner email
+                  address.
+                </p>
+              </div>
 
-        <button
-          type="button"
-          disabled={upiVerifyLoading}
-          onClick={() =>
-            setShowUpiOtpModal(false)
-          }
-          className="text-slate-400 hover:text-slate-700 text-xl"
-        >
-          ×
-        </button>
-      </div>
+              <button
+                type="button"
+                disabled={upiVerifyLoading}
+                onClick={() => setShowUpiOtpModal(false)}
+                className="text-slate-400 hover:text-slate-700 text-xl"
+              >
+                ×
+              </button>
+            </div>
 
-      <div className="mt-6">
-        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
-          Verification OTP
-        </label>
+            <div className="mt-6">
+              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 mb-2">
+                Verification OTP
+              </label>
 
-        <input
-          autoFocus
-          type="text"
-          inputMode="numeric"
-          maxLength={6}
-          value={upiOtp}
-          onChange={(e) => {
-            setUpiOtp(
-              e.target.value
-                .replace(/\D/g, "")
-                .slice(0, 6)
-            );
+              <input
+                autoFocus
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                value={upiOtp}
+                onChange={(e) => {
+                  setUpiOtp(e.target.value.replace(/\D/g, "").slice(0, 6));
 
-            setUpiOtpError("");
-          }}
-          placeholder="000000"
-          className="
+                  setUpiOtpError("");
+                }}
+                placeholder="000000"
+                className="
             w-full
             px-4
             py-4
@@ -664,29 +600,26 @@ const handleVerifyUpiOtp = async () => {
             focus:ring-red-500/10
             outline-none
           "
-        />
-      </div>
+              />
+            </div>
 
-      {upiOtpError && (
-        <div className="mt-4 p-3 rounded-xl bg-red-50 border border-red-100 text-xs font-semibold text-red-600">
-          {upiOtpError}
-        </div>
-      )}
+            {upiOtpError && (
+              <div className="mt-4 p-3 rounded-xl bg-red-50 border border-red-100 text-xs font-semibold text-red-600">
+                {upiOtpError}
+              </div>
+            )}
 
-      {upiOtpInfo && !upiOtpError && (
-        <div className="mt-4 p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-xs font-semibold text-emerald-700">
-          {upiOtpInfo}
-        </div>
-      )}
+            {upiOtpInfo && !upiOtpError && (
+              <div className="mt-4 p-3 rounded-xl bg-emerald-50 border border-emerald-100 text-xs font-semibold text-emerald-700">
+                {upiOtpInfo}
+              </div>
+            )}
 
-      <button
-        type="button"
-        onClick={handleVerifyUpiOtp}
-        disabled={
-          upiVerifyLoading ||
-          upiOtp.length !== 6
-        }
-        className="
+            <button
+              type="button"
+              onClick={handleVerifyUpiOtp}
+              disabled={upiVerifyLoading || upiOtp.length !== 6}
+              className="
           w-full
           mt-6
           py-3.5
@@ -699,18 +632,16 @@ const handleVerifyUpiOtp = async () => {
           disabled:opacity-50
           transition-all
         "
-      >
-        {upiVerifyLoading
-          ? "Verifying..."
-          : "Verify OTP & Unlock UPI"}
-      </button>
+            >
+              {upiVerifyLoading ? "Verifying..." : "Verify OTP & Unlock UPI"}
+            </button>
 
-      <p className="text-[10px] text-slate-400 text-center mt-4">
-        OTP is valid for 10 minutes.
-      </p>
-    </div>
-  </div>
-)}
+            <p className="text-[10px] text-slate-400 text-center mt-4">
+              OTP is valid for 10 minutes.
+            </p>
+          </div>
+        </div>
+      )}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 font-sans bg-[#F9FAFB] min-h-screen">
         {/* Hero Header Banner */}
         <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-6 sm:p-8 rounded-3xl text-white shadow-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 border border-slate-800">
@@ -896,18 +827,17 @@ const handleVerifyUpiOtp = async () => {
                 </div>
 
                 <div className="sm:col-span-2 space-y-1.5">
-  <div className="flex items-center justify-between gap-3">
-    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-      Restaurant UPI ID
-    </label>
+                  <div className="flex items-center justify-between gap-3">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      Restaurant UPI ID
+                    </label>
 
-    {restaurant?.upiId &&
-      !upiChangeMode && (
-        <button
-          type="button"
-          onClick={handleRequestUpiOtp}
-          disabled={upiOtpLoading}
-          className="
+                    {restaurant?.upiId && !upiChangeMode && (
+                      <button
+                        type="button"
+                        onClick={handleRequestUpiOtp}
+                        disabled={upiOtpLoading}
+                        className="
             text-[10px]
             font-bold
             text-red-600
@@ -922,49 +852,40 @@ const handleVerifyUpiOtp = async () => {
             transition-all
             disabled:opacity-50
           "
-        >
-          {upiOtpLoading
-            ? "Sending OTP..."
-            : "Change UPI"}
-        </button>
-      )}
-  </div>
+                      >
+                        {upiOtpLoading ? "Sending OTP..." : "Change UPI"}
+                      </button>
+                    )}
+                  </div>
 
-  {restaurant?.upiId && !upiChangeMode && (
-    <p className="text-[10px] text-amber-600 font-semibold">
-      🔒 UPI ID is locked. Verify your registered
-      owner email to change it.
-    </p>
-  )}
+                  {restaurant?.upiId && !upiChangeMode && (
+                    <p className="text-[10px] text-amber-600 font-semibold">
+                      🔒 UPI ID is locked. Verify your registered owner email to
+                      change it.
+                    </p>
+                  )}
 
-  {upiChangeMode && (
-    <p className="text-[10px] text-emerald-600 font-semibold">
-      ✓ Identity verified. You can now change your UPI ID.
-    </p>
-  )}
+                  {upiChangeMode && (
+                    <p className="text-[10px] text-emerald-600 font-semibold">
+                      ✓ Identity verified. You can now change your UPI ID.
+                    </p>
+                  )}
 
-  <div className="relative flex items-center">
-    <CreditCard
-      size={16}
-      className="absolute left-4 text-emerald-500"
-    />
+                  <div className="relative flex items-center">
+                    <CreditCard
+                      size={16}
+                      className="absolute left-4 text-emerald-500"
+                    />
 
-    <input
-      type="text"
-      placeholder="restaurantname@okhdfcbank"
-      disabled={
-        Boolean(restaurant?.upiId) &&
-        !upiChangeMode
-      }
-      value={upiId}
-      onChange={(e) =>
-        setUpiId(
-          e.target.value
-            .trim()
-            .toLowerCase()
-        )
-      }
-      className="
+                    <input
+                      type="text"
+                      placeholder="restaurantname@okhdfcbank"
+                      disabled={Boolean(restaurant?.upiId) && !upiChangeMode}
+                      value={upiId}
+                      onChange={(e) =>
+                        setUpiId(e.target.value.trim().toLowerCase())
+                      }
+                      className="
         w-full
         pl-11
         pr-4
@@ -984,9 +905,9 @@ const handleVerifyUpiOtp = async () => {
         disabled:text-slate-500
         disabled:cursor-not-allowed
       "
-    />
-  </div>
-</div>
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -1023,30 +944,70 @@ const handleVerifyUpiOtp = async () => {
                   </p>
                 </div>
 
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    GST Number
-                  </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  {/* GST NUMBER */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      GST Number
+                    </label>
 
-                  <input
-                    type="text"
-                    maxLength={15}
-                    placeholder="e.g. 08ABCDE1234F1Z5"
-                    value={gstNumber}
-                    onChange={(e) =>
-                      setGstNumber(
-                        e.target.value
-                          .toUpperCase()
-                          .replace(/\s/g, "")
-                          .slice(0, 15),
-                      )
-                    }
-                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm text-slate-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all shadow-xs"
-                  />
+                    <input
+                      type="text"
+                      maxLength={15}
+                      placeholder="e.g. 08ABCDE1234F1Z5"
+                      value={gstNumber}
+                      onChange={(e) =>
+                        setGstNumber(
+                          e.target.value
+                            .toUpperCase()
+                            .replace(/\s/g, "")
+                            .slice(0, 15),
+                        )
+                      }
+                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-rose-400"
+                    />
+                  </div>
 
-                  <p className="text-[10px] text-slate-400">
-                    15-character GSTIN
-                  </p>
+                  {/* TAX RATE */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      GST / Tax Rate
+                    </label>
+
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        placeholder="e.g. 5"
+                        value={taxRate}
+                        onChange={(e) => {
+                          const value = e.target.value;
+
+                          if (value === "") {
+                            setTaxRate("");
+                            return;
+                          }
+
+                          const num = Number(value);
+
+                          if (num >= 0 && num <= 100) {
+                            setTaxRate(value);
+                          }
+                        }}
+                        className="w-full rounded-xl border border-slate-200 px-4 py-3 pr-12 text-sm font-semibold outline-none focus:border-rose-400"
+                      />
+
+                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400">
+                        %
+                      </span>
+                    </div>
+
+                    <p className="text-[10px] text-slate-400">
+                      This tax rate will be automatically applied to bills.
+                    </p>
+                  </div>
                 </div>
               </div>
             </div>
