@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useSocket } from "../context/SocketContext";
+import { getSelectedBillTemplate } from "../constants/billTemplates";
 export default function CounterPOS() {
   const { user } = useAuth();
   const socket = useSocket();
@@ -26,7 +27,10 @@ export default function CounterPOS() {
   const restaurantId =
     typeof user?.restaurantId === "object"
       ? user.restaurantId?._id
-      : user?.restaurantId;
+      : user?.restaurantId || user?._id;
+  const [selectedBillTemplate, setSelectedBillTemplate] = useState(() =>
+    getSelectedBillTemplate(restaurantId),
+  );
   const [items, setItems] = useState([]);
   const [combos, setCombos] = useState([]);
   const [cart, setCart] = useState([]);
@@ -79,6 +83,7 @@ export default function CounterPOS() {
             upiId: d.upiId || "",
             upiQrCode: d.upiQrCode || d.qrCodeUrl || "",
           });
+          if (d.billTemplate) setSelectedBillTemplate(d.billTemplate);
         }
       } catch (err) {
         console.error("Failed to fetch restaurant profile:", err);
@@ -815,11 +820,77 @@ export default function CounterPOS() {
             line-height: 1.5;
             color: #555;
           }
+
+          .receipt.template-minimal { padding: 12px 10px; font-family: Arial, sans-serif; }
+          .receipt.template-minimal .shop-name { font-size: 15px; text-transform: uppercase; }
+          .receipt.template-minimal .divider-solid { border-top-width: 1px; }
+          .receipt.template-elegant { width: 340px; padding: 24px 20px 18px; font-family: Georgia, serif; }
+          .receipt.template-elegant .shop-name { font-size: 20px; letter-spacing: 1px; }
+          .receipt.template-elegant .divider-solid { border-top: 1px solid #a16207; }
+          .receipt.template-elegant .grand-total { border-top-color: #a16207; font-size: 18px; }
+          .receipt.template-bold { width: 360px; padding: 18px; font-family: Arial, sans-serif; }
+          .receipt.template-bold .shop-name { font-size: 18px; text-transform: uppercase; }
+          .receipt.template-bold .divider-solid { border-top: 4px solid #111; }
+          .receipt.template-bold .grand-total { background: #111; color: #fff; padding: 10px 8px; border-top: 0; }
+          .receipt.template-terracotta { width: 340px; padding: 24px 20px 18px; font-family: Georgia, serif; color: #3f2923; }
+          .receipt.template-terracotta .shop-name { color: #a3482b; font-size: 20px; letter-spacing: 1px; }
+          .receipt.template-terracotta .divider-solid { border-top: 1px solid #a3482b; }
+          .receipt.template-terracotta .grand-total { border-top-color: #a3482b; color: #a3482b; font-size: 18px; }
+          .receipt.template-ledger { width: 360px; padding: 18px; font-family: Arial, sans-serif; }
+          .receipt.template-ledger .shop-name { font-size: 18px; text-transform: uppercase; }
+          .receipt.template-ledger .divider-solid { border-top: 4px solid #1e293b; }
+          .receipt.template-ledger thead td { background: #1e293b; color: #fff; padding: 6px 4px; }
+          .receipt.template-ledger .grand-total { border-top: 2px solid #1e293b; font-size: 17px; }
+          .receipt {
+            background: #fff;
+            -webkit-print-color-adjust: exact;
+            print-color-adjust: exact;
+          }
+          .receipt.template-classic { background: linear-gradient(180deg, #fff 0%, #fffdf9 100%); border-top: 7px solid #111; }
+          .receipt.template-classic .shop-name { letter-spacing: 1px; }
+          .receipt.template-minimal { background-color: #fff; background-image: linear-gradient(#f1f5f9 1px, transparent 1px); background-size: 100% 22px; border: 1px solid #cbd5e1; }
+          .receipt.template-elegant { background: #fffcf5; border: 1px solid #e7d7b0; box-shadow: inset 0 0 0 5px #fff8e7; }
+          .receipt.template-elegant .shop-logo { border: 1px solid #b8892d; border-radius: 50%; padding: 4px; }
+          .receipt.template-bold { background: #f8fafc; border-top: 18px solid #111827; border-bottom: 5px solid #111827; }
+          .receipt.template-bold .shop-name { color: #111827; letter-spacing: 1.2px; }
+          .receipt.template-terracotta { background: #fff7ed; border: 1px solid #e7a98d; box-shadow: inset 0 0 0 5px #fff1e6; }
+          .receipt.template-terracotta .divider { border-top-color: #d98968; }
+          .receipt.template-terracotta .shop-line { color: #70483c; }
+          .receipt.template-ledger { background: #f8fafc; border: 1px solid #94a3b8; border-top: 14px solid #1e293b; }
+          .receipt.template-ledger .shop-line { color: #475569; }
+          .receipt.template-ledger .divider { border-top-color: #94a3b8; }
+          .receipt.template-midnight { width: 360px; background: #111827; color: #f8fafc; border-top: 12px solid #38bdf8; font-family: Arial, sans-serif; }
+          .receipt.template-midnight .shop-name, .receipt.template-midnight .grand-total { color: #7dd3fc; }
+          .receipt.template-midnight .shop-line, .receipt.template-midnight .payment-row, .receipt.template-midnight .footer-line { color: #cbd5e1; }
+          .receipt.template-midnight .divider, .receipt.template-midnight .divider-solid, .receipt.template-midnight .grand-total { border-color: #475569; }
+          .receipt.template-saffron { width: 340px; background: #fffaf0; color: #422006; border: 2px solid #f59e0b; font-family: Georgia, serif; }
+          .receipt.template-saffron .shop-name { color: #b45309; font-size: 20px; }
+          .receipt.template-saffron .divider-solid { border-color: #f59e0b; }
+          .receipt.template-coastal { width: 340px; background: #f0fdfa; color: #134e4a; border-top: 10px solid #0f766e; font-family: Arial, sans-serif; }
+          .receipt.template-coastal .shop-name { color: #0f766e; }
+          .receipt.template-coastal .divider { border-color: #5eead4; }
+          .receipt.template-botanical { width: 340px; background: #f3f7f0; color: #263b2a; border: 1px solid #9caf88; font-family: Georgia, serif; }
+          .receipt.template-botanical .shop-name { color: #3f6212; font-size: 20px; }
+          .receipt.template-botanical .grand-total { border-color: #84a66d; color: #3f6212; }
+          .receipt.template-monogram { width: 360px; background: #18181b; color: #fafafa; border: 3px solid #d4af37; font-family: Georgia, serif; }
+          .receipt.template-monogram .shop-name, .receipt.template-monogram .grand-total { color: #f5d76e; }
+          .receipt.template-monogram .shop-line, .receipt.template-monogram .payment-row, .receipt.template-monogram .footer-line { color: #d4d4d8; }
+          .receipt.template-monogram .divider, .receipt.template-monogram .divider-solid, .receipt.template-monogram .grand-total { border-color: #a38427; }
+          .receipt.template-studio { width: 360px; background: #f5f5f4; color: #292524; border: 1px solid #78716c; font-family: Arial, sans-serif; }
+          .receipt.template-studio thead td { background: #292524; color: #fff; padding: 6px 4px; }
+          .receipt.template-studio .grand-total { background: #d6d3d1; padding: 8px; border: 0; }
+          .receipt.template-noir { width: 300px; background: #000; color: #fff; border-top: 8px solid #fff; font-family: 'Courier New', monospace; }
+          .receipt.template-noir .shop-name, .receipt.template-noir .grand-total { color: #fff; }
+          .receipt.template-noir .shop-line, .receipt.template-noir .payment-row, .receipt.template-noir .footer-line { color: #d4d4d4; }
+          .receipt.template-noir .divider, .receipt.template-noir .divider-solid, .receipt.template-noir .grand-total { border-color: #737373; }
+          .receipt.template-heritage { width: 340px; background: #f5efe3; color: #3f3125; border: 1px solid #b89b72; font-family: Georgia, serif; }
+          .receipt.template-heritage .shop-name { color: #6b4423; font-size: 20px; }
+          .receipt.template-heritage .divider, .receipt.template-heritage .divider-solid, .receipt.template-heritage .grand-total { border-color: #9a744c; }
         </style>
       </head>
 
       <body>
-        <div class="receipt">
+        <div class="receipt template-${selectedBillTemplate}">
 
           <!-- RESTAURANT HEADER -->
           <div class="center">

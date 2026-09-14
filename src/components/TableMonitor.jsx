@@ -17,6 +17,58 @@ import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import axios from "axios";
 import { useSocket } from "../context/SocketContext";
+
+// ============================================================
+// QR STANDEE THEMES
+// Abhi sabhi themes FREE hain.
+// Future mein isi structure mein PRO/payment add kar sakte hain.
+// ============================================================
+
+const QR_STANDEE_THEMES = [
+  {
+    id: "classic",
+    name: "Classic",
+    description: "Clean and professional",
+  },
+  {
+    id: "minimal",
+    name: "Minimal",
+    description: "Simple modern design",
+  },
+  {
+    id: "royal",
+    name: "Royal",
+    description: "Premium royal style",
+  },
+  {
+    id: "dark",
+    name: "Dark",
+    description: "Elegant dark theme",
+  },
+  {
+    id: "elegant",
+    name: "Elegant",
+    description: "Luxury restaurant style",
+  },
+  {
+    id: "modern",
+    name: "Modern",
+    description: "Fresh modern look",
+  },
+  {
+    id: "cafe",
+    name: "Cafe",
+    description: "Warm cafe style",
+  },
+  {
+    id: "traditional",
+    name: "Traditional",
+    description: "Classic Indian style",
+  },
+];
+
+const DEFAULT_QR_STANDEE_THEME = "classic";
+
 // 🔑 Extracted + memoized TableCard component
 const TableCard = memo(function TableCard({
   table,
@@ -229,6 +281,13 @@ export default function TableMonitor() {
   const socket = useSocket();
   const [copied, setCopied] = useState(null);
   const qrRefs = useRef({});
+  const [selectedStandeeTheme, setSelectedStandeeTheme] = useState(() => {
+    try {
+      return localStorage.getItem("qrStandeeTheme") || DEFAULT_QR_STANDEE_THEME;
+    } catch {
+      return DEFAULT_QR_STANDEE_THEME;
+    }
+  });
 
   const [storeDetails, setStoreDetails] = useState({
     id: "",
@@ -264,6 +323,31 @@ export default function TableMonitor() {
       setShowSuccessPopup(false);
     }, 3000);
   }, []);
+
+  const handleStandeeThemeChange = useCallback(
+    (themeId) => {
+      const exists = QR_STANDEE_THEMES.some((theme) => theme.id === themeId);
+
+      if (!exists) {
+        return;
+      }
+
+      setSelectedStandeeTheme(themeId);
+
+      try {
+        localStorage.setItem("qrStandeeTheme", themeId);
+      } catch {
+        // localStorage unavailable hone par app break nahi hoga
+      }
+
+      const selectedTheme = QR_STANDEE_THEMES.find(
+        (theme) => theme.id === themeId,
+      );
+
+      showSuccess(`${selectedTheme?.name || "Theme"} theme selected`);
+    },
+    [showSuccess],
+  );
 
   // Restaurant Profile Fetch
   useEffect(() => {
@@ -368,229 +452,686 @@ export default function TableMonitor() {
     user?._id ||
     storeDetails.id;
 
-  const printQRCode = useCallback(
-  (tableNo) => {
-    const canvas = qrRefs.current[tableNo];
-    if (!canvas) return;
-    const dataUrl = canvas.toDataURL("image/png");
+    const printQRCode = useCallback(
+    (tableNo) => {
+      const canvas = qrRefs.current[tableNo];
 
-    const restaurantName = storeDetails.name || "OUR RESTAURANT";
-
-    let restaurantLogo = storeDetails.logo || "";
-    if (restaurantLogo && restaurantLogo.startsWith("/")) {
-      try {
-        const urlObj = new URL(apiBase);
-        restaurantLogo = `${urlObj.origin}${restaurantLogo}`;
-      } catch {
-        restaurantLogo = `${window.location.origin}${restaurantLogo}`;
+      if (!canvas) {
+        alert("QR code is not ready. Please try again.");
+        return;
       }
-    }
 
-    const windowContent = `
-    <html>
-      <head>
-        <title>Table ${tableNo} - ${restaurantName} Standee</title>
-        <style>
-          @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&display=swap');
+      const dataUrl = canvas.toDataURL("image/png");
 
-          * { box-sizing: border-box; }
+      const restaurantName = storeDetails.name || "OUR RESTAURANT";
 
-          body {
-            font-family: 'Plus Jakarta Sans', sans-serif;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            margin: 0;
-            background: #ffffff;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
+      let restaurantLogo = storeDetails.logo || "";
 
-          .standee-card {
-            width: 340px;
-            background: #ffffff;
-            border: 1px solid #E5E7EB;
-            border-radius: 24px;
-            padding: 36px 28px 28px;
-            text-align: center;
-            box-shadow: 0 20px 40px rgba(15, 23, 42, 0.08);
-            box-sizing: border-box;
-            position: relative;
-          }
+      if (restaurantLogo && restaurantLogo.startsWith("/")) {
+        try {
+          const urlObj = new URL(apiBase);
+          restaurantLogo = `${urlObj.origin}${restaurantLogo}`;
+        } catch {
+          restaurantLogo = `${window.location.origin}${restaurantLogo}`;
+        }
+      }
 
-          .brand-container {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            margin-bottom: 22px;
-          }
+      const theme =
+        QR_STANDEE_THEMES.find((item) => item.id === selectedStandeeTheme) ||
+        QR_STANDEE_THEMES[0];
 
-          .logo-img {
-            width: 56px;
-            height: 56px;
-            object-fit: cover;
-            border-radius: 16px;
-            border: 1px solid #E5E7EB;
-            background: #fff;
-            margin-bottom: 12px;
-          }
+      // ---------------------------------------------------------
+      // SAFE HTML HELPERS
+      // ---------------------------------------------------------
 
-          .logo-fallback {
-            width: 56px;
-            height: 56px;
-            border-radius: 16px;
-            background: #0F172A;
-            color: #fff;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 22px;
-            font-weight: 800;
-            margin-bottom: 12px;
-          }
+      const escapeHtml = (value) =>
+        String(value ?? "")
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/"/g, "&quot;")
+          .replace(/'/g, "&#039;");
 
-          .brand-name {
-            font-size: 17px;
-            font-weight: 800;
-            letter-spacing: -0.2px;
-            color: #0F172A;
-            margin: 0;
-            line-height: 1.3;
-            max-width: 260px;
-          }
+      const safeRestaurantName = escapeHtml(restaurantName);
+      const safeTableNo = escapeHtml(tableNo);
 
-          .brand-tagline {
-            font-size: 10px;
-            font-weight: 600;
-            letter-spacing: 1.5px;
-            text-transform: uppercase;
-            color: #94A3B8;
-            margin: 4px 0 0 0;
-          }
+      // ---------------------------------------------------------
+      // THEME CONFIG — restaurant-grade color palettes + typography.
+      // Each theme now also carries its own font stack (display + body)
+      // and letter-spacing/weight tuned to match the mood — e.g. serif
+      // for Royal/Elegant/Traditional (premium dining), clean grotesk
+      // for Modern/Minimal, warm rounded feel for Cafe.
+      // ---------------------------------------------------------
 
-          .qr-box {
-            background: #ffffff;
-            padding: 18px;
-            border-radius: 20px;
-            display: inline-block;
-            border: 1.5px solid #F1F5F9;
-            margin-bottom: 20px;
-            box-shadow: inset 0 0 0 1px #fff;
-          }
+      const themes = {
+        // =======================================================
+        // CLASSIC — neutral, works for any restaurant type
+        // =======================================================
+        classic: {
+          bodyBackground: "#F1F5F9",
+          cardBackground: "#ffffff",
+          cardBorder: "#E2E8F0",
+          cardRadius: "26px",
+          cardShadow: "0 24px 48px -12px rgba(15,23,42,.16)",
+          primary: "#0F172A",
+          secondary: "#64748B",
+          qrBackground: "#ffffff",
+          qrBorder: "#E2E8F0",
+          footerBackground: "#0F172A",
+          footerColor: "#ffffff",
+          accent: "#0F172A",
+          accentSoft: "#E2E8F0",
+          displayFont: "'Plus Jakarta Sans', sans-serif",
+          bodyFont: "'Plus Jakarta Sans', sans-serif",
+          nameWeight: 800,
+          nameSpacing: "-0.3px",
+        },
 
-          img.qr-image {
-            width: 168px;
-            height: 168px;
-            display: block;
-            border-radius: 6px;
-          }
+        // =======================================================
+        // MINIMAL — quiet, whitespace-forward
+        // =======================================================
+        minimal: {
+          bodyBackground: "#FAFAFA",
+          cardBackground: "#ffffff",
+          cardBorder: "#EBEBEB",
+          cardRadius: "8px",
+          cardShadow: "0 12px 32px -8px rgba(0,0,0,.08)",
+          primary: "#171717",
+          secondary: "#8A8A8A",
+          qrBackground: "#ffffff",
+          qrBorder: "#EBEBEB",
+          footerBackground: "#ffffff",
+          footerColor: "#171717",
+          accent: "#171717",
+          accentSoft: "#EBEBEB",
+          displayFont: "'Plus Jakarta Sans', sans-serif",
+          bodyFont: "'Plus Jakarta Sans', sans-serif",
+          nameWeight: 600,
+          nameSpacing: "0px",
+          footerBordered: true,
+        },
 
-          .scan-subtitle {
-            font-size: 10.5px;
-            font-weight: 700;
-            color: #94A3B8;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            margin: 0 0 6px 0;
-          }
+        // =======================================================
+        // ROYAL — gold on deep maroon, fine-dining feel
+        // =======================================================
+        royal: {
+          bodyBackground: "#1C1006",
+          cardBackground: "#2A1810",
+          cardBorder: "#B8860B",
+          cardRadius: "20px",
+          cardShadow: "0 30px 60px -15px rgba(0,0,0,.5)",
+          primary: "#F5DEB3",
+          secondary: "#D4AF37",
+          qrBackground: "#FFFCF5",
+          qrBorder: "#B8860B",
+          footerBackground: "#B8860B",
+          footerColor: "#1C1006",
+          accent: "#D4AF37",
+          accentSoft: "#8B6914",
+          displayFont: "'Playfair Display', 'Cormorant Garamond', serif",
+          bodyFont: "'Plus Jakarta Sans', sans-serif",
+          nameWeight: 700,
+          nameSpacing: "0.5px",
+          ornate: true,
+        },
 
-          .menu-title {
-            color: #0F172A;
-            margin: 0 0 22px 0;
-            font-size: 25px;
-            font-weight: 800;
-            letter-spacing: -0.5px;
-          }
+        // =======================================================
+        // DARK — modern bistro / lounge
+        // =======================================================
+        dark: {
+          bodyBackground: "#020617",
+          cardBackground: "#0F172A",
+          cardBorder: "#1E293B",
+          cardRadius: "24px",
+          cardShadow: "0 30px 60px -12px rgba(0,0,0,.6)",
+          primary: "#F8FAFC",
+          secondary: "#94A3B8",
+          qrBackground: "#ffffff",
+          qrBorder: "#1E293B",
+          footerBackground: "#F8FAFC",
+          footerColor: "#0F172A",
+          accent: "#38BDF8",
+          accentSoft: "#1E293B",
+          displayFont: "'Plus Jakarta Sans', sans-serif",
+          bodyFont: "'Plus Jakarta Sans', sans-serif",
+          nameWeight: 800,
+          nameSpacing: "-0.3px",
+        },
 
-          .table-footer {
-            background: #0F172A;
-            color: #ffffff;
-            padding: 9px 22px;
-            border-radius: 999px;
-            display: inline-block;
-            font-size: 11px;
-            font-weight: 700;
-            text-transform: uppercase;
-            letter-spacing: 1.5px;
-          }
+        // =======================================================
+        // ELEGANT — soft ivory, fine-dining serif
+        // =======================================================
+        elegant: {
+          bodyBackground: "#F5F0E8",
+          cardBackground: "#FFFDF9",
+          cardBorder: "#C9B79C",
+          cardRadius: "18px",
+          cardShadow: "0 28px 55px -14px rgba(63,48,36,.20)",
+          primary: "#2E2418",
+          secondary: "#8B7355",
+          qrBackground: "#ffffff",
+          qrBorder: "#C9B79C",
+          footerBackground: "#2E2418",
+          footerColor: "#F5F0E8",
+          accent: "#8B7355",
+          accentSoft: "#E4D9C4",
+          displayFont: "'Cormorant Garamond', 'Playfair Display', serif",
+          bodyFont: "'Plus Jakarta Sans', sans-serif",
+          nameWeight: 600,
+          nameSpacing: "0.3px",
+          ornate: true,
+        },
 
-          .powered-by {
-            margin-top: 24px;
-            padding-top: 16px;
-            border-top: 1px dashed #E2E8F0;
-            font-size: 9.5px;
-            font-weight: 600;
-            color: #CBD5E1;
-            letter-spacing: 0.5px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 5px;
-          }
+        // =======================================================
+        // MODERN — teal, clean grid, health/fusion cafes
+        // =======================================================
+        modern: {
+          bodyBackground: "#F0FDFA",
+          cardBackground: "#ffffff",
+          cardBorder: "#CCFBF1",
+          cardRadius: "16px",
+          cardShadow: "0 20px 45px -12px rgba(13,148,136,.18)",
+          primary: "#134E4A",
+          secondary: "#0D9488",
+          qrBackground: "#ffffff",
+          qrBorder: "#CCFBF1",
+          footerBackground: "#0D9488",
+          footerColor: "#ffffff",
+          accent: "#14B8A6",
+          accentSoft: "#CCFBF1",
+          displayFont: "'Plus Jakarta Sans', sans-serif",
+          bodyFont: "'Plus Jakarta Sans', sans-serif",
+          nameWeight: 800,
+          nameSpacing: "-0.4px",
+        },
 
-          .powered-by .brand-tag {
-            font-weight: 800;
-            color: #64748B;
-            letter-spacing: 0.2px;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="standee-card">
-          <div class="brand-container">
-            ${
-              restaurantLogo
-                ? `<img id="print-logo" src="${restaurantLogo}" class="logo-img" />`
-                : `<div class="logo-fallback">${restaurantName.charAt(0).toUpperCase()}</div>`
-            }
-            <h2 class="brand-name">${restaurantName}</h2>
-            <p class="brand-tagline">Digital Menu</p>
-          </div>
+        // =======================================================
+        // CAFE — warm terracotta, cozy roastery feel
+        // =======================================================
+        cafe: {
+          bodyBackground: "#FBF3EC",
+          cardBackground: "#FFFAF5",
+          cardBorder: "#E7C7A3",
+          cardRadius: "22px",
+          cardShadow: "0 24px 48px -12px rgba(124,58,21,.18)",
+          primary: "#5C3A21",
+          secondary: "#A9702E",
+          qrBackground: "#ffffff",
+          qrBorder: "#E7C7A3",
+          footerBackground: "#5C3A21",
+          footerColor: "#FFF7EE",
+          accent: "#C2703D",
+          accentSoft: "#E7C7A3",
+          displayFont: "'Fraunces', 'Playfair Display', serif",
+          bodyFont: "'Plus Jakarta Sans', sans-serif",
+          nameWeight: 600,
+          nameSpacing: "0.2px",
+        },
 
-          <div class="qr-box">
-            <img src="${dataUrl}" class="qr-image" />
-          </div>
+        // =======================================================
+        // TRADITIONAL — deep maroon + gold, classic Indian dining
+        // =======================================================
+        traditional: {
+          bodyBackground: "#3D0C0C",
+          cardBackground: "#4A1414",
+          cardBorder: "#D4A017",
+          cardRadius: "16px",
+          cardShadow: "0 28px 55px -14px rgba(0,0,0,.45)",
+          primary: "#FDF2E9",
+          secondary: "#E8C468",
+          qrBackground: "#FFFBF2",
+          qrBorder: "#D4A017",
+          footerBackground: "#D4A017",
+          footerColor: "#3D0C0C",
+          accent: "#D4A017",
+          accentSoft: "#7A2727",
+          displayFont: "'Cormorant Garamond', 'Playfair Display', serif",
+          bodyFont: "'Plus Jakarta Sans', sans-serif",
+          nameWeight: 700,
+          nameSpacing: "0.4px",
+          ornate: true,
+        },
+      };
 
-          <div class="scan-subtitle">Scan to view menu</div>
-          <h1 class="menu-title">Order Here</h1>
+      const config = themes[selectedStandeeTheme] || themes.classic;
 
-          <div class="table-footer">Table ${tableNo}</div>
+      // ---------------------------------------------------------
+      // LOGO
+      // ---------------------------------------------------------
 
-          <div class="powered-by">
-            <span>Powered by</span>
-            <span class="brand-tag">ChotuGTT</span>
-          </div>
+      const logoHtml = restaurantLogo
+        ? `
+        <img
+          id="print-logo"
+          src="${restaurantLogo}"
+          class="logo-img"
+          alt="Restaurant Logo"
+        />
+      `
+        : `
+        <div class="logo-fallback">
+          ${safeRestaurantName.charAt(0).toUpperCase()}
         </div>
-        <script>
-          const logo = document.getElementById('print-logo');
-          function triggerPrint() {
-            window.focus();
-            window.print();
-            window.close();
-          }
-          if (logo) {
-            if (logo.complete) {
-              triggerPrint();
-            } else {
-              logo.onload = triggerPrint;
-              logo.onerror = triggerPrint;
-            }
-          } else {
-            triggerPrint();
-          }
-        </script>
-      </body>
-    </html>`;
+      `;
 
-    const printWindow = window.open("", "_blank");
-    if (!printWindow) return;
-    printWindow.document.open();
-    printWindow.document.write(windowContent);
-    printWindow.document.close();
-  },
-  [storeDetails, apiBase],
-);
+      // ---------------------------------------------------------
+      // ORNAMENTAL DIVIDER — only for premium/serif themes
+      // ---------------------------------------------------------
+
+      const ornamentHtml = config.ornate
+        ? `<div class="ornament"><span></span><svg width="14" height="14" viewBox="0 0 24 24" fill="${config.accent}"><path d="M12 2l2.5 7.5H22l-6 4.5 2.5 7.5L12 17l-6.5 4.5L8 14 2 9.5h7.5z"/></svg><span></span></div>`
+        : "";
+
+      // ---------------------------------------------------------
+      // PRINT HTML
+      // ---------------------------------------------------------
+
+      const windowContent = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+
+          <title>
+            Table ${safeTableNo} - ${safeRestaurantName} Standee
+          </title>
+
+          <style>
+
+            @import url(
+              'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800;900&family=Playfair+Display:wght@600;700;800&family=Cormorant+Garamond:wght@600;700&family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&display=swap'
+            );
+
+            * {
+              box-sizing: border-box;
+            }
+
+            @page {
+              size: auto;
+              margin: 0;
+            }
+
+            html,
+            body {
+              width: 100%;
+              height: 100%;
+              margin: 0;
+              padding: 0;
+            }
+
+            body {
+              font-family: ${config.bodyFont};
+
+              display: flex;
+              align-items: center;
+              justify-content: center;
+
+              min-height: 100vh;
+
+              background: ${config.bodyBackground};
+
+              -webkit-print-color-adjust: exact;
+              print-color-adjust: exact;
+            }
+
+            .standee-card {
+              width: 340px;
+
+              background: ${config.cardBackground};
+
+              border: 1.5px solid ${config.cardBorder};
+
+              border-radius: ${config.cardRadius};
+
+              padding: 36px 30px 28px;
+
+              text-align: center;
+
+              box-shadow: ${config.cardShadow};
+
+              position: relative;
+
+              overflow: hidden;
+            }
+
+            .top-accent {
+              position: absolute;
+
+              top: 0;
+              left: 0;
+              right: 0;
+
+              height: 4px;
+
+              background: ${config.accent};
+            }
+
+            .brand-container {
+              display: flex;
+              flex-direction: column;
+              align-items: center;
+
+              margin-bottom: 20px;
+            }
+
+            .logo-img,
+            .logo-fallback {
+              width: 60px;
+              height: 60px;
+
+              margin-bottom: 14px;
+
+              border-radius: 16px;
+
+              object-fit: cover;
+            }
+
+            .logo-img {
+              border: 1px solid ${config.cardBorder};
+              background: #ffffff;
+            }
+
+            .logo-fallback {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+
+              background: ${config.accent};
+
+              color: ${config.footerColor === config.primary ? "#ffffff" : config.cardBackground};
+
+              font-family: ${config.displayFont};
+              font-size: 24px;
+              font-weight: 700;
+            }
+
+            .brand-name {
+              margin: 0;
+
+              max-width: 270px;
+
+              color: ${config.primary};
+
+              font-family: ${config.displayFont};
+
+              font-size: 20px;
+
+              line-height: 1.3;
+
+              font-weight: ${config.nameWeight};
+
+              letter-spacing: ${config.nameSpacing};
+            }
+
+            .brand-tagline {
+              margin: 6px 0 0;
+
+              color: ${config.secondary};
+
+              font-family: ${config.bodyFont};
+
+              font-size: 9px;
+
+              font-weight: 700;
+
+              text-transform: uppercase;
+
+              letter-spacing: 2.5px;
+            }
+
+            .ornament {
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              gap: 8px;
+
+              margin: 14px 0 18px;
+            }
+
+            .ornament span {
+              width: 28px;
+              height: 1px;
+              background: ${config.accentSoft};
+            }
+
+            .qr-box {
+              display: inline-block;
+
+              padding: 16px;
+
+              margin-bottom: 18px;
+
+              background: ${config.qrBackground};
+
+              border: 1.5px solid ${config.qrBorder};
+
+              border-radius: 16px;
+
+              box-shadow:
+                0 8px 24px rgba(0, 0, 0, 0.08);
+            }
+
+            .qr-image {
+              display: block;
+
+              width: 166px;
+              height: 166px;
+
+              border-radius: 4px;
+            }
+
+            .scan-subtitle {
+              margin: 0 0 6px;
+
+              color: ${config.secondary};
+
+              font-family: ${config.bodyFont};
+
+              font-size: 10px;
+
+              font-weight: 700;
+
+              text-transform: uppercase;
+
+              letter-spacing: 2.5px;
+            }
+
+            .menu-title {
+              margin: 0 0 20px;
+
+              color: ${config.primary};
+
+              font-family: ${config.displayFont};
+
+              font-size: 25px;
+
+              line-height: 1.2;
+
+              font-weight: ${config.nameWeight >= 700 ? 800 : 700};
+
+              letter-spacing: -0.4px;
+            }
+
+            .table-footer {
+              display: inline-block;
+
+              padding: 10px 24px;
+
+              background: ${config.footerBackground};
+
+              color: ${config.footerColor};
+
+              border: ${config.footerBordered ? `1px solid ${config.cardBorder}` : "none"};
+
+              border-radius: 999px;
+
+              font-family: ${config.bodyFont};
+
+              font-size: 11px;
+
+              font-weight: 800;
+
+              text-transform: uppercase;
+
+              letter-spacing: 1.8px;
+            }
+
+            .powered-by {
+              display: flex;
+
+              align-items: center;
+              justify-content: center;
+
+              gap: 5px;
+
+              margin-top: 22px;
+
+              padding-top: 14px;
+
+              border-top: 1px dashed ${config.accentSoft};
+
+              color: ${config.secondary};
+
+              font-family: ${config.bodyFont};
+
+              font-size: 9px;
+
+              font-weight: 600;
+            }
+
+            .powered-brand {
+              font-weight: 900;
+
+              color: ${config.primary};
+            }
+
+            @media print {
+              body {
+                min-height: 100vh;
+              }
+
+              .standee-card {
+                box-shadow: none;
+              }
+            }
+
+          </style>
+        </head>
+
+        <body>
+
+          <div class="standee-card">
+
+            <div class="top-accent"></div>
+
+            <div class="brand-container">
+
+              ${logoHtml}
+
+              <h2 class="brand-name">
+                ${safeRestaurantName}
+              </h2>
+
+              <p class="brand-tagline">
+                Digital Menu
+              </p>
+
+            </div>
+
+            ${ornamentHtml}
+
+            <div class="qr-box">
+
+              <img
+                src="${dataUrl}"
+                class="qr-image"
+                alt="Table QR Code"
+              />
+
+            </div>
+
+            <div class="scan-subtitle">
+              Scan to view menu
+            </div>
+
+            <h1 class="menu-title">
+              Order Here
+            </h1>
+
+            <div class="table-footer">
+              Table ${safeTableNo}
+            </div>
+
+            <div class="powered-by">
+
+              <span>
+                Powered by
+              </span>
+
+              <span class="powered-brand">
+                ChotuGTT
+              </span>
+
+            </div>
+
+          </div>
+
+          <script>
+
+            const logo =
+              document.getElementById("print-logo");
+
+            function triggerPrint() {
+              window.focus();
+
+              setTimeout(() => {
+                window.print();
+
+                setTimeout(() => {
+                  window.close();
+                }, 300);
+              }, 100);
+            }
+
+            if (logo) {
+
+              if (logo.complete) {
+                triggerPrint();
+              } else {
+
+                logo.onload = triggerPrint;
+
+                logo.onerror = triggerPrint;
+
+              }
+
+            } else {
+
+              triggerPrint();
+
+            }
+
+          </script>
+
+        </body>
+      </html>
+    `;
+
+      const printWindow = window.open("", "_blank", "width=500,height=700");
+
+      if (!printWindow) {
+        alert("Popup blocked. Please allow popups for this site.");
+        return;
+      }
+
+      printWindow.document.open();
+
+      printWindow.document.write(windowContent);
+
+      printWindow.document.close();
+    },
+    [storeDetails, apiBase, selectedStandeeTheme],
+  );
 
   // 🔑 Add Table modal open — defaults reset
   const openAddTableModal = useCallback(() => {
@@ -963,19 +1504,47 @@ export default function TableMonitor() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
+            {/* QR STANDEE THEME */}
+            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2.5">
+              <QrCode size={15} className="text-slate-500 shrink-0" />
+
+              <div className="flex flex-col">
+                <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">
+                  Standee Theme
+                </span>
+
+                <select
+                  value={selectedStandeeTheme}
+                  onChange={(e) => handleStandeeThemeChange(e.target.value)}
+                  className="bg-transparent text-xs font-black text-slate-800 outline-none cursor-pointer min-w-[130px]"
+                >
+                  {QR_STANDEE_THEMES.map((theme) => (
+                    <option key={theme.id} value={theme.id}>
+                      {theme.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* ADD SECTION */}
             <button
               onClick={() => setShowAddSection(true)}
               className="flex-1 sm:flex-none bg-white border border-slate-200 text-slate-700 px-4 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-slate-50 transition-all cursor-pointer"
             >
-              <FolderPlus size={16} /> Add Section
+              <FolderPlus size={16} />
+              Add Section
             </button>
+
+            {/* ADD TABLE */}
             <button
               onClick={openAddTableModal}
               disabled={!activeRestaurantId}
               className="flex-1 sm:flex-none bg-gradient-to-r from-red-500 to-rose-600 text-white px-5 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 hover:opacity-95 shadow-sm shadow-red-500/20 transition-all cursor-pointer disabled:opacity-50"
             >
-              <Plus size={16} /> Add Table
+              <Plus size={16} />
+              Add Table
             </button>
           </div>
         </div>

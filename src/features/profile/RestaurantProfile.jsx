@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
+import { useAuth } from "../../context/AuthContext";
 import {
   Store,
   Save,
@@ -21,9 +22,16 @@ import {
   QrCode,
 } from "lucide-react";
 import Input from "../../components/ui/Input";
-
+import {
+  BILL_TEMPLATES,
+  getSelectedBillTemplate,
+  isProBillTemplate,
+  saveSelectedBillTemplate,
+} from "../../constants/billTemplates";
+import BillTemplatePaymentModal from "../../components/BillTemplatePaymentModal";
 export default function RestaurantProfile() {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
 
   // Form States
   const [name, setName] = useState("");
@@ -63,6 +71,37 @@ export default function RestaurantProfile() {
 
   const [upiOtpInfo, setUpiOtpInfo] = useState("");
 
+  const restaurantId =
+    typeof user?.restaurantId === "object"
+      ? user.restaurantId?._id
+      : user?.restaurantId || user?._id;
+  const [selectedBillTemplate, setSelectedBillTemplate] = useState(() =>
+    getSelectedBillTemplate(restaurantId),
+  );
+  const [paymentTemplate, setPaymentTemplate] = useState(null);
+  const handleBillTemplateChange = async (template) => {
+    if (isProBillTemplate(template.id)) {
+      setPaymentTemplate(template);
+      return;
+    }
+    setSelectedBillTemplate(template.id);
+    saveSelectedBillTemplate(restaurantId, template.id);
+    try {
+      await axios.patch(
+        `${import.meta.env.VITE_APP_API_BASE}/restaurant/profile`,
+        { billTemplate: template.id },
+        { withCredentials: true },
+      );
+    } catch (error) {
+      console.warn("Could not save bill template:", error?.message);
+    }
+  };
+
+  const handleTemplatePaymentSuccess = (template) => {
+    setSelectedBillTemplate(template.id);
+    saveSelectedBillTemplate(restaurantId, template.id);
+    setPaymentTemplate(null);
+  };
   // Staff Management Local States
   //   const [staffList, setStaffList] = useState([]);
   //   const [newStaffName, setNewStaffName] = useState("");
@@ -82,6 +121,10 @@ export default function RestaurantProfile() {
         `${import.meta.env.VITE_APP_API_BASE}/restaurant/profile`,
         { withCredentials: true },
       );
+      if (res.data.data.billTemplate) {
+        setSelectedBillTemplate(res.data.data.billTemplate);
+        saveSelectedBillTemplate(restaurantId, res.data.data.billTemplate);
+      }
       return res.data.data;
     },
     staleTime: 60_000,
@@ -1051,6 +1094,73 @@ export default function RestaurantProfile() {
               />
             </div>
           </div>
+
+          <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
+            <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-500">
+                  Billing
+                </p>
+                <h2 className="mt-1 text-xl font-black text-slate-900">
+                  Bill template
+                </h2>
+                <p className="mt-1 text-sm font-medium text-slate-500">
+                  Select the design used when bills are generated and printed.
+                </p>
+              </div>
+              <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-600">
+                {
+                  BILL_TEMPLATES.find(
+                    (template) => template.id === selectedBillTemplate,
+                  )?.name
+                }
+              </span>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              {BILL_TEMPLATES.map((template) => {
+                const isSelected = selectedBillTemplate === template.id;
+                return (
+                  <button
+                    key={template.id}
+                    type="button"
+                    onClick={() => handleBillTemplateChange(template)}
+                    className={`rounded-2xl border p-4 text-left transition ${
+                      isSelected
+                        ? "border-rose-500 bg-rose-50 ring-2 ring-rose-100"
+                        : "border-slate-200 bg-slate-50/60 hover:border-slate-300"
+                    } cursor-pointer`}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="font-black text-slate-900">
+                        {template.name}
+                      </span>
+                      <span
+                        className={`rounded-full px-2 py-1 text-[9px] font-black ${template.tier === "PRO" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}
+                      >
+                        {template.tier}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-xs font-medium leading-5 text-slate-500">
+                      {template.description}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+            {/* {!canUseProTemplates && (
+              <p className="mt-4 text-xs font-semibold text-amber-700">
+                Upgrade to Pro to unlock premium bill designs.
+              </p>
+            )} */}
+          </section>
+
+          {paymentTemplate && (
+            <BillTemplatePaymentModal
+              template={paymentTemplate}
+              onClose={() => setPaymentTemplate(null)}
+              onSuccess={handleTemplatePaymentSuccess}
+            />
+          )}
 
           {/* Sticky Action Footer Bar */}
           <div className="bg-white/80 backdrop-blur-md p-4 rounded-3xl border border-slate-200/80 shadow-lg flex items-center justify-between gap-4">
