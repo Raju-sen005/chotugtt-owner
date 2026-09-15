@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components */
+
 import {
   createContext,
   useContext,
@@ -22,17 +24,6 @@ const SOCKET_URL = import.meta.env.VITE_APP_API_BASE;
  * --------------------------------------------------
  */
 
-/*
- * Same order can arrive through:
- *
- * NEW_ORDER_RECEIVED
- * +
- * PLAY_NOTIFICATION_SOUND
- *
- * within a very short time.
- *
- * We keep a small deduplication window.
- */
 const SOUND_DEDUP_WINDOW_MS = 1500;
 
 /*
@@ -40,6 +31,7 @@ const SOUND_DEDUP_WINDOW_MS = 1500;
  * RESTAURANT ID
  * --------------------------------------------------
  */
+
 const getRestaurantId = (user) => {
   if (!user?.restaurantId) {
     return null;
@@ -54,6 +46,48 @@ const getRestaurantId = (user) => {
   return String(user.restaurantId);
 };
 
+/*
+ * --------------------------------------------------
+ * EVENT TENANT VALIDATION
+ * --------------------------------------------------
+ */
+
+const getEventRestaurantId = (payload) => {
+  if (!payload?.restaurantId) {
+    return null;
+  }
+
+  if (typeof payload.restaurantId === "object") {
+    return payload.restaurantId?._id
+      ? String(payload.restaurantId._id)
+      : null;
+  }
+
+  return String(payload.restaurantId);
+};
+
+const isTenantEvent = (payload, restaurantId) => {
+  const eventRestaurantId = getEventRestaurantId(payload);
+
+  /*
+   * If backend does not include restaurantId in payload,
+   * trust the Socket.IO server-side tenant room.
+   *
+   * If it does include restaurantId, validate it.
+   */
+  if (!eventRestaurantId) {
+    return true;
+  }
+
+  return String(eventRestaurantId) === String(restaurantId);
+};
+
+/*
+ * --------------------------------------------------
+ * PROVIDER
+ * --------------------------------------------------
+ */
+
 export const SocketProvider = ({ children }) => {
   const { user } = useAuth();
 
@@ -62,42 +96,34 @@ export const SocketProvider = ({ children }) => {
   const socketRef = useRef(null);
 
   /*
-   * --------------------------------------------------
-   * SOUND DEDUPLICATION
-   * --------------------------------------------------
-   *
    * Stores recently played order IDs.
    *
-   * Example:
+   * Prevents:
    *
    * NEW_ORDER_RECEIVED
-   *       ↓
-   * play sound
-   *
+   * +
    * PLAY_NOTIFICATION_SOUND
-   *       ↓
-   * same order
-   *       ↓
-   * skip duplicate
+   *
+   * from playing two sounds.
    */
   const recentSoundEventsRef = useRef(new Map());
 
   const restaurantId = getRestaurantId(user);
 
   /*
-   * Existing hook API remains unchanged.
+   * Existing notification sound hook.
+   *
+   * API remains unchanged.
    */
   const playAlert = useNotificationSound();
 
   /*
    * --------------------------------------------------
-   * SOUND TRIGGER HELPER
+   * SOUND TRIGGER
    * --------------------------------------------------
    */
+
   const triggerNotificationSound = (payload, source) => {
-    /*
-     * Try to identify the order.
-     */
     const orderId =
       payload?.orderId ??
       payload?._id ??
@@ -105,10 +131,8 @@ export const SocketProvider = ({ children }) => {
       null;
 
     /*
-     * If order ID is unavailable,
-     * preserve existing behavior.
-     *
-     * We cannot safely deduplicate an unknown event.
+     * Preserve existing behavior when order ID
+     * is not available.
      */
     if (!orderId) {
       console.log(
@@ -116,7 +140,6 @@ export const SocketProvider = ({ children }) => {
       );
 
       playAlert();
-
       return;
     }
 
@@ -125,7 +148,7 @@ export const SocketProvider = ({ children }) => {
     const now = Date.now();
 
     /*
-     * Remove old entries.
+     * Remove expired entries.
      */
     for (const [
       cachedOrderId,
@@ -182,12 +205,14 @@ export const SocketProvider = ({ children }) => {
    * SOCKET EFFECT
    * --------------------------------------------------
    */
+
   useEffect(() => {
     /*
      * -----------------------------------------------
      * AUTH CHECK
      * -----------------------------------------------
      */
+
     if (!user || !restaurantId) {
       if (socketRef.current) {
         console.log(
@@ -201,10 +226,6 @@ export const SocketProvider = ({ children }) => {
         socketRef.current = null;
       }
 
-      /*
-       * Clear old sound deduplication state
-       * when tenant changes/logs out.
-       */
       recentSoundEventsRef.current.clear();
 
       setSocket(null);
@@ -217,6 +238,7 @@ export const SocketProvider = ({ children }) => {
      * PREVENT DUPLICATE SOCKET
      * -----------------------------------------------
      */
+
     if (socketRef.current) {
       console.log(
         "♻️ Existing socket already present"
@@ -235,6 +257,7 @@ export const SocketProvider = ({ children }) => {
      * SOCKET INSTANCE
      * -----------------------------------------------
      */
+
     const socketInstance = io(SOCKET_URL, {
       /*
        * JWT authentication is handled through
@@ -243,11 +266,12 @@ export const SocketProvider = ({ children }) => {
       withCredentials: true,
 
       /*
-       * WebSocket + polling fallback.
+       * WebSocket first is generally preferable,
+       * polling remains the fallback.
        */
       transports: [
-        "polling",
         "websocket",
+        "polling",
       ],
 
       upgrade: true,
@@ -276,6 +300,7 @@ export const SocketProvider = ({ children }) => {
      * CONNECT
      * -----------------------------------------------
      */
+
     const handleConnect = () => {
       console.log(
         "🟢 Socket connected:",
@@ -292,7 +317,7 @@ export const SocketProvider = ({ children }) => {
        *
        * restaurantId is NOT sent to backend.
        *
-       * Backend derives restaurantId from JWT.
+       * Backend derives tenant from JWT.
        */
     };
 
@@ -300,7 +325,11 @@ export const SocketProvider = ({ children }) => {
      * -----------------------------------------------
      * NEW ORDER
      * -----------------------------------------------
+     *
+     * This event is used for the GLOBAL blocking
+     * order alert.
      */
+
     const handleNewOrder = (order) => {
       console.log(
         "🔔 NEW_ORDER_RECEIVED:",
@@ -308,24 +337,17 @@ export const SocketProvider = ({ children }) => {
       );
 
       /*
-       * -------------------------------------------
-       * TENANT DEFENSE
-       * -------------------------------------------
+       * Defense in depth.
+       *
+       * Socket server already isolates the tenant.
+       * If payload contains restaurantId, validate it.
        */
-      const eventRestaurantId =
-        typeof order?.restaurantId ===
-        "object"
-          ? order.restaurantId?._id
-          : order?.restaurantId;
 
-      /*
-       * If event explicitly contains another
-       * restaurant ID, ignore it.
-       */
       if (
-        eventRestaurantId &&
-        String(eventRestaurantId) !==
-          String(restaurantId)
+        !isTenantEvent(
+          order,
+          restaurantId
+        )
       ) {
         console.warn(
           "🚫 Ignoring cross-tenant order event"
@@ -335,9 +357,7 @@ export const SocketProvider = ({ children }) => {
       }
 
       /*
-       * -------------------------------------------
-       * NOTIFICATION SOUND
-       * -------------------------------------------
+       * Existing notification sound.
        */
       triggerNotificationSound(
         order,
@@ -347,14 +367,63 @@ export const SocketProvider = ({ children }) => {
 
     /*
      * -----------------------------------------------
+     * RUNNING ORDER UPDATED
+     * -----------------------------------------------
+     *
+     * This event is ONLY for the case where new
+     * items are appended to an already-running order.
+     *
+     * IMPORTANT:
+     *
+     * We do NOT use ORDER_STATUS_UPDATED for this,
+     * because ORDER_STATUS_UPDATED is also used for
+     * accept/reject/cancel/etc.
+     */
+
+    const handleRunningOrderUpdated = (
+      payload
+    ) => {
+      console.log(
+        "🔔 RUNNING_ORDER_UPDATED:",
+        payload
+      );
+
+      const order =
+        payload?.order ?? payload;
+
+      if (
+        !isTenantEvent(
+          order,
+          restaurantId
+        )
+      ) {
+        console.warn(
+          "🚫 Ignoring cross-tenant running-order event"
+        );
+
+        return;
+      }
+
+      /*
+       * Sound.
+       *
+       * If backend also emits PLAY_NOTIFICATION_SOUND,
+       * deduplication prevents double playback.
+       */
+      triggerNotificationSound(
+        order,
+        "RUNNING_ORDER_UPDATED"
+      );
+    };
+
+    /*
+     * -----------------------------------------------
      * PLAY NOTIFICATION SOUND
      * -----------------------------------------------
      *
      * Existing event preserved.
-     *
-     * It will now be deduplicated if the same order
-     * already triggered NEW_ORDER_RECEIVED.
      */
+
     const handleNotificationSound = (
       payload
     ) => {
@@ -363,20 +432,11 @@ export const SocketProvider = ({ children }) => {
         payload
       );
 
-      /*
-       * If payload contains restaurantId,
-       * perform the same defense-in-depth check.
-       */
-      const eventRestaurantId =
-        typeof payload?.restaurantId ===
-        "object"
-          ? payload.restaurantId?._id
-          : payload?.restaurantId;
-
       if (
-        eventRestaurantId &&
-        String(eventRestaurantId) !==
-          String(restaurantId)
+        !isTenantEvent(
+          payload,
+          restaurantId
+        )
       ) {
         console.warn(
           "🚫 Ignoring cross-tenant notification sound"
@@ -396,6 +456,7 @@ export const SocketProvider = ({ children }) => {
      * DISCONNECT
      * -----------------------------------------------
      */
+
     const handleDisconnect = (
       reason
     ) => {
@@ -410,6 +471,7 @@ export const SocketProvider = ({ children }) => {
      * CONNECTION ERROR
      * -----------------------------------------------
      */
+
     const handleConnectError = (
       error
     ) => {
@@ -424,6 +486,7 @@ export const SocketProvider = ({ children }) => {
      * RECONNECT ATTEMPT
      * -----------------------------------------------
      */
+
     const handleReconnectAttempt = (
       attempt
     ) => {
@@ -437,6 +500,7 @@ export const SocketProvider = ({ children }) => {
      * RECONNECTED
      * -----------------------------------------------
      */
+
     const handleReconnect = (
       attempt
     ) => {
@@ -461,9 +525,11 @@ export const SocketProvider = ({ children }) => {
       handleNewOrder
     );
 
-    /*
-     * Existing functionality preserved.
-     */
+    socketInstance.on(
+      "RUNNING_ORDER_UPDATED",
+      handleRunningOrderUpdated
+    );
+
     socketInstance.on(
       "PLAY_NOTIFICATION_SOUND",
       handleNotificationSound
@@ -482,6 +548,7 @@ export const SocketProvider = ({ children }) => {
     /*
      * Socket.IO Manager events.
      */
+
     socketInstance.io.on(
       "reconnect_attempt",
       handleReconnectAttempt
@@ -497,6 +564,7 @@ export const SocketProvider = ({ children }) => {
      * CLEANUP
      * -----------------------------------------------
      */
+
     return () => {
       console.log(
         "🧹 Cleaning tenant socket:",
@@ -511,6 +579,11 @@ export const SocketProvider = ({ children }) => {
       socketInstance.off(
         "NEW_ORDER_RECEIVED",
         handleNewOrder
+      );
+
+      socketInstance.off(
+        "RUNNING_ORDER_UPDATED",
+        handleRunningOrderUpdated
       );
 
       socketInstance.off(
@@ -559,7 +632,13 @@ export const SocketProvider = ({ children }) => {
    * --------------------------------------------------
    * CONTEXT VALUE
    * --------------------------------------------------
+   *
+   * IMPORTANT:
+   *
+   * useSocket() continues returning the socket
+   * instance exactly like before.
    */
+
   const value = useMemo(
     () => socket,
     [socket]
@@ -577,5 +656,6 @@ export const SocketProvider = ({ children }) => {
  * SOCKET HOOK
  * --------------------------------------------------
  */
+
 export const useSocket = () =>
   useContext(SocketContext);
