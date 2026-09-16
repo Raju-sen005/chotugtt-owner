@@ -68,7 +68,9 @@ const OrderRow = memo(function OrderRow({
                   item?._id
                     ? String(item._id)
                     : `${order?._id || order?.orderId || "order"}:item:${index}`
-                } className="flex items-center gap-1.5 group">
+                }
+                className="flex items-center gap-1.5 group"
+              >
                 <span
                   className={`truncate ${
                     item.status === "REJECTED"
@@ -432,6 +434,7 @@ export default function LiveOrderMonitor() {
     gstin: "",
     upiId: "",
     upiQrCode: "",
+    googleReviewQrCode: "",
   });
 
   const printKOT = useCallback(
@@ -1258,6 +1261,7 @@ export default function LiveOrderMonitor() {
             gstin: d.gstin || d.gstNumber || "",
             upiId: d.upiId || "",
             upiQrCode: d.upiQrCode || d.qrCodeUrl || "",
+            googleReviewQrCode: d.googleReviewQrCode || "",
           });
           if (d.billTemplate) setSelectedBillTemplate(d.billTemplate);
         }
@@ -1372,9 +1376,7 @@ export default function LiveOrderMonitor() {
         }
 
         return old.map((o) =>
-          String(o?._id) === String(updatedOrder?._id)
-            ? updatedOrder
-            : o,
+          String(o?._id) === String(updatedOrder?._id) ? updatedOrder : o,
         );
       });
 
@@ -1527,9 +1529,7 @@ export default function LiveOrderMonitor() {
       setCancelItemData(null);
 
       showError(
-        err.response?.data?.message ||
-          err.message ||
-          "Failed to cancel item",
+        err.response?.data?.message || err.message || "Failed to cancel item",
       );
     }
   }, [
@@ -1606,14 +1606,7 @@ export default function LiveOrderMonitor() {
         console.error("Error transitioning state context pipeline:", err);
       }
     },
-    [
-      queryClient,
-      apiBase,
-      restaurantId,
-      showSuccess,
-      showError,
-      printKOT,
-    ],
+    [queryClient, apiBase, restaurantId, showSuccess, showError, printKOT],
   );
 
   // 🧾 Opens a thermal-receipt-style print window for a completed order
@@ -1649,30 +1642,58 @@ export default function LiveOrderMonitor() {
         user?.name || user?.username || user?.email || "Staff";
 
       // 🔑 image ko absolute URL (relative path ho to base attach karo)
-      const upiQrUrl = await (async () => {
-        if (!storeDetails.upiId || Number(grandTotal) <= 0) {
-          return "";
+      // =========================================================
+      // BILL QR LOGIC
+      // =========================================================
+      // UPI      -> UPI QR
+      // CASH     -> Google Review QR
+      // DUE      -> Google Review QR
+      // SPLIT    -> based on splitPaymentMethod
+      // =========================================================
+
+      const effectivePaymentMethod =
+        order.paymentMethod === "SPLIT"
+          ? order.splitPaymentMethod
+          : order.paymentMethod;
+
+      let billQrUrl = "";
+      let billQrType = "";
+
+      if (effectivePaymentMethod === "UPI") {
+        // Prefer restaurant's uploaded/static UPI QR.
+        // Fallback to dynamically generated amount-based QR.
+        if (storeDetails.upiQrCode) {
+          billQrUrl = storeDetails.upiQrCode;
+          billQrType = "UPI";
+        } else if (storeDetails.upiId && Number(grandTotal) > 0) {
+          const amount = Number(grandTotal).toFixed(2);
+
+          const upiString =
+            `upi://pay?pa=${encodeURIComponent(storeDetails.upiId)}` +
+            `&pn=${encodeURIComponent(storeDetails.name || "Restaurant")}` +
+            `&am=${amount}` +
+            `&cu=INR`;
+
+          try {
+            billQrUrl = await QRCode.toDataURL(upiString, {
+              errorCorrectionLevel: "H",
+              margin: 2,
+              width: 300,
+            });
+
+            billQrType = "UPI";
+          } catch (error) {
+            console.error("Failed to generate bill UPI QR:", error);
+          }
         }
-
-        const amount = Number(grandTotal).toFixed(2);
-
-        const upiString =
-          `upi://pay?pa=${encodeURIComponent(storeDetails.upiId)}` +
-          `&pn=${encodeURIComponent(storeDetails.name || "Restaurant")}` +
-          `&am=${amount}` +
-          `&cu=INR`;
-
-        try {
-          return await QRCode.toDataURL(upiString, {
-            errorCorrectionLevel: "H",
-            margin: 2,
-            width: 300,
-          });
-        } catch (error) {
-          console.error("Failed to generate bill UPI QR:", error);
-          return "";
+      } else {
+        // Any non-UPI payment method:
+        // CASH / DUE / SPLIT-CASH etc.
+        if (storeDetails.googleReviewQrCode) {
+          billQrUrl = storeDetails.googleReviewQrCode;
+          billQrType = "GOOGLE_REVIEW";
         }
-      })();
+      }
 
       const itemRows = items
         .map(
@@ -2027,16 +2048,38 @@ ${
       </div>
     `
         }
+       ${
+         billQrUrl
+           ? `<div class="upi-block">
+        <div class="divider"></div>
+
+        <p class="scan-label">
+          ${billQrType === "UPI" ? "Scan &amp; Pay" : "Scan &amp; Review Us"}
+        </p>
+
+        <img
+          src="${escapeHtml(billQrUrl)}"
+          alt="${billQrType === "UPI" ? "UPI QR" : "Google Review QR"}"
+        />
+
         ${
-          upiQrUrl
-            ? `<div class="upi-block">
-                <div class="divider"></div>
-                <p class="scan-label">Scan &amp; Pay</p>
-                <img src="${escapeHtml(upiQrUrl)}" alt="UPI QR" />
-                ${storeDetails.upiId ? `<p class="upi-id">${escapeHtml(storeDetails.upiId)}</p>` : ""}
-              </div>`
+          billQrType === "UPI" && storeDetails.upiId
+            ? `<p class="upi-id">
+                 ${escapeHtml(storeDetails.upiId)}
+               </p>`
             : ""
         }
+
+        ${
+          billQrType === "GOOGLE_REVIEW"
+            ? `<p class="upi-id">
+                 We'd love your feedback ❤️
+               </p>`
+            : ""
+        }
+      </div>`
+           : ""
+       }
 
         <div class="footer-line">Thank you for visiting!<br/>Visit again 🙏</div>
 

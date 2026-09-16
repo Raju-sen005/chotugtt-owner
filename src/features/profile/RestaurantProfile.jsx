@@ -51,7 +51,8 @@ export default function RestaurantProfile() {
   // Logo Upload State
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState("");
-
+  const [googleReviewQrFile, setGoogleReviewQrFile] = useState(null);
+  const [googleReviewQrPreview, setGoogleReviewQrPreview] = useState("");
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [showUpiOtpModal, setShowUpiOtpModal] = useState(false);
 
@@ -214,6 +215,11 @@ export default function RestaurantProfile() {
       setLogoPreview((prev) =>
         prev !== (restaurant.logo || "") ? restaurant.logo || "" : prev,
       );
+      setGoogleReviewQrPreview((prev) =>
+        prev !== (restaurant.googleReviewQrCode || "")
+          ? restaurant.googleReviewQrCode || ""
+          : prev,
+      );
     }
     // if (staffData) {
     //   setStaffList(staffData);
@@ -238,7 +244,7 @@ export default function RestaurantProfile() {
       queryClient.invalidateQueries(["restaurant-profile"]);
 
       setLogoFile(null);
-
+      setGoogleReviewQrFile(null);
       if (res.data?.upiQrCode) {
         setUpiQrCode(res.data.upiQrCode);
       }
@@ -288,6 +294,29 @@ export default function RestaurantProfile() {
       setLogoFile(file);
       setLogoPreview(URL.createObjectURL(file));
     }
+  };
+
+  const handleGoogleReviewQrChange = (e) => {
+    const file = e.target.files?.[0];
+
+    if (!file) return;
+
+    const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+    if (!allowedTypes.includes(file.type)) {
+      alert("Please upload JPG, PNG or WebP image.");
+      e.target.value = "";
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("Google Review QR image must be smaller than 5MB.");
+      e.target.value = "";
+      return;
+    }
+
+    setGoogleReviewQrFile(file);
+    setGoogleReviewQrPreview(URL.createObjectURL(file));
   };
 
   const handleRequestUpiOtp = async () => {
@@ -472,7 +501,9 @@ export default function RestaurantProfile() {
       if (logoFile) {
         formData.append("logo", logoFile);
       }
-
+      if (googleReviewQrFile) {
+        formData.append("googleReviewQrCode", googleReviewQrFile);
+      }
       updateProfileMutation.mutate(formData);
     },
     [
@@ -486,7 +517,7 @@ export default function RestaurantProfile() {
       phone,
       email,
       themeColor,
-
+      googleReviewQrFile,
       fssaiNumber,
       gstNumber,
       taxRate,
@@ -951,6 +982,59 @@ export default function RestaurantProfile() {
                     />
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* GOOGLE REVIEW QR */}
+            <div className="pt-4 border-t border-slate-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-2">
+                  <QrCode size={14} className="text-blue-500" />
+                  Google Review QR
+                </h3>
+
+                <span className="text-[9px] font-bold text-slate-400 uppercase">
+                  Customer Reviews
+                </span>
+              </div>
+
+              <div className="flex flex-col items-center justify-center p-4 bg-slate-50 border border-slate-200 rounded-2xl">
+                {googleReviewQrPreview ? (
+                  <img
+                    src={googleReviewQrPreview}
+                    alt="Google Review QR Code"
+                    className="w-32 h-32 object-contain rounded-xl shadow-sm bg-white p-2"
+                  />
+                ) : (
+                  <div className="w-32 h-32 flex items-center justify-center text-center text-[11px] text-slate-400 font-medium">
+                    Upload your Google Review QR
+                  </div>
+                )}
+
+                <p className="text-[10px] text-slate-500 text-center mt-2">
+                  Customers can scan this QR to leave a Google review.
+                </p>
+
+                <label className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border border-blue-100 bg-blue-50 hover:bg-blue-100 text-xs font-bold text-blue-700 cursor-pointer transition-all">
+                  <Upload size={14} />
+
+                  <span>
+                    {googleReviewQrPreview
+                      ? "Replace Review QR"
+                      : "Upload Review QR"}
+                  </span>
+
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={handleGoogleReviewQrChange}
+                    className="hidden"
+                  />
+                </label>
+
+                <span className="text-[9px] text-slate-400 mt-2">
+                  JPG, PNG or WebP • Max 5MB
+                </span>
               </div>
             </div>
 

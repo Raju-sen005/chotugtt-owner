@@ -517,53 +517,148 @@ export default function CounterPOS() {
   // taaki order place karte waqt har item ke sath uska apna discount save ho
   // (backend cancelOrderItem isi field se sahi recalculation karta hai)
   const { appliedDiscount, itemDiscountMap } = useMemo(() => {
-    if (!offers.length) return { appliedDiscount: 0, itemDiscountMap: {} };
+    if (!offers.length || !cart.length) {
+      return {
+        appliedDiscount: 0,
+        itemDiscountMap: {},
+      };
+    }
+
+    const now = Date.now();
 
     let totalDiscount = 0;
     const map = {};
 
     cart.forEach((item) => {
-      const itemTotalPrice = Number(item.price) * Number(item.quantity);
+      // Backend offer engine combos par offer apply nahi karta.
+      if (item.catalogType === "COMBO") {
+        return;
+      }
 
-      const applicableOffers = offers.filter((offer) => {
-        const hasTargetItems =
-          offer.targetItems && offer.targetItems.length > 0;
+      const itemTotalPrice =
+        Number(item.price || 0) * Number(item.quantity || 0);
 
-        if (hasTargetItems) {
-          // 🔑 FIX: targetItems populate() ki wajah se objects ({_id, name})
-          // ban jaate hain, plain string ObjectId nahi — dono handle karo
-          return offer.targetItems.some(
-            (t) => String(t._id || t) === String(item._id),
-          );
+      if (itemTotalPrice <= 0) {
+        return;
+      }
+
+      // ---------------------------------------------
+      // ONLY CURRENTLY ACTIVE OFFERS
+      // ---------------------------------------------
+      const activeOffers = offers.filter((offer) => {
+        // Manually inactive offer
+        if (offer?.isActive === false) {
+          return false;
+        }
+
+        const startsAt = offer?.startsAt
+          ? new Date(offer.startsAt).getTime()
+          : null;
+
+        const expiresAt = offer?.expiresAt
+          ? new Date(offer.expiresAt).getTime()
+          : null;
+
+        // Scheduled -> abhi apply nahi hoga
+        if (startsAt !== null && Number.isFinite(startsAt) && startsAt > now) {
+          return false;
+        }
+
+        // Expired -> apply nahi hoga
+        if (
+          expiresAt !== null &&
+          Number.isFinite(expiresAt) &&
+          expiresAt <= now
+        ) {
+          return false;
         }
 
         return true;
       });
 
-      if (!applicableOffers.length) return;
+      if (!activeOffers.length) {
+        return;
+      }
 
-      const targetedOffers = applicableOffers.filter(
-        (o) => o.targetItems && o.targetItems.length > 0,
-      );
+      // ---------------------------------------------
+      // FIND ALL OFFERS APPLICABLE TO THIS ITEM
+      // ---------------------------------------------
+      const applicableOffers = activeOffers.filter((offer) => {
+        const targetItems = Array.isArray(offer?.targetItems)
+          ? offer.targetItems
+          : [];
 
-      const relevantOffers =
-        targetedOffers.length > 0 ? targetedOffers : applicableOffers;
+        // ALL_ITEMS
+        if (offer?.targetScope === "ALL_ITEMS") {
+          return true;
+        }
 
-      const bestOffer = relevantOffers.reduce((best, current) =>
-        Number(current.discountValue) > Number(best.discountValue)
-          ? current
-          : best,
-      );
+        // SPECIFIC_ITEMS
+        if (targetItems.length > 0) {
+          return targetItems.some(
+            (target) => String(target?._id || target) === String(item._id),
+          );
+        }
 
-      const itemDiscount = Math.round(
-        (itemTotalPrice * Number(bestOffer.discountValue)) / 100,
-      );
+        return false;
+      });
 
-      map[item._id] = itemDiscount;
-      totalDiscount += itemDiscount;
+      if (!applicableOffers.length) {
+        return;
+      }
+
+      // ---------------------------------------------
+      // CALCULATE REAL DISCOUNT VALUE
+      // IMPORTANT:
+      // PERCENTAGE and FLAT cannot be compared by
+      // discountValue directly.
+      // ---------------------------------------------
+      let bestDiscount = 0;
+
+      applicableOffers.forEach((offer) => {
+        const discountType = String(
+          offer?.discountType || "PERCENTAGE",
+        ).toUpperCase();
+
+        const discountValue = Number(offer?.discountValue || 0);
+
+        if (!Number.isFinite(discountValue) || discountValue <= 0) {
+          return;
+        }
+
+        let discount = 0;
+
+        if (discountType === "PERCENTAGE") {
+          discount = Math.round((itemTotalPrice * discountValue) / 100);
+        } else if (discountType === "FLAT") {
+          // Flat discount = per eligible order line
+          // and cannot exceed that line's subtotal.
+          discount = Math.min(
+            Math.round(discountValue),
+            Math.round(itemTotalPrice),
+          );
+        }
+
+        // Safety: discount can never exceed item subtotal
+        discount = Math.min(Math.max(0, discount), Math.round(itemTotalPrice));
+
+        // Multiple offers do not stack.
+        // Use the maximum actual discount.
+        if (discount > bestDiscount) {
+          bestDiscount = discount;
+        }
+      });
+
+      if (bestDiscount > 0) {
+        map[item._id] = bestDiscount;
+        totalDiscount += bestDiscount;
+      }
     });
 
-    return { appliedDiscount: Math.round(totalDiscount), itemDiscountMap: map };
+    return {
+      appliedDiscount: Math.round(totalDiscount),
+      itemDiscountMap: map,
+    };
   }, [cart, offers]);
 
   const total = Math.max(0, subtotal - appliedDiscount);
