@@ -942,9 +942,7 @@ export default function LiveOrderMonitor() {
 
     <div class="header">
 
-      <div class="brand">
-        CHOTUGTT
-      </div>
+      
 
       <div class="main-title">
         ${escapeHtml(kotTitle)}

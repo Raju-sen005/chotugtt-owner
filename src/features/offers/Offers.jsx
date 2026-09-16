@@ -1,6 +1,16 @@
-import { useState, useCallback, useMemo, memo, useEffect } from "react";
+import {
+  useState,
+  useCallback,
+  useMemo,
+  memo,
+  useEffect,
+} from "react";
 import axios from "axios";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+} from "@tanstack/react-query";
 import {
   Tag,
   X,
@@ -8,64 +18,278 @@ import {
   PlusCircle,
   Sparkles,
   Percent,
+  IndianRupee,
   CheckCircle2,
+  CalendarClock,
+  Layers3,
+  PackageSearch,
+  Clock3,
+  AlertCircle,
+  Search,
+  ChevronDown,
+  RefreshCw,
 } from "lucide-react";
 import { useSocket } from "../../context/SocketContext";
-// const api = axios.create({ baseURL: `${import.meta.env.VITE_APP_API_BASE}` });
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_APP_API_BASE,
   withCredentials: true,
 });
 
-// Offer Card Component
-const OfferCard = memo(function OfferCard({ offer, onDelete }) {
-  return (
-    <div className="bg-white p-5 rounded-3xl border border-slate-200/80 hover:border-red-200 transition-all shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 group">
-      <div className="flex gap-4 items-center flex-1 min-w-0">
-        <div className="p-3 bg-red-50 text-red-500 rounded-2xl shrink-0 group-hover:bg-red-500 group-hover:text-white transition-colors">
-          <Tag size={20} />
-        </div>
-        <div className="min-w-0 space-y-0.5">
-          <h3 className="font-black text-slate-900 text-sm sm:text-base truncate">
-            {offer.title}
-          </h3>
-          <p className="text-xs text-slate-500 truncate font-medium">
-            {offer.description || "No description provided."}
-          </p>
-        </div>
-      </div>
+const EMPTY_FORM = {
+  title: "",
+  discountType: "PERCENTAGE",
+  discountValue: "",
+  description: "",
+  targetScope: "SPECIFIC_ITEMS",
+  targetItems: [],
+  startsAt: "",
+  expiresAt: "",
+};
 
-      <div className="flex items-center justify-between sm:justify-end gap-6 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-slate-100">
-        <div className="text-left sm:text-right">
-          <div className="text-emerald-600 font-black text-base sm:text-lg">
-            {offer.discountValue}% OFF
+const formatDateTime = (value) => {
+  if (!value) return "No expiry";
+
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "Invalid date";
+
+  return date.toLocaleString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const toDateTimeLocalValue = (date) => {
+  const d = new Date(date);
+  if (Number.isNaN(d.getTime())) return "";
+
+  const pad = (n) => String(n).padStart(2, "0");
+
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(
+    d.getDate(),
+  )}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+const getOfferStatus = (offer) => {
+  const now = Date.now();
+  const startsAt = offer?.startsAt
+    ? new Date(offer.startsAt).getTime()
+    : null;
+  const expiresAt = offer?.expiresAt
+    ? new Date(offer.expiresAt).getTime()
+    : null;
+
+  if (offer?.isActive === false) {
+    return "INACTIVE";
+  }
+
+  if (startsAt && startsAt > now) {
+    return "SCHEDULED";
+  }
+
+  if (expiresAt && expiresAt <= now) {
+    return "EXPIRED";
+  }
+
+  return "ACTIVE";
+};
+
+const getDiscountLabel = (offer) => {
+  if (offer?.discountType === "FLAT") {
+    return `₹${Number(offer.discountValue || 0).toLocaleString(
+      "en-IN",
+    )} OFF`;
+  }
+
+  return `${Number(offer?.discountValue || 0)}% OFF`;
+};
+
+const getTargetLabel = (offer) => {
+  if (offer?.targetScope === "ALL_ITEMS") {
+    return "All menu items";
+  }
+
+  return `${offer?.targetItems?.length || 0} selected items`;
+};
+
+const StatusBadge = memo(function StatusBadge({ status }) {
+  const config = {
+    ACTIVE: {
+      label: "Active",
+      className:
+        "bg-emerald-50 text-emerald-700 border-emerald-100",
+      dot: "bg-emerald-500",
+    },
+    SCHEDULED: {
+      label: "Scheduled",
+      className:
+        "bg-blue-50 text-blue-700 border-blue-100",
+      dot: "bg-blue-500",
+    },
+    EXPIRED: {
+      label: "Expired",
+      className:
+        "bg-slate-100 text-slate-500 border-slate-200",
+      dot: "bg-slate-400",
+    },
+    INACTIVE: {
+      label: "Inactive",
+      className:
+        "bg-amber-50 text-amber-700 border-amber-100",
+      dot: "bg-amber-500",
+    },
+  };
+
+  const item = config[status] || config.INACTIVE;
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide ${item.className}`}
+    >
+      <span className={`h-1.5 w-1.5 rounded-full ${item.dot}`} />
+      {item.label}
+    </span>
+  );
+});
+
+const OfferCard = memo(function OfferCard({
+  offer,
+  onDelete,
+  deleting,
+}) {
+  const status = getOfferStatus(offer);
+
+  return (
+    <article className="group overflow-hidden rounded-[24px] border border-slate-200 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-red-200 hover:shadow-lg">
+      <div className="flex flex-col gap-5 p-5 sm:p-6">
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex min-w-0 items-start gap-3.5">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-lg shadow-red-500/20">
+              <Tag size={20} strokeWidth={2.4} />
+            </div>
+
+            <div className="min-w-0">
+              <div className="mb-1.5 flex flex-wrap items-center gap-2">
+                <h3 className="truncate text-sm font-extrabold text-slate-900 sm:text-base">
+                  {offer.title}
+                </h3>
+                <StatusBadge status={status} />
+              </div>
+
+              <p className="line-clamp-2 text-xs leading-5 text-slate-500">
+                {offer.description || "No description provided."}
+              </p>
+            </div>
           </div>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider whitespace-nowrap">
-            {offer.targetItems?.length || 0} Target Items
-          </p>
+
+          <button
+            type="button"
+            onClick={() => onDelete(offer._id)}
+            disabled={deleting}
+            title="Delete offer"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-400 transition hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {deleting ? (
+              <RefreshCw size={16} className="animate-spin" />
+            ) : (
+              <Trash2 size={16} />
+            )}
+          </button>
         </div>
-        <button
-          onClick={() => onDelete(offer._id)}
-          className="p-2.5 rounded-xl text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-all cursor-pointer"
-          title="Delete Offer"
-        >
-          <Trash2 size={18} />
-        </button>
+
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="rounded-2xl bg-emerald-50/70 p-3">
+            <p className="mb-1 text-[9px] font-extrabold uppercase tracking-wider text-emerald-600">
+              Discount
+            </p>
+            <p className="text-sm font-black text-emerald-700">
+              {getDiscountLabel(offer)}
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-slate-50 p-3">
+            <p className="mb-1 text-[9px] font-extrabold uppercase tracking-wider text-slate-400">
+              Applies To
+            </p>
+            <p className="truncate text-xs font-bold text-slate-700">
+              {getTargetLabel(offer)}
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-slate-50 p-3">
+            <p className="mb-1 text-[9px] font-extrabold uppercase tracking-wider text-slate-400">
+              Starts
+            </p>
+            <p className="truncate text-xs font-bold text-slate-700">
+              {formatDateTime(offer.startsAt)}
+            </p>
+          </div>
+
+          <div className="rounded-2xl bg-slate-50 p-3">
+            <p className="mb-1 text-[9px] font-extrabold uppercase tracking-wider text-slate-400">
+              Expires
+            </p>
+            <p
+              className={`truncate text-xs font-bold ${
+                status === "EXPIRED"
+                  ? "text-slate-400"
+                  : status === "SCHEDULED"
+                    ? "text-blue-600"
+                    : "text-slate-700"
+              }`}
+            >
+              {formatDateTime(offer.expiresAt)}
+            </p>
+          </div>
+        </div>
+
+        {offer.targetScope === "ALL_ITEMS" && (
+          <div className="flex items-center gap-2 rounded-2xl border border-blue-100 bg-blue-50 px-3.5 py-2.5 text-[11px] font-semibold text-blue-700">
+            <Layers3 size={14} />
+            Automatically applies to new menu items created during
+            this offer period.
+          </div>
+        )}
+
+        {offer.targetScope === "SPECIFIC_ITEMS" &&
+          Array.isArray(offer.targetItems) &&
+          offer.targetItems.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">
+              {offer.targetItems.slice(0, 6).map((item) => (
+                <span
+                  key={item?._id || item}
+                  className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[10px] font-bold text-slate-600"
+                >
+                  {item?.name || "Menu item"}
+                </span>
+              ))}
+
+              {offer.targetItems.length > 6 && (
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-500">
+                  +{offer.targetItems.length - 6} more
+                </span>
+              )}
+            </div>
+          )}
       </div>
-    </div>
+    </article>
   );
 });
 
 export default function Offers() {
-  const [formData, setFormData] = useState({
-    title: "",
-    discountValue: "",
-    description: "",
-    targetItems: [],
-  });
   const socket = useSocket();
   const queryClient = useQueryClient();
+
+  const [formData, setFormData] = useState(EMPTY_FORM);
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
+  const [successMessage, setSuccessMessage] = useState("");
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [offerToDelete, setOfferToDelete] = useState(null);
+  const [offerSearch, setOfferSearch] = useState("");
+  const [offerFilter, setOfferFilter] = useState("ALL");
 
   useEffect(() => {
     if (!socket) return;
@@ -90,34 +314,19 @@ export default function Offers() {
       socket.off("OFFER_DELETED", handleOfferDeleted);
     };
   }, [socket, queryClient]);
-  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
-  const [successMessage, setSuccessMessage] = useState("");
-
-  const [showDeleteModal, setShowDeleteModal] = useState(false);
-  const [offerToDelete, setOfferToDelete] = useState(null);
-
-  const deleteMutation = useMutation({
-    mutationFn: (offerId) => api.delete(`/offers/${offerId}`),
-
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: ["offers"],
-      });
-
-      setSuccessMessage("Offer Deleted Successfully");
-
-      setShowSuccessPopup(true);
-    },
-  });
 
   const {
     data: offersRaw,
     isLoading: offersLoading,
     isError: offersError,
+    refetch: refetchOffers,
+    isFetching: offersFetching,
   } = useQuery({
     queryKey: ["offers"],
-    queryFn: () => api.get("/offers").then((r) => r.data.data),
+    queryFn: () =>
+      api.get("/offers").then((response) => response.data.data),
     staleTime: 30_000,
+    refetchOnWindowFocus: true,
   });
 
   const {
@@ -126,14 +335,19 @@ export default function Offers() {
     isError: itemsError,
   } = useQuery({
     queryKey: ["menu-items-list"],
-    queryFn: () => api.get("/menu/admin/items").then((r) => r.data.data),
+    queryFn: () =>
+      api
+        .get("/menu/admin/items")
+        .then((response) => response.data.data),
     staleTime: 60_000,
+    refetchOnWindowFocus: false,
   });
 
   const offers = useMemo(
     () => (Array.isArray(offersRaw) ? offersRaw : []),
     [offersRaw],
   );
+
   const menuItems = useMemo(
     () => (Array.isArray(menuItemsRaw) ? menuItemsRaw : []),
     [menuItemsRaw],
@@ -141,11 +355,58 @@ export default function Offers() {
 
   const menuItemsById = useMemo(() => {
     const map = {};
+
     menuItems.forEach((item) => {
-      map[item._id] = item;
+      map[String(item._id)] = item;
     });
+
     return map;
   }, [menuItems]);
+
+  const offerStats = useMemo(() => {
+    return offers.reduce(
+      (stats, offer) => {
+        const status = getOfferStatus(offer);
+
+        stats.total += 1;
+
+        if (status === "ACTIVE") stats.active += 1;
+        if (status === "SCHEDULED") stats.scheduled += 1;
+        if (status === "EXPIRED") stats.expired += 1;
+
+        return stats;
+      },
+      {
+        total: 0,
+        active: 0,
+        scheduled: 0,
+        expired: 0,
+      },
+    );
+  }, [offers]);
+
+  const filteredOffers = useMemo(() => {
+    const search = offerSearch.trim().toLowerCase();
+
+    return offers.filter((offer) => {
+      const status = getOfferStatus(offer);
+
+      const matchesFilter =
+        offerFilter === "ALL" ||
+        status === offerFilter;
+
+      const matchesSearch =
+        !search ||
+        String(offer.title || "")
+          .toLowerCase()
+          .includes(search) ||
+        String(offer.description || "")
+          .toLowerCase()
+          .includes(search);
+
+      return matchesFilter && matchesSearch;
+    });
+  }, [offers, offerSearch, offerFilter]);
 
   const addMutation = useMutation({
     mutationFn: (data) => api.post("/offers", data),
@@ -155,35 +416,85 @@ export default function Offers() {
         queryKey: ["offers"],
       });
 
-      setFormData({
-        title: "",
-        discountValue: "",
-        description: "",
-        targetItems: [],
-      });
+      setFormData(EMPTY_FORM);
+      setSuccessMessage("Offer created successfully");
+      setShowSuccessPopup(true);
+    },
 
-      setSuccessMessage("Offer Created Successfully");
+    onError: (error) => {
+      const message =
+        error?.response?.data?.message ||
+        "Unable to create offer.";
 
+      setSuccessMessage(message);
       setShowSuccessPopup(true);
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (offerId) =>
+      api.delete(`/offers/${offerId}`),
+
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: ["offers"],
+      });
+
+      setSuccessMessage("Offer deleted successfully");
+      setShowSuccessPopup(true);
+    },
+
+    onError: (error) => {
+      const message =
+        error?.response?.data?.message ||
+        "Unable to delete offer.";
+
+      setSuccessMessage(message);
+      setShowSuccessPopup(true);
+    },
+  });
+
+  useEffect(() => {
+    if (!showSuccessPopup) return;
+
+    const timer = setTimeout(() => {
+      setShowSuccessPopup(false);
+    }, 3500);
+
+    return () => clearTimeout(timer);
+  }, [showSuccessPopup]);
+
   const updateField = useCallback((field, value) => {
-    setFormData((prev) => ({ ...prev, [field]: value }));
+    setFormData((previous) => ({
+      ...previous,
+      [field]: value,
+    }));
   }, []);
 
   const addTargetItem = useCallback((itemId) => {
-    setFormData((prev) =>
-      prev.targetItems.includes(itemId)
-        ? prev
-        : { ...prev, targetItems: [...prev.targetItems, itemId] },
-    );
+    if (!itemId) return;
+
+    setFormData((previous) => {
+      if (previous.targetItems.includes(itemId)) {
+        return previous;
+      }
+
+      return {
+        ...previous,
+        targetItems: [
+          ...previous.targetItems,
+          itemId,
+        ],
+      };
+    });
   }, []);
 
   const removeTargetItem = useCallback((itemId) => {
-    setFormData((prev) => ({
-      ...prev,
-      targetItems: prev.targetItems.filter((id) => id !== itemId),
+    setFormData((previous) => ({
+      ...previous,
+      targetItems: previous.targetItems.filter(
+        (id) => id !== itemId,
+      ),
     }));
   }, []);
 
@@ -204,65 +515,160 @@ export default function Offers() {
   }, [deleteMutation, offerToDelete]);
 
   const handleLaunchOffer = useCallback(() => {
-    if (!formData.title || !formData.discountValue) {
-      alert("Please enter title and discount value.");
+    const title = String(
+      formData.title || "",
+    ).trim();
+
+    const description = String(
+      formData.description || "",
+    ).trim();
+
+    const discount = Number(
+      formData.discountValue,
+    );
+
+    if (!title) {
+      alert("Please enter an offer title.");
       return;
     }
-    addMutation.mutate(formData);
+
+    if (title.length > 100) {
+      alert("Offer title cannot exceed 100 characters.");
+      return;
+    }
+
+    if (
+      !Number.isFinite(discount) ||
+      discount <= 0
+    ) {
+      alert("Please enter a valid discount value.");
+      return;
+    }
+
+    if (
+      formData.discountType === "PERCENTAGE" &&
+      discount > 100
+    ) {
+      alert("Percentage discount cannot exceed 100%.");
+      return;
+    }
+
+    if (
+      formData.targetScope === "SPECIFIC_ITEMS" &&
+      formData.targetItems.length === 0
+    ) {
+      alert("Please select at least one menu item.");
+      return;
+    }
+
+    if (
+      formData.startsAt &&
+      formData.expiresAt &&
+      new Date(formData.expiresAt) <=
+        new Date(formData.startsAt)
+    ) {
+      alert("Expiry time must be after start time.");
+      return;
+    }
+
+    if (
+      formData.expiresAt &&
+      new Date(formData.expiresAt) <= new Date()
+    ) {
+      alert("Expiry time must be in the future.");
+      return;
+    }
+
+    addMutation.mutate({
+      title,
+      description,
+      discountType: formData.discountType,
+      discountValue: discount,
+      targetScope: formData.targetScope,
+      targetItems:
+        formData.targetScope === "ALL_ITEMS"
+          ? []
+          : formData.targetItems,
+      startsAt: formData.startsAt || undefined,
+      expiresAt: formData.expiresAt || undefined,
+    });
   }, [addMutation, formData]);
 
+  const setQuickStartNow = useCallback(() => {
+    updateField(
+      "startsAt",
+      toDateTimeLocalValue(new Date()),
+    );
+  }, [updateField]);
+
+  const setQuickExpiry = useCallback(
+    (days) => {
+      updateField(
+        "expiresAt",
+        toDateTimeLocalValue(
+          Date.now() + days * 24 * 60 * 60 * 1000,
+        ),
+      );
+    },
+    [updateField],
+  );
+
+  const isSubmitting = addMutation.isPending;
+
   return (
-    <>
+    <div className="min-h-screen bg-[#f6f7fb] px-3 py-4 font-sans text-slate-900 sm:px-6 sm:py-6 lg:px-10 lg:py-8">
       {showSuccessPopup && (
-        <div className="fixed top-6 right-6 z-[9999] animate-in slide-in-from-right-5 fade-in duration-300">
-          <div className="flex items-start gap-3 bg-white border border-emerald-200 shadow-2xl rounded-2xl px-5 py-4 min-w-[320px] max-w-[400px]">
-            <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
-              <CheckCircle2 size={22} strokeWidth={2.5} />
+        <div className="fixed right-4 top-4 z-[10000] w-[calc(100%-2rem)] max-w-sm animate-in slide-in-from-right-5 fade-in duration-300 sm:right-6 sm:top-6">
+          <div className="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-white p-4 shadow-2xl">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+              <CheckCircle2 size={21} strokeWidth={2.5} />
             </div>
 
-            <div className="flex-1">
-              <p className="text-sm font-black text-slate-900">
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-extrabold text-slate-900">
                 {successMessage}
               </p>
-
-              <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                The operation was completed successfully.
+              <p className="mt-1 text-xs leading-5 text-slate-500">
+                The operation has been completed.
               </p>
             </div>
 
             <button
               type="button"
               onClick={() => setShowSuccessPopup(false)}
-              className="text-slate-400 hover:text-slate-700 transition-colors text-lg leading-none"
+              className="text-slate-400 transition hover:text-slate-700"
+              aria-label="Close notification"
             >
-              ×
+              <X size={18} />
             </button>
           </div>
         </div>
       )}
 
       {showDeleteModal && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="w-full max-w-sm bg-white rounded-3xl shadow-2xl p-6 animate-in zoom-in-95 fade-in duration-200">
-            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center mb-4">
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-[28px] bg-white p-6 shadow-2xl">
+            <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-100 text-rose-600">
               <Trash2 size={22} strokeWidth={2.5} />
             </div>
 
-            <h3 className="text-lg font-black text-slate-900">Delete Offer?</h3>
+            <h3 className="text-lg font-black text-slate-900">
+              Delete this offer?
+            </h3>
 
-            <p className="text-sm text-slate-500 mt-2 leading-relaxed">
-              Are you sure you want to delete this offer? This action cannot be
-              undone.
+            <p className="mt-2 text-sm leading-6 text-slate-500">
+              This offer will no longer be available for new
+              orders. Existing completed orders remain unchanged.
             </p>
 
-            <div className="flex gap-3 mt-6">
+            <div className="mt-6 flex gap-3">
               <button
                 type="button"
                 onClick={() => {
                   setShowDeleteModal(false);
                   setOfferToDelete(null);
                 }}
-                className="flex-1 py-3 rounded-xl border border-slate-200 text-slate-700 text-sm font-bold hover:bg-slate-50 transition-all"
+                className="flex-1 rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700 transition hover:bg-slate-50"
               >
                 Cancel
               </button>
@@ -271,185 +677,652 @@ export default function Offers() {
                 type="button"
                 onClick={confirmDeleteOffer}
                 disabled={deleteMutation.isPending}
-                className="flex-1 py-3 rounded-xl bg-gradient-to-r from-rose-500 to-red-600 text-white text-sm font-bold hover:opacity-95 transition-all disabled:opacity-50"
+                className="flex-1 rounded-2xl bg-rose-600 px-4 py-3 text-sm font-bold text-white transition hover:bg-rose-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {deleteMutation.isPending ? "Deleting..." : "Delete"}
+                {deleteMutation.isPending
+                  ? "Deleting..."
+                  : "Delete Offer"}
               </button>
             </div>
           </div>
         </div>
       )}
-      <div className="max-w-5xl mx-auto p-4 sm:p-6 lg:p-10 space-y-8 font-sans bg-[#F8F9FA] min-h-screen">
-        {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-red-50 text-red-600 rounded-2xl border border-red-100">
-              <Sparkles size={28} />
-            </div>
-            <div>
-              <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-                Restaurant Offers & Discounts
-              </h2>
-              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                Launch special promotional campaigns for customers.
-              </p>
+
+      <div className="mx-auto max-w-7xl space-y-6">
+        {/* Header */}
+        <section className="overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-sm">
+          <div className="relative p-5 sm:p-7 lg:p-8">
+            <div className="absolute right-0 top-0 h-40 w-40 rounded-full bg-red-100/60 blur-3xl" />
+
+            <div className="relative flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-start gap-4">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-xl shadow-red-500/20">
+                  <Sparkles size={27} strokeWidth={2.2} />
+                </div>
+
+                <div>
+                  <div className="mb-1 flex flex-wrap items-center gap-2">
+                    <h1 className="text-xl font-black tracking-tight text-slate-950 sm:text-2xl">
+                      Offers & Discounts
+                    </h1>
+
+                    <span className="rounded-full bg-red-50 px-2.5 py-1 text-[9px] font-extrabold uppercase tracking-wider text-red-600">
+                      Promotions
+                    </span>
+                  </div>
+
+                  <p className="max-w-2xl text-xs leading-5 text-slate-500 sm:text-sm">
+                    Create restaurant promotions with percentage or
+                    flat discounts, scheduling, expiry and automatic
+                    future-item coverage.
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2 sm:gap-3">
+                <div className="min-w-[82px] rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-center">
+                  <p className="text-lg font-black text-slate-900">
+                    {offerStats.total}
+                  </p>
+                  <p className="text-[9px] font-extrabold uppercase tracking-wider text-slate-400">
+                    Total
+                  </p>
+                </div>
+
+                <div className="min-w-[82px] rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2.5 text-center">
+                  <p className="text-lg font-black text-emerald-700">
+                    {offerStats.active}
+                  </p>
+                  <p className="text-[9px] font-extrabold uppercase tracking-wider text-emerald-500">
+                    Active
+                  </p>
+                </div>
+
+                <div className="min-w-[82px] rounded-2xl border border-blue-100 bg-blue-50 px-3 py-2.5 text-center">
+                  <p className="text-lg font-black text-blue-700">
+                    {offerStats.scheduled}
+                  </p>
+                  <p className="text-[9px] font-extrabold uppercase tracking-wider text-blue-500">
+                    Scheduled
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
+        </section>
 
-        {/* Create Offer Form Container */}
-        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200 shadow-xs space-y-5">
-          <div className="border-b border-slate-100 pb-4">
-            <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
-              <PlusCircle size={18} className="text-red-500" /> Create New Offer
-            </h3>
-          </div>
+        {/* Create Offer */}
+        <section className="rounded-[28px] border border-slate-200 bg-white shadow-sm">
+          <div className="border-b border-slate-100 px-5 py-5 sm:px-7">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-600">
+                <PlusCircle size={20} />
+              </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                Offer Title
-              </label>
-              <input
-                placeholder="e.g. Weekend Mega Special"
-                className="w-full px-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all"
-                value={formData.title}
-                onChange={(e) => updateField("title", e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                Discount Value (%)
-              </label>
-              <div className="relative">
-                <input
-                  type="number"
-                  placeholder="20"
-                  className="w-full px-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all pr-8"
-                  value={formData.discountValue}
-                  onChange={(e) => updateField("discountValue", e.target.value)}
-                />
-                <Percent
-                  size={14}
-                  className="absolute right-3.5 top-3.5 text-slate-400"
-                />
+              <div>
+                <h2 className="text-base font-black text-slate-900">
+                  Create New Offer
+                </h2>
+                <p className="text-xs text-slate-500">
+                  Configure the promotion rules and validity period.
+                </p>
               </div>
             </div>
           </div>
 
-          <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-              Brief Description
-            </label>
-            <textarea
-              placeholder="Describe the offer details..."
-              className="w-full px-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all"
-              rows={2}
-              value={formData.description}
-              onChange={(e) => updateField("description", e.target.value)}
-            />
-          </div>
+          <div className="space-y-6 p-5 sm:p-7">
+            {/* Basic details */}
+            <div>
+              <div className="mb-3 flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 text-[10px] font-black text-slate-600">
+                  01
+                </span>
+                <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
+                  Offer Details
+                </p>
+              </div>
 
-          <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-              Apply to Specific Menu Items
-            </label>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+                <div className="lg:col-span-2">
+                  <label className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                    Offer Title
+                  </label>
 
-            {itemsLoading && (
-              <p className="text-xs text-slate-400 mt-1">Loading items...</p>
-            )}
-            {itemsError && (
-              <p className="text-xs text-red-500 mt-1 font-medium">
-                Failed to load menu items. Check your authentication token.
-              </p>
-            )}
+                  <input
+                    value={formData.title}
+                    maxLength={100}
+                    onChange={(e) =>
+                      updateField("title", e.target.value)
+                    }
+                    placeholder="e.g. Weekend Mega Special"
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm font-semibold text-slate-900 outline-none transition focus:border-red-400 focus:bg-white focus:ring-4 focus:ring-red-500/10"
+                  />
+                  <div className="mt-1 flex justify-end text-[9px] font-semibold text-slate-400">
+                    {formData.title.length}/100
+                  </div>
+                </div>
 
-            <select
-              className="w-full mt-1 px-4 py-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs font-medium text-slate-900 focus:outline-none focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all cursor-pointer"
-              value=""
-              onChange={(e) => e.target.value && addTargetItem(e.target.value)}
-            >
-              <option value="">Select menu item to target...</option>
-              {menuItems.map((item) => (
-                <option key={item._id} value={item._id}>
-                  {item.name} - ₹{item.price}
-                </option>
-              ))}
-            </select>
+                <div>
+                  <label className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                    Discount Type
+                  </label>
 
-            {/* Selected Item Chips */}
-            <div className="flex flex-wrap gap-2 mt-3">
-              {formData.targetItems.map((itemId) => {
-                const item = menuItemsById[itemId];
-                return (
-                  <span
-                    key={itemId}
-                    className="inline-flex items-center gap-1.5 bg-red-50 text-red-600 px-3 py-1.5 rounded-full text-xs font-bold border border-red-100"
+                  <select
+                    value={formData.discountType}
+                    onChange={(e) =>
+                      updateField(
+                        "discountType",
+                        e.target.value,
+                      )
+                    }
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm font-semibold text-slate-900 outline-none transition focus:border-red-400 focus:bg-white focus:ring-4 focus:ring-red-500/10"
                   >
-                    {item?.name || "Unknown item"}
-                    <X
-                      size={14}
-                      className="cursor-pointer shrink-0 hover:text-red-800"
-                      onClick={() => removeTargetItem(itemId)}
+                    <option value="PERCENTAGE">
+                      Percentage (%)
+                    </option>
+                    <option value="FLAT">
+                      Flat Amount (₹)
+                    </option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                    Discount Value
+                  </label>
+
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      max={
+                        formData.discountType === "PERCENTAGE"
+                          ? 100
+                          : undefined
+                      }
+                      step="0.01"
+                      value={formData.discountValue}
+                      onChange={(e) =>
+                        updateField(
+                          "discountValue",
+                          e.target.value,
+                        )
+                      }
+                      placeholder={
+                        formData.discountType === "PERCENTAGE"
+                          ? "20"
+                          : "100"
+                      }
+                      className="w-full rounded-2xl border border-slate-200 bg-slate-50 py-3.5 pl-4 pr-11 text-sm font-semibold text-slate-900 outline-none transition focus:border-red-400 focus:bg-white focus:ring-4 focus:ring-red-500/10"
                     />
-                  </span>
-                );
-              })}
+
+                    <div className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400">
+                      {formData.discountType === "PERCENTAGE" ? (
+                        <Percent size={16} />
+                      ) : (
+                        <IndianRupee size={16} />
+                      )}
+                    </div>
+                  </div>
+
+                  <p className="mt-1.5 text-[10px] font-medium text-slate-400">
+                    {formData.discountType === "PERCENTAGE"
+                      ? "Maximum 100%"
+                      : "Flat discount in INR"}
+                  </p>
+                </div>
+
+                <div className="lg:col-span-2">
+                  <label className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                    Description
+                  </label>
+
+                  <textarea
+                    rows={3}
+                    maxLength={500}
+                    value={formData.description}
+                    onChange={(e) =>
+                      updateField(
+                        "description",
+                        e.target.value,
+                      )
+                    }
+                    placeholder="Describe the promotion for your customers..."
+                    className="w-full resize-none rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 text-sm font-medium text-slate-900 outline-none transition focus:border-red-400 focus:bg-white focus:ring-4 focus:ring-red-500/10"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Targeting */}
+            <div>
+              <div className="mb-3 flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 text-[10px] font-black text-slate-600">
+                  02
+                </span>
+                <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
+                  Targeting
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                <label className="mb-1.5 block text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                  Apply Offer To
+                </label>
+
+                <select
+                  value={formData.targetScope}
+                  onChange={(e) => {
+                    const value = e.target.value;
+
+                    updateField(
+                      "targetScope",
+                      value,
+                    );
+
+                    if (value === "ALL_ITEMS") {
+                      updateField(
+                        "targetItems",
+                        [],
+                      );
+                    }
+                  }}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3.5 text-sm font-semibold text-slate-900 outline-none transition focus:border-red-400 focus:ring-4 focus:ring-red-500/10"
+                >
+                  <option value="SPECIFIC_ITEMS">
+                    Selected Menu Items
+                  </option>
+                  <option value="ALL_ITEMS">
+                    All Menu Items — Including Future Items
+                  </option>
+                </select>
+
+                {formData.targetScope === "ALL_ITEMS" ? (
+                  <div className="mt-3 flex items-start gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-3.5 text-blue-700">
+                    <Layers3
+                      size={17}
+                      className="mt-0.5 shrink-0"
+                    />
+                    <div>
+                      <p className="text-xs font-extrabold">
+                        Automatic future-item coverage
+                      </p>
+                      <p className="mt-0.5 text-[11px] leading-5 text-blue-600">
+                        Any eligible menu item added while this offer
+                        is valid will automatically qualify. No manual
+                        offer update is required.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-4">
+                    <div className="mb-2 flex items-center justify-between">
+                      <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                        Select Menu Items
+                      </p>
+
+                      <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-bold text-slate-500 shadow-sm">
+                        {formData.targetItems.length} selected
+                      </span>
+                    </div>
+
+                    {itemsLoading ? (
+                      <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-white p-4 text-xs font-semibold text-slate-400">
+                        <RefreshCw
+                          size={15}
+                          className="animate-spin"
+                        />
+                        Loading menu items...
+                      </div>
+                    ) : itemsError ? (
+                      <div className="flex items-start gap-2 rounded-2xl border border-rose-100 bg-rose-50 p-4 text-xs font-semibold text-rose-600">
+                        <AlertCircle size={16} className="mt-0.5" />
+                        <span>
+                          Failed to load menu items. Please check your
+                          authentication and try again.
+                        </span>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="relative">
+                          <select
+                            value=""
+                            onChange={(e) => {
+                              addTargetItem(e.target.value);
+                            }}
+                            className="w-full appearance-none rounded-2xl border border-slate-200 bg-white px-4 py-3.5 pr-10 text-sm font-semibold text-slate-700 outline-none transition focus:border-red-400 focus:ring-4 focus:ring-red-500/10"
+                          >
+                            <option value="">
+                              Select a menu item to add...
+                            </option>
+
+                            {menuItems
+                              .filter(
+                                (item) =>
+                                  !formData.targetItems.includes(
+                                    String(item._id),
+                                  ),
+                              )
+                              .map((item) => (
+                                <option
+                                  key={item._id}
+                                  value={item._id}
+                                >
+                                  {item.name} — ₹
+                                  {Number(
+                                    item.price || 0,
+                                  ).toLocaleString("en-IN")}
+                                </option>
+                              ))}
+                          </select>
+
+                          <ChevronDown
+                            size={16}
+                            className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"
+                          />
+                        </div>
+
+                        {formData.targetItems.length > 0 && (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {formData.targetItems.map((itemId) => {
+                              const item =
+                                menuItemsById[String(itemId)];
+
+                              return (
+                                <span
+                                  key={itemId}
+                                  className="inline-flex items-center gap-2 rounded-full border border-red-100 bg-red-50 px-3 py-1.5 text-[11px] font-bold text-red-700"
+                                >
+                                  {item?.name || "Unknown item"}
+
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      removeTargetItem(
+                                        itemId,
+                                      )
+                                    }
+                                    className="rounded-full text-red-400 transition hover:text-red-700"
+                                    aria-label={`Remove ${
+                                      item?.name || "item"
+                                    }`}
+                                  >
+                                    <X size={13} />
+                                  </button>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Schedule */}
+            <div>
+              <div className="mb-3 flex items-center gap-2">
+                <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 text-[10px] font-black text-slate-600">
+                  03
+                </span>
+                <p className="text-xs font-extrabold uppercase tracking-wider text-slate-500">
+                  Schedule & Expiry
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <label className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                      <Clock3 size={14} />
+                      Starts At
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={setQuickStartNow}
+                      className="text-[10px] font-extrabold text-red-600 hover:text-red-700"
+                    >
+                      Start Now
+                    </button>
+                  </div>
+
+                  <input
+                    type="datetime-local"
+                    value={formData.startsAt}
+                    onChange={(e) =>
+                      updateField(
+                        "startsAt",
+                        e.target.value,
+                      )
+                    }
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-red-400 focus:ring-4 focus:ring-red-500/10"
+                  />
+
+                  <p className="mt-2 text-[10px] font-medium text-slate-400">
+                    Leave empty to start immediately.
+                  </p>
+                </div>
+
+                <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+                  <div className="mb-2 flex items-center justify-between gap-3">
+                    <label className="flex items-center gap-2 text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                      <CalendarClock size={14} />
+                      Expires At
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={() => setQuickExpiry(7)}
+                      className="text-[10px] font-extrabold text-red-600 hover:text-red-700"
+                    >
+                      +7 Days
+                    </button>
+                  </div>
+
+                  <input
+                    type="datetime-local"
+                    value={formData.expiresAt}
+                    onChange={(e) =>
+                      updateField(
+                        "expiresAt",
+                        e.target.value,
+                      )
+                    }
+                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 outline-none transition focus:border-red-400 focus:ring-4 focus:ring-red-500/10"
+                  />
+
+                  <p className="mt-2 text-[10px] font-medium text-slate-400">
+                    Leave empty for no expiry.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Summary + submit */}
+            <div className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-4 lg:flex-row lg:items-center lg:justify-between">
+              <div className="flex items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white text-slate-600 shadow-sm">
+                  <PackageSearch size={17} />
+                </div>
+
+                <div>
+                  <p className="text-xs font-extrabold text-slate-800">
+                    Promotion summary
+                  </p>
+
+                  <p className="mt-0.5 text-[11px] leading-5 text-slate-500">
+                    {formData.discountValue
+                      ? getDiscountLabel({
+                          discountType:
+                            formData.discountType,
+                          discountValue:
+                            formData.discountValue,
+                        })
+                      : "Discount not configured"}{" "}
+                    •{" "}
+                    {formData.targetScope === "ALL_ITEMS"
+                      ? "All menu items"
+                      : `${formData.targetItems.length} selected item(s)`}
+                  </p>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleLaunchOffer}
+                disabled={isSubmitting}
+                className="inline-flex min-h-12 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-500 to-rose-600 px-6 text-sm font-extrabold text-white shadow-lg shadow-red-500/20 transition hover:-translate-y-0.5 hover:shadow-xl hover:shadow-red-500/25 active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw
+                      size={17}
+                      className="animate-spin"
+                    />
+                    Creating Offer...
+                  </>
+                ) : (
+                  <>
+                    <PlusCircle size={17} />
+                    Launch Offer
+                  </>
+                )}
+              </button>
             </div>
           </div>
+        </section>
 
-          <button
-            onClick={handleLaunchOffer}
-            disabled={addMutation.isPending}
-            className="w-full bg-gradient-to-r from-red-500 to-rose-600 text-white py-3.5 rounded-2xl font-bold hover:opacity-95 active:scale-[0.99] transition-all shadow-md shadow-red-500/20 text-xs cursor-pointer disabled:opacity-50"
-          >
-            {addMutation.isPending
-              ? "Launching Campaign..."
-              : "Launch Offer Campaign"}
-          </button>
-        </div>
-
-        {/* Offers Listing Section */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between px-2">
-            <h3 className="font-black text-slate-800 text-base">
-              Active Offers List
-            </h3>
-            <span className="text-xs font-bold bg-white px-3 py-1 rounded-full border border-slate-200 text-slate-600 shadow-xs">
-              {offers.length} Total Offers
-            </span>
-          </div>
-
-          {offersLoading && (
-            <p className="text-sm text-slate-400 p-6 text-center bg-white rounded-3xl border border-slate-200">
-              Loading offers...
-            </p>
-          )}
-          {offersError && (
-            <p className="text-sm text-red-500 p-6 text-center bg-white rounded-3xl border border-slate-200">
-              Failed to load offers.
-            </p>
-          )}
-          {!offersLoading && offers.length === 0 && (
-            <div className="text-center py-12 bg-white rounded-3xl border border-slate-200 shadow-xs space-y-2">
-              <Tag size={36} className="mx-auto text-slate-300" />
-              <p className="text-sm text-slate-500 font-medium">
-                No offers created yet.
+        {/* Offer list */}
+        <section>
+          <div className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-lg font-black tracking-tight text-slate-900">
+                Offer Management
+              </h2>
+              <p className="mt-0.5 text-xs text-slate-500">
+                Manage active, scheduled and expired promotions.
               </p>
             </div>
-          )}
 
-          <div className="space-y-3">
-            {offers.map((offer) => (
-              <OfferCard
-                key={offer._id}
-                offer={offer}
-                onDelete={handleDeleteOffer}
+            <button
+              type="button"
+              onClick={() => refetchOffers()}
+              disabled={offersFetching}
+              className="inline-flex items-center justify-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-50 lg:self-auto"
+            >
+              <RefreshCw
+                size={14}
+                className={
+                  offersFetching
+                    ? "animate-spin"
+                    : ""
+                }
               />
-            ))}
+              Refresh
+            </button>
           </div>
-        </div>
+
+          <div className="mb-4 flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:flex-row">
+            <div className="relative flex-1">
+              <Search
+                size={16}
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                value={offerSearch}
+                onChange={(e) =>
+                  setOfferSearch(e.target.value)
+                }
+                placeholder="Search offers..."
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-10 pr-4 text-xs font-semibold outline-none transition focus:border-red-300 focus:bg-white focus:ring-4 focus:ring-red-500/10"
+              />
+            </div>
+
+            <div className="flex gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1">
+              {[
+                ["ALL", "All"],
+                ["ACTIVE", "Active"],
+                ["SCHEDULED", "Scheduled"],
+                ["EXPIRED", "Expired"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() =>
+                    setOfferFilter(value)
+                  }
+                  className={`whitespace-nowrap rounded-lg px-3 py-2 text-[10px] font-extrabold transition ${
+                    offerFilter === value
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-500 hover:text-slate-800"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {offersLoading ? (
+            <div className="grid grid-cols-1 gap-3">
+              {[1, 2, 3].map((item) => (
+                <div
+                  key={item}
+                  className="h-48 animate-pulse rounded-[24px] border border-slate-200 bg-white"
+                />
+              ))}
+            </div>
+          ) : offersError ? (
+            <div className="rounded-[24px] border border-rose-100 bg-white p-10 text-center shadow-sm">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-500">
+                <AlertCircle size={22} />
+              </div>
+              <h3 className="text-sm font-black text-slate-900">
+                Unable to load offers
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Please refresh and try again.
+              </p>
+            </div>
+          ) : filteredOffers.length === 0 ? (
+            <div className="rounded-[24px] border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+                <Tag size={25} />
+              </div>
+
+              <h3 className="text-sm font-black text-slate-800">
+                {offers.length === 0
+                  ? "No offers created yet"
+                  : "No matching offers"}
+              </h3>
+
+              <p className="mx-auto mt-1 max-w-sm text-xs leading-5 text-slate-500">
+                {offers.length === 0
+                  ? "Create your first promotion using the offer builder above."
+                  : "Try a different search term or status filter."}
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3">
+              {filteredOffers.map((offer) => (
+                <OfferCard
+                  key={offer._id}
+                  offer={offer}
+                  onDelete={handleDeleteOffer}
+                  deleting={
+                    deleteMutation.isPending &&
+                    deleteMutation.variables ===
+                      offer._id
+                  }
+                />
+              ))}
+            </div>
+          )}
+        </section>
       </div>
-    </>
+    </div>
   );
 }
