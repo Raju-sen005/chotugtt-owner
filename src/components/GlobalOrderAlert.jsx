@@ -1,26 +1,34 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { AlertCircle, ShoppingBag } from "lucide-react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useSocket } from "../context/SocketContext";
+import { useAuth } from "../context/AuthContext";
 
-const getRestaurantId = (order) => {
-  if (!order?.restaurantId) {
-    return null;
-  }
+// const getRestaurantId = (order) => {
+//   if (!order?.restaurantId) {
+//     return null;
+//   }
 
-  if (typeof order.restaurantId === "object") {
-    return order.restaurantId?._id ? String(order.restaurantId._id) : null;
-  }
+//   if (typeof order.restaurantId === "object") {
+//     return order.restaurantId?._id ? String(order.restaurantId._id) : null;
+//   }
 
-  return String(order.restaurantId);
-};
+//   return String(order.restaurantId);
+// };
 
 export default function GlobalOrderAlert() {
-  const socket = useSocket();
+  const { user } = useAuth();
 
+  const socket = useSocket();
+  const restaurantId =
+    typeof user?.restaurantId === "object"
+      ? user.restaurantId?._id
+      : user?.restaurantId;
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const [orderAlert, setOrderAlert] = useState(null);
 
@@ -31,6 +39,7 @@ export default function GlobalOrderAlert() {
   const [rejectReason, setRejectReason] = useState("Item Out of Stock");
   const [showRejectReason, setShowRejectReason] = useState(false);
   const [cancelItemData, setCancelItemData] = useState(null);
+
   /*
    * Prevent duplicate popup for the exact same
    * event/order arriving multiple times.
@@ -52,35 +61,58 @@ export default function GlobalOrderAlert() {
   const handleAcceptOrder = useCallback(async () => {
     const orderId = orderAlert?.order?._id;
 
-    if (!orderId || isProcessing || !isPendingOrder) return;
+    if (!orderId || isProcessing || !isPendingOrder) {
+      return;
+    }
 
     try {
       setIsProcessing(true);
 
       const res = await axios.patch(
         `/orders/${orderId}/status`,
-        { status: "ACCEPTED" },
-        { withCredentials: true },
+        {
+          status: "ACCEPTED",
+        },
+        {
+          withCredentials: true,
+        },
       );
 
       const updatedOrder = res.data?.data;
+      const kotItems = res.data?.kotItems || [];
 
-      if (updatedOrder) {
-        setOrderAlert((current) =>
-          current
-            ? {
-                ...current,
-                order: updatedOrder,
-              }
-            : current,
-        );
-      }
+      console.log("✅ Order accepted:", {
+        order: updatedOrder,
+        kotItems,
+      });
 
-      console.log("✅ Order accepted:", res.data);
-
+      /*
+       * IMPORTANT:
+       *
+       * LiveOrderMonitor already contains the production KOT
+       * printing logic.
+       *
+       * Send the accepted order + KOT items to /orders.
+       * LiveOrderMonitor will automatically call its existing
+       * printKOT() function.
+       */
       setShowRejectReason(false);
       recentAlertsRef.current.clear();
       setOrderAlert(null);
+
+      navigate("/orders", {
+        state: {
+          autoPrintKOT:
+            kotItems.length > 0
+              ? {
+                  order: updatedOrder,
+                  items: kotItems,
+                  kotType: "NEW",
+                }
+              : null,
+        },
+        replace: true,
+      });
     } catch (error) {
       console.error("❌ Failed to accept order:", error);
 
@@ -91,7 +123,7 @@ export default function GlobalOrderAlert() {
     } finally {
       setIsProcessing(false);
     }
-  }, [orderAlert, isProcessing, isPendingOrder]);
+  }, [orderAlert, isProcessing, isPendingOrder, navigate]);
 
   const handleRejectOrder = useCallback(async () => {
     const orderId = orderAlert?.order?._id;
@@ -134,20 +166,27 @@ export default function GlobalOrderAlert() {
     }
   }, [orderAlert, rejectReason, isProcessing, isPendingOrder]);
 
-  const handleCancelItem = useCallback((orderId, itemId) => {
-    if (!orderId || !itemId) return;
+  const handleCancelItem = useCallback(
+    (orderId, itemId) => {
+      if (!orderId || !itemId || isProcessing) {
+        return;
+      }
 
-    setCancelItemData({
-      orderId,
-      itemId,
-    });
-  }, []);
+      setCancelItemData({
+        orderId: String(orderId),
+        itemId: String(itemId),
+      });
+    },
+    [isProcessing],
+  );
 
   const confirmCancelItem = useCallback(async () => {
     const orderId = cancelItemData?.orderId;
     const itemId = cancelItemData?.itemId;
 
-    if (!orderId || !itemId || isProcessing) return;
+    if (!orderId || !itemId || isProcessing) {
+      return;
+    }
 
     try {
       setIsProcessing(true);
@@ -155,34 +194,94 @@ export default function GlobalOrderAlert() {
       const res = await axios.patch(
         `/orders/${orderId}/item/${itemId}/cancel`,
         {},
-        { withCredentials: true },
+        {
+          withCredentials: true,
+        },
       );
 
       const updatedOrder = res.data?.data;
 
-      if (updatedOrder) {
-        setOrderAlert((current) =>
-          current
-            ? {
-                ...current,
-                order: updatedOrder,
-              }
-            : current,
-        );
+      if (!updatedOrder) {
+        throw new Error("Updated order was not returned by server.");
       }
 
+      // --------------------------------------------------
+      // UPDATE LIVE ORDER CACHE
+      // --------------------------------------------------
+      setOrderAlert((current) => {
+        if (!current) return null;
+
+        const currentOrder = current.order;
+
+        // Running popup should continue showing ONLY
+        // the running-order items that belong to this alert.
+        const alertItemIds = new Set(
+          (currentOrder?.items || []).map((item) => String(item?._id)),
+        );
+
+        const updatedAlertItems = (updatedOrder.items || []).filter(
+          (item) =>
+            alertItemIds.has(String(item?._id)) && item?.status !== "REJECTED",
+        );
+
+        // If the cancelled item was the only item shown
+        // in this running popup, close the popup.
+        if (updatedAlertItems.length === 0) {
+          return null;
+        }
+
+        return {
+          ...current,
+          order: {
+            ...currentOrder,
+            ...updatedOrder,
+
+            // IMPORTANT:
+            // Do NOT put the complete updatedOrder.items here.
+            // Popup must retain only this alert's item set.
+            items: updatedAlertItems,
+          },
+        };
+      });
+
+      // --------------------------------------------------
+      // UPDATE LIVE ORDERS CACHE
+      // --------------------------------------------------
+      queryClient.setQueryData(
+        ["live-orders", restaurantId],
+        (oldOrders = []) =>
+          oldOrders.map((order) =>
+            String(order?._id) === String(orderId) ? updatedOrder : order,
+          ),
+      );
+
+      // --------------------------------------------------
+      // TABLE STATUS
+      // --------------------------------------------------
+      queryClient.invalidateQueries({
+        queryKey: ["live-orders", restaurantId],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["table-status", restaurantId],
+      });
+
+      // Close confirmation popup
       setCancelItemData(null);
     } catch (error) {
       console.error("❌ Failed to cancel order item:", error);
 
+      setCancelItemData(null);
+
       window.alert(
         error.response?.data?.message ||
+          error.message ||
           "Failed to cancel item. Please try again.",
       );
     } finally {
       setIsProcessing(false);
     }
-  }, [cancelItemData, isProcessing]);
+  }, [cancelItemData, isProcessing, queryClient, restaurantId]);
 
   const cancelItemName =
     orderAlert?.order?.items?.find(
@@ -195,7 +294,7 @@ export default function GlobalOrderAlert() {
    * --------------------------------------------------
    */
 
-  const getAlertKey = useCallback((order, eventType) => {
+  const getAlertKey = useCallback((order, eventType, eventItems = []) => {
     if (!order) {
       return null;
     }
@@ -219,8 +318,24 @@ export default function GlobalOrderAlert() {
       return `NEW:${String(orderId)}`;
     }
 
-    const updatedAt = order?.updatedAt ?? order?.createdAt ?? Date.now();
+    // For running-order events, the embedded order-item _id values are the
+    // stable event identity. This is safer than relying only on updatedAt,
+    // because multiple legitimate append requests can occur very quickly.
+    const itemIds = Array.isArray(eventItems)
+      ? eventItems
+          .map((item) => item?._id)
+          .filter(Boolean)
+          .map(String)
+          .sort()
+      : [];
 
+    if (itemIds.length > 0) {
+      return `RUNNING:${String(orderId)}:${itemIds.join(",")}`;
+    }
+
+    // Backward-compatible fallback for older socket payloads that do not
+    // contain embedded order-item ids.
+    const updatedAt = order?.updatedAt ?? order?.createdAt ?? Date.now();
     return `RUNNING:${String(orderId)}:${String(updatedAt)}`;
   }, []);
 
@@ -247,12 +362,12 @@ export default function GlobalOrderAlert() {
    */
 
   const showAlert = useCallback(
-    (order, eventType) => {
+    (order, eventType, eventItems = []) => {
       if (!order) {
         return;
       }
 
-      const key = getAlertKey(order, eventType);
+      const key = getAlertKey(order, eventType, eventItems);
 
       /*
        * If no reliable order ID exists,
@@ -305,11 +420,38 @@ export default function GlobalOrderAlert() {
     };
 
     const handleRunningOrderUpdated = (payload) => {
-      const order = payload?.order ?? payload;
+      const order = payload?.order ?? null;
 
-      console.log("🚨 GLOBAL RUNNING ORDER ALERT:", order);
+      const newItems = Array.isArray(payload?.items)
+        ? payload.items.filter((item) => item?.status !== "REJECTED")
+        : [];
 
-      showAlert(order, "RUNNING_ORDER_UPDATED");
+      if (!order?._id) {
+        console.warn("⚠️ Running order alert ignored: invalid order");
+        return;
+      }
+
+      if (newItems.length === 0) {
+        console.warn("⚠️ Running order alert ignored: no new items", payload);
+        return;
+      }
+
+      console.log("🚨 GLOBAL RUNNING ORDER ALERT:", {
+        orderId: order.orderId,
+        newItems,
+      });
+
+      showAlert(
+        {
+          ...order,
+
+          // 🔥 IMPORTANT:
+          // Popup gets ONLY newly added items.
+          items: newItems,
+        },
+        "RUNNING_ORDER_UPDATED",
+        newItems,
+      );
     };
 
     socket.on("NEW_ORDER_RECEIVED", handleNewOrder);
@@ -358,7 +500,7 @@ export default function GlobalOrderAlert() {
 
       const focusable = Array.from(
         dialog.querySelectorAll(
-          'button:not([disabled]), select:not([disabled]), [href], input:not([disabled]), textarea:not([disabled])',
+          "button:not([disabled]), select:not([disabled]), [href], input:not([disabled]), textarea:not([disabled])",
         ),
       ).filter((element) => {
         const style = window.getComputedStyle(element);
@@ -434,8 +576,7 @@ export default function GlobalOrderAlert() {
 
   const orderType = order?.orderType ?? "ORDER";
 
-  const isRunningOrder =
-    orderAlert.eventType === "RUNNING_ORDER_UPDATED";
+  const isRunningOrder = orderAlert.eventType === "RUNNING_ORDER_UPDATED";
 
   const totalItemCount = activeItems.reduce(
     (sum, item) => sum + Number(item?.quantity || 0),
@@ -623,16 +764,21 @@ export default function GlobalOrderAlert() {
 
               <div className="divide-y divide-slate-100">
                 {order?.items?.length ? (
-                  order.items.map((item) => {
+                  order.items.map((item, index) => {
                     const isRejected = item?.status === "REJECTED";
                     const canCancel =
+                      Boolean(item?._id) &&
                       !isRejected &&
                       order?.status !== "COMPLETED" &&
                       order?.status !== "REJECTED";
 
                     return (
                       <div
-                        key={item?._id || `${item?.name}-${item?.itemId}`}
+                        key={
+                          item?._id
+                            ? String(item._id)
+                            : `${order?._id || order?.orderId || "order"}:item:${index}`
+                        }
                         className="flex items-center gap-3 px-4 py-3"
                       >
                         <div
@@ -697,10 +843,7 @@ export default function GlobalOrderAlert() {
                   })
                 ) : (
                   <div className="px-4 py-8 text-center">
-                    <ShoppingBag
-                      size={30}
-                      className="mx-auto text-slate-300"
-                    />
+                    <ShoppingBag size={30} className="mx-auto text-slate-300" />
                     <p className="mt-2 text-sm font-semibold text-slate-500">
                       No items found
                     </p>
@@ -730,7 +873,7 @@ export default function GlobalOrderAlert() {
                   {isProcessing ? "PROCESSING..." : "✓ ACCEPT ORDER"}
                 </button>
 
-                <button
+                {/* <button
                   type="button"
                   disabled={isProcessing}
                   onClick={() => setShowRejectReason((prev) => !prev)}
@@ -748,7 +891,7 @@ export default function GlobalOrderAlert() {
                   <span className="ml-2 text-xs">
                     {showRejectReason ? "▲" : "▼"}
                   </span>
-                </button>
+                </button> */}
 
                 {/* REJECTION PANEL
                     Kept outside the button so native select/dropdown
@@ -765,9 +908,7 @@ export default function GlobalOrderAlert() {
                     <select
                       id="global-order-reject-reason"
                       value={rejectReason}
-                      onChange={(event) =>
-                        setRejectReason(event.target.value)
-                      }
+                      onChange={(event) => setRejectReason(event.target.value)}
                       disabled={isProcessing}
                       className="
                         block w-full appearance-auto rounded-xl
@@ -801,9 +942,7 @@ export default function GlobalOrderAlert() {
                         disabled:cursor-wait disabled:opacity-60
                       "
                     >
-                      {isProcessing
-                        ? "REJECTING..."
-                        : "CONFIRM REJECTION"}
+                      {isProcessing ? "REJECTING..." : "CONFIRM REJECTION"}
                     </button>
                   </div>
                 )}

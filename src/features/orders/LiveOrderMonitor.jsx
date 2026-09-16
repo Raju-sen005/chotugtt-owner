@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback, memo } from "react";
+import { useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import QRCode from "qrcode";
@@ -61,8 +62,13 @@ const OrderRow = memo(function OrderRow({
       <td className="px-6 py-4 text-xs text-slate-600 font-medium">
         <div className="flex flex-col gap-0.5 max-w-[220px]">
           {(showAllItems ? order.items : order.items.slice(0, 1)).map(
-            (item) => (
-              <div key={item._id} className="flex items-center gap-1.5 group">
+            (item, index) => (
+              <div
+                key={
+                  item?._id
+                    ? String(item._id)
+                    : `${order?._id || order?.orderId || "order"}:item:${index}`
+                } className="flex items-center gap-1.5 group">
                 <span
                   className={`truncate ${
                     item.status === "REJECTED"
@@ -72,7 +78,8 @@ const OrderRow = memo(function OrderRow({
                 >
                   • {item.quantity}x {item.name}
                 </span>
-                {item.status !== "REJECTED" &&
+                {Boolean(item?._id) &&
+                  item.status !== "REJECTED" &&
                   order.status !== "COMPLETED" &&
                   order.status !== "REJECTED" && (
                     <button
@@ -196,9 +203,13 @@ const OrderCard = memo(function OrderCard({
       <div className="text-xs text-slate-600 font-medium border-t border-dashed border-slate-200 pt-2.5">
         <div className="flex flex-col gap-1">
           {(showAllItems ? order.items : order.items.slice(0, 2)).map(
-            (item) => (
+            (item, index) => (
               <div
-                key={item._id}
+                key={
+                  item?._id
+                    ? String(item._id)
+                    : `${order?._id || order?.orderId || "order"}:item:${index}`
+                }
                 className="flex items-center justify-between gap-2"
               >
                 <span
@@ -210,7 +221,8 @@ const OrderCard = memo(function OrderCard({
                 >
                   • {item.quantity}x {item.name}
                 </span>
-                {item.status !== "REJECTED" &&
+                {Boolean(item?._id) &&
+                  item.status !== "REJECTED" &&
                   order.status !== "COMPLETED" &&
                   order.status !== "REJECTED" && (
                     <button
@@ -345,6 +357,7 @@ const TableStatusStrip = memo(function TableStatusStrip({ tables, isLoading }) {
 
 export default function LiveOrderMonitor() {
   const { user } = useAuth();
+  const location = useLocation();
   const restaurantId =
     typeof user?.restaurantId === "object"
       ? user.restaurantId?._id
@@ -359,7 +372,6 @@ export default function LiveOrderMonitor() {
   const [statusPopupOrderId, setStatusPopupOrderId] = useState(null);
   const [kotItems, setKotItems] = useState([]);
   const [cancelItemData, setCancelItemData] = useState(null);
-  
 
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
@@ -373,6 +385,7 @@ export default function LiveOrderMonitor() {
   const [splitAmount, setSplitAmount] = useState("");
   const [isSplitSubmitting, setIsSplitSubmitting] = useState(false);
   const [isGeneratingBill, setIsGeneratingBill] = useState(false);
+  const [kotType, setKotType] = useState("NEW");
   const [rejectReasonDropdown, setRejectReasonDropdown] =
     useState("Item Out of Stock");
   const [selectedBillTemplate, setSelectedBillTemplate] = useState(() =>
@@ -422,53 +435,89 @@ export default function LiveOrderMonitor() {
   });
 
   const printKOT = useCallback(
-    async ({ order, items }) => {
-      if (!order || !items?.length) {
+    async ({ order, items, kotType = "NEW" }) => {
+      if (!order?._id) {
+        showError("Invalid order.");
+        return;
+      }
+
+      if (!Array.isArray(items) || !items.length) {
         showError("No new items available for KOT.");
         return;
       }
 
-      const activeItems = items.filter((item) => item.status !== "REJECTED");
+      const normalizedKotType = kotType === "RUNNING" ? "RUNNING" : "NEW";
+
+      const activeItems = items.filter(
+        (item) => item && item.status !== "REJECTED",
+      );
 
       if (!activeItems.length) {
         showError("No active items available for KOT.");
         return;
       }
 
-      const kotRows = order.items
-        .map((item) => {
+      const isRunningOrder = normalizedKotType === "RUNNING";
+
+      const kotTitle = isRunningOrder ? "RUNNING ORDER KOT" : "NEW ORDER KOT";
+
+      const kotSubtitle = isRunningOrder ? "ADDITIONAL ITEMS" : "NEW ORDER";
+
+      // -----------------------------------------
+      // KOT ITEMS
+      // -----------------------------------------
+      const kotRows = activeItems
+        .map((item, index) => {
           return `
-    <tr>
-      <td class="item-col">
-        <div class="item-name">
-          ${escapeHtml(item.name)}
-        </div>
+          <tr>
+            <td class="sr-col">
+              ${index + 1}
+            </td>
 
-        ${
-          item.variant
-            ? `<div class="item-meta">Variant: ${escapeHtml(item.variant)}</div>`
-            : ""
-        }
+            <td class="item-col">
+              <div class="item-name">
+                ${escapeHtml(item.name || "Item")}
+              </div>
 
-        ${
-          item.notes
-            ? `<div class="item-meta">Note: ${escapeHtml(item.notes)}</div>`
-            : ""
-        }
-      </td>
+              ${
+                item.variant
+                  ? `
+                    <div class="item-meta">
+                      Variant: ${escapeHtml(item.variant)}
+                    </div>
+                  `
+                  : ""
+              }
 
-      <td class="qty-col">
-        ${escapeHtml(item.quantity)}
-      </td>
-    </tr>
-  `;
+              ${
+                item.notes
+                  ? `
+                    <div class="item-meta note-text">
+                      Note: ${escapeHtml(item.notes)}
+                    </div>
+                  `
+                  : ""
+              }
+            </td>
+
+            <td class="qty-col">
+              ${escapeHtml(String(item.quantity ?? 0))}
+            </td>
+          </tr>
+        `;
         })
         .join("");
 
+      // -----------------------------------------
+      // TABLE LABEL
+      // -----------------------------------------
       const tableLabel = order.mergedTables?.length
-        ? `${order.tableNumber}, ${order.mergedTables.join(", ")}`
-        : order.tableNumber;
+        ? `${order.tableNumber || "-"}, ${order.mergedTables.join(", ")}`
+        : order.tableNumber || "-";
 
+      // -----------------------------------------
+      // DATE / TIME
+      // -----------------------------------------
       const now = new Date();
 
       const dateStr = `${String(now.getDate()).padStart(2, "0")}/${String(
@@ -481,301 +530,576 @@ export default function LiveOrderMonitor() {
         hour12: false,
       });
 
+      // -----------------------------------------
+      // ORDER TYPE
+      // -----------------------------------------
+      const orderType = String(order.orderType || "DINE IN").toUpperCase();
+
+      // -----------------------------------------
+      // PRINT HTML
+      // -----------------------------------------
       const windowContent = `
+<!DOCTYPE html>
 <html>
-  <head>
-    <title>KOT ${escapeHtml(order.orderId)}</title>
+<head>
+  <meta charset="UTF-8" />
 
-    <style>
-      @media print {
-        @page {
-          margin: 0;
-          size: 80mm auto;
-        }
+  <title>
+    ${escapeHtml(kotTitle)} - ${escapeHtml(order.orderId || "")}
+  </title>
 
-        html,
-        body {
-          width: 80mm;
-          margin: 0;
-          padding: 0;
-        }
-      }
+  <style>
 
-      * {
-        box-sizing: border-box;
-      }
+    @page {
+      margin: 0;
+      size: 80mm auto;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      width: 80mm;
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+    }
+
+    body {
+      font-family:
+        "Courier New",
+        Courier,
+        monospace;
+
+      color: #111;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .kot {
+      width: 80mm;
+      max-width: 80mm;
+
+      padding:
+        10px
+        9px
+        14px;
+    }
+
+    /* ================================
+       HEADER
+    ================================= */
+
+    .header {
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .brand {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      margin-bottom: 5px;
+    }
+
+    .main-title {
+      font-size: 18px;
+      line-height: 1.1;
+      font-weight: 900;
+      letter-spacing: 0.4px;
+      margin-bottom: 5px;
+    }
+
+    .subtitle {
+      font-size: 9px;
+      font-weight: 900;
+      letter-spacing: 1.2px;
+      margin-bottom: 8px;
+    }
+
+    .order-id {
+      font-size: 16px;
+      font-weight: 900;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .order-badge {
+      display: inline-block;
+
+      border: 2px solid #111;
+
+      padding:
+        4px
+        12px;
+
+      border-radius: 3px;
+
+      font-size: 11px;
+      font-weight: 900;
+
+      letter-spacing: 0.8px;
+    }
+
+    /* ================================
+       DIVIDER
+    ================================= */
+
+    .divider {
+      border-top: 1.5px dashed #111;
+      margin: 9px 0;
+    }
+
+    .solid-divider {
+      border-top: 2px solid #111;
+      margin: 8px 0;
+    }
+
+    /* ================================
+       ORDER META
+    ================================= */
+
+    .section-heading {
+      font-size: 9px;
+      font-weight: 900;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+
+      margin-bottom: 5px;
+    }
+
+    .meta {
+      width: 100%;
+    }
+
+    .meta-row {
+      display: flex;
+
+      justify-content: space-between;
+      align-items: flex-start;
+
+      gap: 8px;
+
+      margin: 3px 0;
+    }
+
+    .meta-label {
+      font-size: 10px;
+      font-weight: 700;
+
+      min-width: 58px;
+    }
+
+    .meta-value {
+      flex: 1;
+
+      text-align: right;
+
+      font-size: 11px;
+      font-weight: 900;
+
+      word-break: break-word;
+    }
+
+    /* ================================
+       ITEMS
+    ================================= */
+
+    .items-header {
+      display: flex;
+      align-items: center;
+
+      font-size: 9px;
+      font-weight: 900;
+
+      letter-spacing: 0.8px;
+
+      padding-bottom: 5px;
+
+      border-bottom: 1.5px solid #111;
+    }
+
+    .items-header .number {
+      width: 8%;
+    }
+
+    .items-header .name {
+      width: 70%;
+    }
+
+    .items-header .quantity {
+      width: 22%;
+
+      text-align: right;
+    }
+
+    table {
+      width: 100%;
+
+      border-collapse: collapse;
+
+      table-layout: fixed;
+    }
+
+    td {
+      vertical-align: top;
+
+      padding:
+        7px
+        0;
+
+      border-bottom: 1px dotted #777;
+    }
+
+    .sr-col {
+      width: 8%;
+
+      font-size: 10px;
+      font-weight: 900;
+
+      text-align: left;
+    }
+
+    .item-col {
+      width: 70%;
+
+      padding-right: 5px;
+
+      text-align: left;
+    }
+
+    .qty-col {
+      width: 22%;
+
+      text-align: right;
+
+      font-size: 15px;
+      font-weight: 900;
+    }
+
+    .item-name {
+      font-size: 12px;
+
+      line-height: 1.3;
+
+      font-weight: 900;
+    }
+
+    .item-meta {
+      margin-top: 2px;
+
+      font-size: 9px;
+
+      line-height: 1.3;
+
+      font-weight: 600;
+    }
+
+    .note-text {
+      font-style: italic;
+    }
+
+    /* ================================
+       SPECIAL INSTRUCTIONS
+    ================================= */
+
+    .notes {
+      border: 1.5px solid #111;
+
+      padding: 7px;
+
+      margin-top: 7px;
+
+      border-radius: 3px;
+    }
+
+    .notes-title {
+      font-size: 9px;
+
+      font-weight: 900;
+
+      letter-spacing: 0.7px;
+
+      text-transform: uppercase;
+
+      margin-bottom: 4px;
+    }
+
+    .note {
+      font-size: 10px;
+
+      line-height: 1.4;
+
+      font-weight: 700;
+
+      word-break: break-word;
+    }
+
+    /* ================================
+       SUMMARY
+    ================================= */
+
+    .item-summary {
+      display: flex;
+
+      justify-content: space-between;
+
+      align-items: center;
+
+      margin-top: 8px;
+
+      padding:
+        6px
+        0;
+
+      border-top: 2px solid #111;
+
+      border-bottom: 1px solid #111;
+    }
+
+    .summary-label {
+      font-size: 10px;
+
+      font-weight: 900;
+
+      letter-spacing: 0.5px;
+    }
+
+    .summary-value {
+      font-size: 13px;
+
+      font-weight: 900;
+    }
+
+    /* ================================
+       FOOTER
+    ================================= */
+
+    .footer {
+      text-align: center;
+
+      margin-top: 12px;
+    }
+
+    .kitchen-copy {
+      font-size: 11px;
+
+      font-weight: 900;
+
+      letter-spacing: 1.2px;
+    }
+
+    .powered-by {
+      margin-top: 8px;
+
+      padding-top: 6px;
+
+      border-top: 1px dashed #999;
+
+      font-size: 8px;
+
+      color: #777;
+
+      letter-spacing: 0.4px;
+    }
+
+    .powered-by b {
+      color: #333;
+
+      font-weight: 900;
+    }
+
+    /* ================================
+       PRINT
+    ================================= */
+
+    @media print {
 
       html,
       body {
+        width: 80mm;
         margin: 0;
         padding: 0;
-        background: #fff;
-      }
-
-      body {
-        font-family: "Courier New", Courier, monospace;
-        color: #111;
-        font-size: 12px;
-        font-weight: 600;
       }
 
       .kot {
         width: 80mm;
-        max-width: 80mm;
-        padding: 14px 10px 16px;
       }
+    }
 
-      .center {
-        text-align: center;
-      }
+  </style>
+</head>
 
-      .title {
-        font-size: 17px;
-        font-weight: 900;
-        letter-spacing: 0.5px;
-        margin-bottom: 6px;
-      }
+<body>
 
-      .order-id {
-        font-size: 15px;
-        font-weight: 900;
-        margin-bottom: 6px;
-      }
+  <div class="kot">
 
-      .order-type {
-        display: inline-block;
-        border: 1.5px solid #111;
-        padding: 3px 10px;
-        font-size: 11px;
-        font-weight: 900;
-        margin-bottom: 8px;
-        letter-spacing: 0.4px;
-        border-radius: 3px;
-      }
+    <!-- ==========================
+         HEADER
+    =========================== -->
 
-      .meta {
-        font-size: 11px;
-        line-height: 1.6;
-        text-align: left;
-      }
+    <div class="header">
 
-      .meta-row {
-        display: flex;
-        justify-content: space-between;
-        gap: 8px;
-      }
-
-      .meta-label {
-        font-weight: 700;
-        color: #444;
-      }
-
-      .meta-value {
-        font-weight: 900;
-        text-align: right;
-      }
-
-      .divider {
-        border-top: 1.5px dashed #111;
-        margin: 10px 0;
-      }
-
-      .section-title {
-        font-size: 11px;
-        font-weight: 900;
-        text-transform: uppercase;
-        letter-spacing: 0.4px;
-        margin-bottom: 6px;
-      }
-
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        table-layout: fixed;
-      }
-
-      th {
-        font-size: 11px;
-        font-weight: 900;
-        padding: 5px 0 6px;
-        border-bottom: 1.5px solid #111;
-        text-transform: uppercase;
-      }
-
-      td {
-        padding: 7px 0;
-        vertical-align: top;
-        font-size: 13px;
-        font-weight: 700;
-        line-height: 1.35;
-      }
-
-      .item-col {
-        width: 76%;
-        padding-right: 6px;
-        text-align: left;
-      }
-
-      .qty-col {
-        width: 24%;
-        text-align: right;
-        font-size: 14px;
-        font-weight: 900;
-      }
-
-      .item-name {
-        font-weight: 900;
-      }
-
-      .item-meta {
-        font-size: 10px;
-        font-weight: 600;
-        margin-top: 2px;
-        line-height: 1.3;
-        color: #333;
-      }
-
-      .notes {
-        border: 1.5px solid #111;
-        padding: 8px;
-        margin-top: 5px;
-        border-radius: 3px;
-      }
-
-      .notes-title {
-        font-size: 10px;
-        font-weight: 900;
-        text-transform: uppercase;
-        margin-bottom: 4px;
-        letter-spacing: 0.3px;
-      }
-
-      .note {
-        font-size: 11px;
-        font-weight: 700;
-        line-height: 1.45;
-      }
-
-      .footer {
-        text-align: center;
-        margin-top: 12px;
-        font-size: 10px;
-        font-weight: 900;
-        letter-spacing: 0.6px;
-      }
-
-      .powered-by {
-        text-align: center;
-        margin-top: 10px;
-        padding-top: 8px;
-        border-top: 1px dashed #999;
-        font-size: 8.5px;
-        font-weight: 600;
-        color: #999;
-        letter-spacing: 0.3px;
-      }
-
-      .powered-by b {
-        font-weight: 900;
-        color: #555;
-      }
-    </style>
-  </head>
-
-  <body>
-    <div class="kot">
-
-      <!-- HEADER -->
-      <div class="center">
-        <div class="title">
-          KITCHEN ORDER TICKET
-        </div>
-
-        <div class="order-id">
-          ${escapeHtml(order.orderId)}
-        </div>
-
-        <div class="order-type">
-          ${escapeHtml(order.orderType || "DINE IN")}
-        </div>
+      <div class="brand">
+        CHOTUGTT
       </div>
 
-      <div class="divider"></div>
-
-      <!-- ORDER INFORMATION -->
-      <div class="meta">
-
-        <div class="meta-row">
-          <span class="meta-label">TABLE</span>
-          <span class="meta-value">${escapeHtml(tableLabel)}</span>
-        </div>
-
-        <div class="meta-row">
-          <span class="meta-label">CUSTOMER</span>
-          <span class="meta-value">
-            ${escapeHtml(order.customerName || "Guest")}
-          </span>
-        </div>
-
-        <div class="meta-row">
-          <span class="meta-label">DATE</span>
-          <span class="meta-value">${dateStr}</span>
-        </div>
-
-        <div class="meta-row">
-          <span class="meta-label">TIME</span>
-          <span class="meta-value">${timeStr}</span>
-        </div>
-
+      <div class="main-title">
+        ${escapeHtml(kotTitle)}
       </div>
 
-      <div class="divider"></div>
-
-      <!-- ITEMS -->
-      <div class="section-title">
-        Order Items
+      <div class="subtitle">
+        ${escapeHtml(kotSubtitle)}
       </div>
 
-      <table>
-        <thead>
-          <tr>
-            <th class="item-col">
-              ITEM
-            </th>
+      <div class="order-id">
+        #${escapeHtml(order.orderId || "-")}
+      </div>
 
-            <th class="qty-col">
-              QTY
-            </th>
-          </tr>
-        </thead>
+      <div class="order-badge">
+        ${escapeHtml(orderType)}
+      </div>
 
-        <tbody>
-          ${kotRows}
-        </tbody>
-      </table>
+    </div>
 
-      <div class="divider"></div>
+    <div class="solid-divider"></div>
 
-      ${
-        order.notes
-          ? `
-            <div class="notes">
-              <div class="notes-title">
-                Special Instructions
-              </div>
+    <!-- ==========================
+         ORDER INFORMATION
+    =========================== -->
 
-              <div class="note">
-                ${escapeHtml(order.notes)}
-              </div>
+    <div class="section-heading">
+      Order Information
+    </div>
+
+    <div class="meta">
+
+      <div class="meta-row">
+        <span class="meta-label">
+          TABLE
+        </span>
+
+        <span class="meta-value">
+          ${escapeHtml(tableLabel)}
+        </span>
+      </div>
+
+      <div class="meta-row">
+        <span class="meta-label">
+          CUSTOMER
+        </span>
+
+        <span class="meta-value">
+          ${escapeHtml(order.customerName || "Guest")}
+        </span>
+      </div>
+
+      <div class="meta-row">
+        <span class="meta-label">
+          DATE
+        </span>
+
+        <span class="meta-value">
+          ${dateStr}
+        </span>
+      </div>
+
+      <div class="meta-row">
+        <span class="meta-label">
+          TIME
+        </span>
+
+        <span class="meta-value">
+          ${timeStr}
+        </span>
+      </div>
+
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- ==========================
+         ITEMS
+    =========================== -->
+
+    <div class="section-heading">
+      Order Items
+    </div>
+
+    <div class="items-header">
+
+      <div class="number">
+        #
+      </div>
+
+      <div class="name">
+        ITEM
+      </div>
+
+      <div class="quantity">
+        QTY
+      </div>
+
+    </div>
+
+    <table>
+
+      <tbody>
+        ${kotRows}
+      </tbody>
+
+    </table>
+
+    <!-- ==========================
+         ITEM SUMMARY
+    =========================== -->
+
+    <div class="item-summary">
+
+      <span class="summary-label">
+        TOTAL ITEMS
+      </span>
+
+      <span class="summary-value">
+        ${activeItems.reduce(
+          (total, item) => total + Number(item.quantity || 0),
+          0,
+        )}
+      </span>
+
+    </div>
+
+    <!-- ==========================
+         SPECIAL INSTRUCTIONS
+    =========================== -->
+
+    ${
+      order.notes
+        ? `
+          <div class="notes">
+
+            <div class="notes-title">
+              Special Instructions
             </div>
 
-            <div class="divider"></div>
-          `
-          : ""
-      }
+            <div class="note">
+              ${escapeHtml(order.notes)}
+            </div>
 
-      <!-- FOOTER -->
-      <div class="footer">
+          </div>
+        `
+        : ""
+    }
+
+    <!-- ==========================
+         FOOTER
+    =========================== -->
+
+    <div class="footer">
+
+      <div class="kitchen-copy">
         KITCHEN COPY
       </div>
 
@@ -785,23 +1109,33 @@ export default function LiveOrderMonitor() {
 
     </div>
 
-    <script>
-      window.focus();
+  </div>
 
-      window.addEventListener("load", () => {
-        setTimeout(() => {
-          window.print();
-        }, 150);
-      });
+  <script>
 
-      window.onafterprint = () => {
-        window.close();
-      };
-    </script>
-  </body>
+    window.focus();
+
+    window.addEventListener("load", () => {
+
+      setTimeout(() => {
+        window.print();
+      }, 150);
+
+    });
+
+    window.onafterprint = () => {
+      window.close();
+    };
+
+  </script>
+
+</body>
 </html>
 `;
 
+      // -----------------------------------------
+      // OPEN PRINT WINDOW
+      // -----------------------------------------
       const printWindow = window.open("", "_blank", "width=380,height=680");
 
       if (!printWindow) {
@@ -815,7 +1149,9 @@ export default function LiveOrderMonitor() {
       printWindow.document.write(windowContent);
       printWindow.document.close();
 
-      // 🆕 Mark ONLY these newly printed items
+      // -----------------------------------------
+      // MARK ONLY PRINTED ITEMS
+      // -----------------------------------------
       try {
         await axios.patch(
           `${apiBase}/orders/${order._id}/kot/printed`,
@@ -827,11 +1163,20 @@ export default function LiveOrderMonitor() {
           },
         );
 
+        const printedIds = new Set(activeItems.map((item) => String(item._id)));
+
+        setKotItems((currentItems) =>
+          currentItems.filter((item) => !printedIds.has(String(item._id))),
+        );
         queryClient.invalidateQueries({
           queryKey: ["live-orders", restaurantId],
         });
 
-        showSuccess("KOT Printed Successfully");
+        showSuccess(
+          isRunningOrder
+            ? "Running Order KOT Printed Successfully"
+            : "New Order KOT Printed Successfully",
+        );
       } catch (error) {
         console.error("Failed to mark KOT printed:", error);
 
@@ -841,9 +1186,55 @@ export default function LiveOrderMonitor() {
         );
       }
     },
-    [apiBase, queryClient, showError, showSuccess],
+    [apiBase, queryClient, restaurantId, showError, showSuccess],
   );
 
+  useEffect(() => {
+    const autoPrintKOT = location.state?.autoPrintKOT;
+
+    if (
+      !autoPrintKOT?.order ||
+      !Array.isArray(autoPrintKOT.items) ||
+      autoPrintKOT.items.length === 0
+    ) {
+      return;
+    }
+
+    /*
+     * Give LiveOrderMonitor one render cycle to finish mounting
+     * before opening the browser print window.
+     */
+    const timer = window.setTimeout(async () => {
+      try {
+        console.log("🧾 Auto printing KOT from global order alert:", {
+          orderId: autoPrintKOT.order?.orderId,
+          itemCount: autoPrintKOT.items.length,
+        });
+
+        await printKOT({
+          order: autoPrintKOT.order,
+          items: autoPrintKOT.items,
+          kotType: autoPrintKOT.kotType || "NEW",
+        });
+      } catch (error) {
+        console.error("❌ Auto KOT print failed:", error);
+      } finally {
+        /*
+         * Remove navigation state so browser refresh/back-forward
+         * does not print the same KOT again.
+         */
+        window.history.replaceState(
+          {},
+          document.title,
+          window.location.pathname + window.location.search,
+        );
+      }
+    }, 100);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [location.state, printKOT]);
   useEffect(() => {
     axios
       .get(`${apiBase}/restaurant/profile`, { withCredentials: true })
@@ -925,77 +1316,171 @@ export default function LiveOrderMonitor() {
   }, []);
 
   useEffect(() => {
-    if (!socket) return;
+    if (!socket || !restaurantId) return;
 
+    // ==========================================
+    // NEW ORDER
+    // ==========================================
     const handleNewOrder = (newOrder) => {
-      // try {
-      //   playAlert();
-      // } catch (e) {
-      //   console.log("Audio play error:", e);
-      // }
+      console.log("🆕 NEW_ORDER_RECEIVED:", newOrder?.orderId);
 
       queryClient.setQueryData(["live-orders", restaurantId], (old = []) => {
-        const exists = old.some((o) => o._id === newOrder._id);
+        const exists = old.some(
+          (o) => String(o?._id) === String(newOrder?._id),
+        );
 
         if (exists) {
-          return old.map((o) => (o._id === newOrder._id ? newOrder : o));
+          return old.map((o) =>
+            String(o?._id) === String(newOrder?._id) ? newOrder : o,
+          );
         }
 
         return [newOrder, ...old];
       });
+
       queryClient.invalidateQueries({
         queryKey: ["table-status", restaurantId],
       });
+
       setCurrentPage(1);
     };
 
+    // ==========================================
+    // NORMAL ORDER STATUS UPDATE
+    // ==========================================
     const handleOrderUpdated = (updatedOrder) => {
+      console.log(
+        "🔄 ORDER_STATUS_UPDATED:",
+        updatedOrder?.orderId,
+        updatedOrder?.status,
+      );
+
       queryClient.setQueryData(["live-orders", restaurantId], (old = []) => {
         if (
           updatedOrder.status === "COMPLETED" ||
           updatedOrder.status === "REJECTED"
         ) {
-          return old.filter((o) => o._id !== updatedOrder._id);
+          return old.filter(
+            (o) => String(o?._id) !== String(updatedOrder?._id),
+          );
         }
 
-        const exists = old.some((o) => o._id === updatedOrder._id);
+        const exists = old.some(
+          (o) => String(o?._id) === String(updatedOrder?._id),
+        );
 
         if (!exists) {
           return [updatedOrder, ...old];
         }
 
-        return old.map((o) => (o._id === updatedOrder._id ? updatedOrder : o));
+        return old.map((o) =>
+          String(o?._id) === String(updatedOrder?._id)
+            ? updatedOrder
+            : o,
+        );
       });
+
       queryClient.invalidateQueries({
         queryKey: ["table-status", restaurantId],
       });
     };
 
-    // const handlePlaySoundOnly = () => {
-    //   try {
-    //     playAlert();
-    //   } catch (e) {
-    //     console.log("Audio play error:", e);
-    //   }
-    // };
+    // ==========================================
+    // 🔥 RUNNING ORDER UPDATE
+    // ==========================================
+    const handleRunningOrderUpdated = (payload) => {
+      console.log("🔥 RUNNING_ORDER_UPDATED:", payload);
 
+      /*
+       * Backend contract:
+       * {
+       *   order: <FULL UPDATED ORDER>,
+       *   items: <ONLY ITEMS ADDED BY THIS REQUEST>,
+       *   kotType: "RUNNING"
+       * }
+       *
+       * LiveOrderMonitor cache must keep the FULL order.
+       * GlobalOrderAlert is responsible for displaying only payload.items
+       * in the blocking running-order popup.
+       */
+      const updatedOrder = payload?.order ?? null;
+
+      if (!updatedOrder?._id) {
+        console.warn(
+          "⚠️ RUNNING_ORDER_UPDATED received without order ID",
+          payload,
+        );
+        return;
+      }
+
+      queryClient.setQueryData(["live-orders", restaurantId], (old = []) => {
+        const exists = old.some(
+          (order) => String(order?._id) === String(updatedOrder._id),
+        );
+
+        if (exists) {
+          return old.map((order) =>
+            String(order?._id) === String(updatedOrder._id)
+              ? {
+                  ...order,
+                  ...updatedOrder,
+                }
+              : order,
+          );
+        }
+
+        // Defensive fallback for a race where the socket event arrives
+        // before the initial live-orders query has populated the cache.
+        return [updatedOrder, ...old];
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["table-status", restaurantId],
+      });
+
+      // Keep existing UX: updated order appears on page 1.
+      setCurrentPage(1);
+    };
+
+    // ==========================================
+    // SOCKET LISTENERS
+    // ==========================================
     socket.on("NEW_ORDER_RECEIVED", handleNewOrder);
-    socket.on("ORDER_STATUS_UPDATED", handleOrderUpdated);
-    // socket.on("PLAY_NOTIFICATION_SOUND", handlePlaySoundOnly);
 
+    socket.on("ORDER_STATUS_UPDATED", handleOrderUpdated);
+
+    socket.on("RUNNING_ORDER_UPDATED", handleRunningOrderUpdated);
+
+    // ==========================================
+    // CLEANUP
+    // ==========================================
     return () => {
       socket.off("NEW_ORDER_RECEIVED", handleNewOrder);
+
       socket.off("ORDER_STATUS_UPDATED", handleOrderUpdated);
-      // socket.off("PLAY_NOTIFICATION_SOUND", handlePlaySoundOnly);
+
+      socket.off("RUNNING_ORDER_UPDATED", handleRunningOrderUpdated);
     };
-  }, [socket, queryClient]);
+  }, [socket, restaurantId, queryClient]);
 
   // 🆕 Cancel a single item — hits the real backend endpoint and refreshes
   // subtotal/tax/total from the response (backend does the recalculation).
+  //
+  // IMPORTANT:
+  // `itemId` here MUST be the embedded Order.items._id.
+  // It must never fall back to the catalog MenuItem/Combo `itemId`.
   const handleCancelItem = useCallback((orderId, itemId) => {
+    if (!orderId || !itemId) {
+      console.warn("⚠️ Cancel item ignored: missing order-item id", {
+        orderId,
+        itemId,
+      });
+      return;
+    }
+
     setCancelItemData({
-      orderId,
-      itemId,
+      orderId: String(orderId),
+      itemId: String(itemId),
     });
   }, []);
 
@@ -1004,6 +1489,12 @@ export default function LiveOrderMonitor() {
 
     const { orderId, itemId } = cancelItemData;
 
+    if (!orderId || !itemId) {
+      setCancelItemData(null);
+      showError("Invalid order item. Please refresh the order and try again.");
+      return;
+    }
+
     try {
       const res = await axios.patch(
         `${apiBase}/orders/${orderId}/item/${itemId}/cancel`,
@@ -1011,27 +1502,46 @@ export default function LiveOrderMonitor() {
         { withCredentials: true },
       );
 
-      const updatedOrder = res.data.data;
+      const updatedOrder = res.data?.data;
+
+      if (!updatedOrder?._id) {
+        throw new Error("Updated order was not returned by server.");
+      }
 
       queryClient.setQueryData(
         ["live-orders", restaurantId],
         (oldOrders = []) =>
           oldOrders.map((order) =>
-            order._id === orderId ? updatedOrder : order,
+            String(order?._id) === String(orderId) ? updatedOrder : order,
           ),
       );
+
+      queryClient.invalidateQueries({
+        queryKey: ["table-status", restaurantId],
+      });
 
       setCancelItemData(null);
 
       showSuccess("Item Cancelled Successfully");
     } catch (err) {
-      console.error("Failed to cancel item", err);
+      console.error("❌ Failed to cancel item:", err);
 
       setCancelItemData(null);
 
-      showError(err.response?.data?.message || "Failed to cancel item");
+      showError(
+        err.response?.data?.message ||
+          err.message ||
+          "Failed to cancel item",
+      );
     }
-  }, [cancelItemData, apiBase, queryClient, showSuccess, showError]);
+  }, [
+    cancelItemData,
+    apiBase,
+    queryClient,
+    restaurantId,
+    showSuccess,
+    showError,
+  ]);
 
   const handleStatusTransition = useCallback(
     async (orderId, targetStatus, customReason = "") => {
@@ -1063,10 +1573,12 @@ export default function LiveOrderMonitor() {
         );
 
         if (targetStatus === "ACCEPTED" && newKotItems.length > 0) {
-          // 🧾 First order ka automatic KOT
+          // 🧾 Initial customer order
+          // MUST always print as NEW ORDER KOT.
           await printKOT({
             order: updatedOrderFromBackend,
             items: newKotItems,
+            kotType: "NEW",
           });
         }
 
@@ -1096,7 +1608,14 @@ export default function LiveOrderMonitor() {
         console.error("Error transitioning state context pipeline:", err);
       }
     },
-    [queryClient, apiBase, showSuccess, showError, printKOT],
+    [
+      queryClient,
+      apiBase,
+      restaurantId,
+      showSuccess,
+      showError,
+      printKOT,
+    ],
   );
 
   // 🧾 Opens a thermal-receipt-style print window for a completed order
@@ -1735,21 +2254,50 @@ ${
 
   const handleView = useCallback(
     async (order) => {
+      if (!order?._id) {
+        showError("Invalid order selected.");
+        return;
+      }
+
       try {
         const res = await axios.get(`${apiBase}/orders/${order._id}/kot`, {
           withCredentials: true,
         });
 
-        setSelectedOrder(order);
-        setKotItems(res.data?.data?.items || []);
+        const responseData = res.data || {};
+        const data = responseData.data || {};
+
+        const latestOrder = data.order || order;
+
+        const items = Array.isArray(data.items)
+          ? data.items.filter((item) => item?.status !== "REJECTED")
+          : [];
+
+        const type =
+          responseData.kotType ||
+          data.kotType ||
+          (latestOrder.status === "PENDING" ? "NEW" : "RUNNING");
+
+        console.log("👁️ VIEW KOT:", {
+          orderId: latestOrder.orderId,
+          kotType: type,
+          itemIds: items.map((item) => String(item._id)),
+        });
+
+        setSelectedOrder(latestOrder);
+        setKotItems(items);
+        setKotType(type);
       } catch (error) {
         console.error("Failed to fetch KOT items:", error);
 
         setSelectedOrder(order);
         setKotItems([]);
+        setKotType("NEW");
+
+        showError(error.response?.data?.message || "Failed to load KOT items.");
       }
     },
-    [apiBase],
+    [apiBase, showError],
   );
   const handleCloseModal = useCallback(() => {
     setSelectedOrder(null);
@@ -2568,6 +3116,7 @@ ${
           <OrderDetailsModal
             order={selectedOrder}
             kotItems={kotItems}
+            kotType={kotType}
             onPrintKOT={printKOT}
             onClose={handleCloseModal}
           />
