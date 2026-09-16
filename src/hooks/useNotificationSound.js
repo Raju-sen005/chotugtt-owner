@@ -4,255 +4,256 @@ const NOTIFICATION_SOUND = "/sounds/new.mp3";
 
 export const useNotificationSound = () => {
   const audioRef = useRef(null);
-  const audioUnlockedRef = useRef(false);
+
+  const unlockedRef = useRef(false);
+  const pendingSoundRef = useRef(false);
+  const unlockInProgressRef = useRef(false);
 
   /*
    * --------------------------------------------------
-   * CREATE AUDIO INSTANCE
+   * CREATE AUDIO
    * --------------------------------------------------
    */
   useEffect(() => {
     const audio = new Audio(NOTIFICATION_SOUND);
 
     audio.preload = "auto";
-    audio.volume = 1.0;
+    audio.volume = 1;
 
     audioRef.current = audio;
 
     /*
-     * Start loading the audio resource.
-     * This does NOT bypass autoplay policy.
+     * Preload the sound.
      */
     audio.load();
 
     return () => {
       audio.pause();
-
-      try {
-        audio.currentTime = 0;
-      } catch {
-        // Ignore cleanup error.
-      }
-
-      audio.removeAttribute("src");
-
+      audio.currentTime = 0;
       audioRef.current = null;
-      audioUnlockedRef.current = false;
     };
+  }, []);
+
+  /*
+   * --------------------------------------------------
+   * ACTUALLY PLAY SOUND
+   * --------------------------------------------------
+   */
+  const playSoundNow = useCallback(() => {
+    const audio = audioRef.current;
+
+    if (!audio) {
+      return;
+    }
+
+    try {
+      audio.pause();
+      audio.currentTime = 0;
+
+      const playPromise = audio.play();
+
+      if (playPromise?.catch) {
+        playPromise.catch((error) => {
+          /*
+           * Browser can still reject playback.
+           * Keep the sound pending so the next user
+           * interaction can retry it.
+           */
+          if (error?.name === "NotAllowedError") {
+            console.warn(
+              "🔊 Audio still blocked by browser. Keeping sound pending."
+            );
+
+            unlockedRef.current = false;
+            pendingSoundRef.current = true;
+          } else {
+            console.warn(
+              "🔊 Notification sound playback failed:",
+              error
+            );
+          }
+        });
+      }
+    } catch (error) {
+      console.warn(
+        "🔊 Notification sound playback error:",
+        error
+      );
+
+      pendingSoundRef.current = true;
+    }
   }, []);
 
   /*
    * --------------------------------------------------
    * UNLOCK AUDIO
    * --------------------------------------------------
+   *
+   * Browser autoplay policy requires a user gesture.
+   *
+   * We intentionally unlock the audio from:
+   * pointerdown
+   * keydown
+   * touchstart
    */
-  const unlockAudio = useCallback(async () => {
+  const unlockAudio = useCallback(() => {
     const audio = audioRef.current;
 
-    if (!audio) {
-      return false;
+    if (!audio || unlockedRef.current || unlockInProgressRef.current) {
+      return;
     }
 
-    if (audioUnlockedRef.current) {
-      return true;
-    }
+    unlockInProgressRef.current = true;
 
     try {
-      /*
-       * Mute while unlocking.
-       * User will NOT hear the sound.
-       */
       audio.muted = true;
-      audio.volume = 0;
-
       audio.currentTime = 0;
 
-      const playPromise = audio.play();
+      const unlockPromise = audio.play();
 
-      if (playPromise !== undefined) {
-        await playPromise;
+      if (unlockPromise?.then) {
+        unlockPromise
+          .then(() => {
+            audio.pause();
+            audio.currentTime = 0;
+            audio.muted = false;
+
+            unlockedRef.current = true;
+            unlockInProgressRef.current = false;
+
+            console.log("🔓 Notification audio unlocked");
+
+            /*
+             * IMPORTANT:
+             *
+             * If an order arrived before the user
+             * interacted with the page, don't lose
+             * that notification.
+             */
+            if (pendingSoundRef.current) {
+              pendingSoundRef.current = false;
+
+              /*
+               * Play directly after successful unlock.
+               */
+              playSoundNow();
+            }
+          })
+          .catch(() => {
+            audio.muted = false;
+            unlockInProgressRef.current = false;
+
+            /*
+             * Still locked.
+             * Keep pending sound.
+             */
+            pendingSoundRef.current =
+              pendingSoundRef.current || false;
+          });
+      } else {
+        audio.pause();
+        audio.currentTime = 0;
+        audio.muted = false;
+
+        unlockedRef.current = true;
+        unlockInProgressRef.current = false;
+
+        console.log("🔓 Notification audio unlocked");
+
+        if (pendingSoundRef.current) {
+          pendingSoundRef.current = false;
+          playSoundNow();
+        }
       }
-
-      /*
-       * Stop immediately.
-       */
-      audio.pause();
-      audio.currentTime = 0;
-
-      /*
-       * Restore normal state.
-       */
-      audio.muted = false;
-      audio.volume = 1.0;
-
-      audioUnlockedRef.current = true;
-
-      console.log("🔓 Notification audio unlocked");
-
-      return true;
     } catch (error) {
       audio.muted = false;
-      audio.volume = 1.0;
+      unlockInProgressRef.current = false;
 
-      if (error?.name !== "NotAllowedError") {
-        console.warn(
-          "🔊 Notification audio unlock failed:",
-          error?.message || error
-        );
-      }
-
-      return false;
+      console.warn(
+        "🔊 Notification audio unlock failed:",
+        error
+      );
     }
-  }, []);
+  }, [playSoundNow]);
 
   /*
    * --------------------------------------------------
-   * FIRST USER INTERACTION
+   * GLOBAL USER INTERACTION LISTENER
    * --------------------------------------------------
    */
   useEffect(() => {
-    let active = true;
-
-    const handleUserInteraction = async () => {
-      if (!active) {
-        return;
-      }
-
-      if (audioUnlockedRef.current) {
-        return;
-      }
-
-      const unlocked = await unlockAudio();
-
-      if (unlocked) {
-        removeListeners();
-      }
-    };
-
-    const removeListeners = () => {
-      window.removeEventListener(
-        "pointerdown",
-        handleUserInteraction
-      );
-
-      window.removeEventListener(
-        "keydown",
-        handleUserInteraction
-      );
-
-      window.removeEventListener(
-        "touchstart",
-        handleUserInteraction
-      );
-    };
-
-    window.addEventListener(
+    const events = [
       "pointerdown",
-      handleUserInteraction,
-      {
-        passive: true,
-      }
-    );
-
-    window.addEventListener(
-      "keydown",
-      handleUserInteraction,
-      {
-        passive: true,
-      }
-    );
-
-    window.addEventListener(
       "touchstart",
-      handleUserInteraction,
-      {
-        passive: true,
-      }
-    );
+      "keydown",
+    ];
+
+    const handleInteraction = () => {
+      unlockAudio();
+    };
+
+    events.forEach((eventName) => {
+      document.addEventListener(
+        eventName,
+        handleInteraction,
+        {
+          capture: true,
+          passive: true,
+        }
+      );
+    });
 
     return () => {
-      active = false;
-      removeListeners();
+      events.forEach((eventName) => {
+        document.removeEventListener(
+          eventName,
+          handleInteraction,
+          true
+        );
+      });
     };
   }, [unlockAudio]);
 
   /*
    * --------------------------------------------------
-   * PLAY ALERT
+   * PUBLIC PLAY ALERT
    * --------------------------------------------------
    */
   const playAlert = useCallback(() => {
-    const audio = audioRef.current;
+    /*
+     * Audio not created yet.
+     */
+    if (!audioRef.current) {
+      pendingSoundRef.current = true;
 
-    if (!audio) {
-      console.warn(
-        "🔊 Notification audio is not initialized."
+      console.log(
+        "🔊 Notification sound queued: audio not ready"
       );
 
       return;
     }
 
     /*
-     * Browser has not received a user gesture yet.
+     * Browser audio is not unlocked yet.
      *
-     * Don't call play() repeatedly.
+     * IMPORTANT:
+     * Do NOT discard the notification.
      */
-    if (!audioUnlockedRef.current) {
-      console.warn(
-        "🔊 Notification sound skipped: waiting for user interaction."
+    if (!unlockedRef.current) {
+      pendingSoundRef.current = true;
+
+      console.log(
+        "🔊 Notification sound queued: waiting for user interaction."
       );
 
       return;
     }
 
-    try {
-      /*
-       * Stop previous sound.
-       */
-      audio.pause();
-      audio.currentTime = 0;
+    /*
+     * Audio is unlocked.
+     */
+    playSoundNow();
+  }, [playSoundNow]);
 
-      /*
-       * Normal playback.
-       */
-      audio.muted = false;
-      audio.volume = 1.0;
-
-      const playPromise = audio.play();
-
-      if (playPromise !== undefined) {
-        playPromise.catch((error) => {
-          if (error?.name === "NotAllowedError") {
-            /*
-             * Browser permission may have changed.
-             * Allow next user interaction to unlock again.
-             */
-            audioUnlockedRef.current = false;
-
-            console.warn(
-              "🔊 Notification playback blocked by browser."
-            );
-
-            return;
-          }
-
-          console.warn(
-            "🔊 Notification playback failed:",
-            error?.message || error
-          );
-        });
-      }
-    } catch (error) {
-      console.error(
-        "🔊 Notification sound error:",
-        error?.message || error
-      );
-    }
-  }, []);
-
-  /*
-   * IMPORTANT:
-   * Existing API preserved.
-   */
   return playAlert;
 };
