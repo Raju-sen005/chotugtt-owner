@@ -8,6 +8,7 @@ import {
   QrCode,
   Power,
   X,
+  Palette,
   Pencil,
   FolderPlus,
   ChevronDown,
@@ -17,57 +18,8 @@ import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import axios from "axios";
 import { useSocket } from "../context/SocketContext";
-
-// ============================================================
-// QR STANDEE THEMES
-// Abhi sabhi themes FREE hain.
-// Future mein isi structure mein PRO/payment add kar sakte hain.
-// ============================================================
-
-const QR_STANDEE_THEMES = [
-  {
-    id: "classic",
-    name: "Classic",
-    description: "Clean and professional",
-  },
-  {
-    id: "minimal",
-    name: "Minimal",
-    description: "Simple modern design",
-  },
-  {
-    id: "royal",
-    name: "Royal",
-    description: "Premium royal style",
-  },
-  {
-    id: "dark",
-    name: "Dark",
-    description: "Elegant dark theme",
-  },
-  {
-    id: "elegant",
-    name: "Elegant",
-    description: "Luxury restaurant style",
-  },
-  {
-    id: "modern",
-    name: "Modern",
-    description: "Fresh modern look",
-  },
-  {
-    id: "cafe",
-    name: "Cafe",
-    description: "Warm cafe style",
-  },
-  {
-    id: "traditional",
-    name: "Traditional",
-    description: "Classic Indian style",
-  },
-];
-
-const DEFAULT_QR_STANDEE_THEME = "classic";
+import QRStandeeThemeSelector from "./QRStandeeThemeSelector";
+import { QR_STANDEE_THEMES, DEFAULT_QR_STANDEE_THEME } from "./qrStandeeThemes";
 
 // 🔑 Extracted + memoized TableCard component
 const TableCard = memo(function TableCard({
@@ -240,7 +192,7 @@ const SectionBlock = memo(function SectionBlock({
           </span>
         </div>
 
-        {section !== "General" && !isRenaming && (
+        {!isRenaming && (
           <div className="flex items-center gap-1">
             <button
               onClick={() => setIsRenaming(true)}
@@ -289,19 +241,21 @@ export default function TableMonitor() {
     }
   });
 
+  const [showThemeSelector, setShowThemeSelector] = useState(false);
+
   const [storeDetails, setStoreDetails] = useState({
     id: "",
     name: "",
     logo: "",
   });
   const [tables, setTables] = useState([]);
-  const [sections, setSections] = useState(["General"]);
+  const [sections, setSections] = useState([]);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
   // Add Table modal state
   const [showAddTable, setShowAddTable] = useState(false);
   const [newTableName, setNewTableName] = useState("");
-  const [newTableSection, setNewTableSection] = useState("General");
+  const [newTableSection, setNewTableSection] = useState("");
   const [creatingNewSection, setCreatingNewSection] = useState(false);
   const [newSectionInline, setNewSectionInline] = useState("");
   const [isSavingTable, setIsSavingTable] = useState(false);
@@ -377,11 +331,20 @@ export default function TableMonitor() {
       });
       const backendTables = res.data?.data;
       if (Array.isArray(backendTables)) {
-        const formatted = backendTables.map((t) =>
-          typeof t === "string"
-            ? { tableNumber: t, isDisabled: false, section: "General" }
-            : { ...t, section: t.section || "General" },
-        );
+        const formatted = backendTables
+          .map((t) =>
+            typeof t === "string"
+              ? {
+                  tableNumber: t,
+                  isDisabled: false,
+                  section: "",
+                }
+              : {
+                  ...t,
+                  section: String(t.section || "").trim(),
+                },
+          )
+          .filter((t) => t.section);
         setTables(formatted);
       }
     } catch (err) {
@@ -396,9 +359,19 @@ export default function TableMonitor() {
       });
       const backendSections = res.data?.data;
       if (Array.isArray(backendSections)) {
-        const names = backendSections.map((s) => s.name);
-        // "General" always in the list, even if not created in the backend
-        setSections(names.includes("General") ? names : ["General", ...names]);
+        const names = backendSections
+          .map((section) => String(section.name || "").trim())
+          .filter(Boolean);
+
+        setSections(names);
+
+        setNewTableSection((current) => {
+          if (current && names.includes(current)) {
+            return current;
+          }
+
+          return names[0] || "";
+        });
       }
     } catch (err) {
       console.warn("Could not fetch sections from backend:", err?.message);
@@ -447,12 +420,9 @@ export default function TableMonitor() {
   }, [socket, fetchTables, fetchSections]);
 
   const activeRestaurantId =
-    user?.restaurantId?._id ||
-    user?.restaurantId ||
-    user?._id ||
-    storeDetails.id;
+    user?.restaurantId?._id || user?.restaurantId || storeDetails.id || "";
 
-    const printQRCode = useCallback(
+  const printQRCode = useCallback(
     (tableNo) => {
       const canvas = qrRefs.current[tableNo];
 
@@ -1136,7 +1106,7 @@ export default function TableMonitor() {
   // 🔑 Add Table modal open — defaults reset
   const openAddTableModal = useCallback(() => {
     setNewTableName("");
-    setNewTableSection(sections[0] || "General");
+    setNewTableSection(sections[0] || "");
     setCreatingNewSection(false);
     setNewSectionInline("");
     setShowAddTable(true);
@@ -1148,8 +1118,12 @@ export default function TableMonitor() {
     if (!cleanName) return alert("Enter the table name (e.g., A1, H5)");
 
     const finalSection = creatingNewSection
-      ? newSectionInline.trim() || "General"
-      : newTableSection;
+      ? newSectionInline.trim()
+      : newTableSection.trim();
+
+    if (!finalSection) {
+      return alert("Please select or create a section first");
+    }
 
     if (
       tables.some(
@@ -1169,7 +1143,7 @@ export default function TableMonitor() {
       if (res.data?.success && Array.isArray(res.data.data)) {
         const formatted = res.data.data.map((t) => ({
           ...t,
-          section: t.section || "General",
+          section: String(t.section || "").trim(),
         }));
         setTables(formatted);
         setShowAddTable(false);
@@ -1264,11 +1238,7 @@ export default function TableMonitor() {
 
       setSections((prev) => prev.filter((s) => s !== sectionToDelete));
 
-      setTables((prev) =>
-        prev.map((t) =>
-          t.section === sectionToDelete ? { ...t, section: "General" } : t,
-        ),
-      );
+      setTables((prev) => prev.filter((t) => t.section !== sectionToDelete));
 
       setShowDeleteSectionModal(false);
 
@@ -1291,13 +1261,15 @@ export default function TableMonitor() {
       try {
         const res = await axios.delete(
           `${apiBase}/tables/admin/${encodeURIComponent(tableNo)}`,
-          {
-            withCredentials: true,
-          },
+          { withCredentials: true },
         );
 
-        if (res.data?.success !== false) {
-          setTables((prev) => prev.filter((t) => t.tableNumber !== tableNo));
+        if (res.data?.success) {
+          setTables((prev) =>
+            prev.filter(
+              (table) => String(table.tableNumber) !== String(tableNo),
+            ),
+          );
 
           showSuccess(`Table ${tableNo} deleted successfully!`);
         }
@@ -1371,6 +1343,10 @@ export default function TableMonitor() {
     return map;
   }, [tables, activeRestaurantId]);
 
+  const previewTable = useMemo(() => {
+    return tables.find((table) => tableUrls[table.tableNumber]);
+  }, [tables, tableUrls]);
+
   const handleCopyLink = useCallback(async (url, tableNo) => {
     if (!url) return;
     await navigator.clipboard.writeText(url);
@@ -1378,22 +1354,35 @@ export default function TableMonitor() {
     setTimeout(() => setCopied(null), 2000);
   }, []);
 
-  // 🔑 Sections ke according se tables group  — jo section list mein na hai
-  // (edge case) woh bhi "General" ke with see
+  // 🔑 Group tables by the server-provided sections.
+  // Tables without a valid section are intentionally not rendered.
   const groupedBySections = useMemo(() => {
-    const knownSections = sections.length ? sections : ["General"];
-    const map = {};
-    knownSections.forEach((s) => (map[s] = []));
+    const knownSections = Array.isArray(sections) ? sections : [];
 
-    tables.forEach((t) => {
-      const sec = t.section || "General";
-      if (!map[sec]) map[sec] = [];
-      map[sec].push(t);
+    const map = {};
+
+    knownSections.forEach((section) => {
+      map[section] = [];
     });
 
-    return knownSections
-      .filter((s) => map[s] !== undefined)
-      .map((s) => ({ section: s, tables: map[s] }));
+    tables.forEach((table) => {
+      const section = String(table.section || "").trim();
+
+      if (!section) {
+        return;
+      }
+
+      if (!map[section]) {
+        map[section] = [];
+      }
+
+      map[section].push(table);
+    });
+
+    return knownSections.map((section) => ({
+      section,
+      tables: map[section] || [],
+    }));
   }, [sections, tables]);
 
   const renderCard = (table) => (
@@ -1410,6 +1399,23 @@ export default function TableMonitor() {
       qrRef={(el) => (qrRefs.current[table.tableNumber] = el)}
     />
   );
+
+  if (showThemeSelector) {
+    return (
+      <QRStandeeThemeSelector
+        selectedTheme={selectedStandeeTheme}
+        restaurantName={storeDetails.name}
+        restaurantLogo={storeDetails.logo}
+        previewQrValue={previewTable ? tableUrls[previewTable.tableNumber] : ""}
+        previewTableNumber={previewTable?.tableNumber || ""}
+        onSelect={(themeId) => {
+          handleStandeeThemeChange(themeId);
+          setShowThemeSelector(false);
+        }}
+        onBack={() => setShowThemeSelector(false)}
+      />
+    );
+  }
 
   return (
     <>
@@ -1458,9 +1464,9 @@ export default function TableMonitor() {
               ?
             </p>
 
-            <p className="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-xl p-3 mt-3">
-              Tables inside this section will be moved to
-              <span className="font-bold"> General</span>.
+            <p className="text-xs text-rose-600 bg-rose-50 border border-rose-100 rounded-xl p-3 mt-3">
+              All tables inside this section will also be permanently deleted.
+              This action cannot be undone.
             </p>
 
             <div className="flex gap-3 mt-6">
@@ -1487,216 +1493,295 @@ export default function TableMonitor() {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-10 space-y-8 font-sans bg-[#F8F9FA] min-h-screen">
+      <div className="min-h-screen bg-[#F6F7FB] font-sans text-slate-900">
         {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-red-50 text-red-600 rounded-2xl border border-red-100">
-              <QrCode size={28} />
-            </div>
-            <div>
-              <h1 className="text-2xl font-black text-slate-900 tracking-tight">
-                Table Monitor
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                Manage custom table names, sections, and QR standees.
-              </p>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-            {/* QR STANDEE THEME */}
-            <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-2.5">
-              <QrCode size={15} className="text-slate-500 shrink-0" />
-
-              <div className="flex flex-col">
-                <span className="text-[9px] font-black uppercase tracking-wider text-slate-400">
-                  Standee Theme
-                </span>
-
-                <select
-                  value={selectedStandeeTheme}
-                  onChange={(e) => handleStandeeThemeChange(e.target.value)}
-                  className="bg-transparent text-xs font-black text-slate-800 outline-none cursor-pointer min-w-[130px]"
-                >
-                  {QR_STANDEE_THEMES.map((theme) => (
-                    <option key={theme.id} value={theme.id}>
-                      {theme.name}
-                    </option>
-                  ))}
-                </select>
+        <div className="mx-auto max-w-7xl px-4 pb-4 pt-5 sm:px-6 lg:px-8 lg:pb-5 lg:pt-8">
+          <div className="flex flex-col gap-5 rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-50 text-red-600 ring-1 ring-red-100">
+                <QrCode size={25} />
+              </div>
+              <div className="min-w-0">
+                <h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+                  Table Monitor
+                </h1>
+                <p className="mt-1 text-xs text-slate-500 sm:text-sm">
+                  Manage tables, sections, QR links and standee printing.
+                </p>
               </div>
             </div>
 
-            {/* ADD SECTION */}
-            <button
-              onClick={() => setShowAddSection(true)}
-              className="flex-1 sm:flex-none bg-white border border-slate-200 text-slate-700 px-4 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 hover:bg-slate-50 transition-all cursor-pointer"
-            >
-              <FolderPlus size={16} />
-              Add Section
-            </button>
+            <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
+              <button
+                onClick={() => setShowAddSection(true)}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 sm:flex-none"
+              >
+                <FolderPlus size={16} />
+                Add Section
+              </button>
 
-            {/* ADD TABLE */}
-            <button
-              onClick={openAddTableModal}
-              disabled={!activeRestaurantId}
-              className="flex-1 sm:flex-none bg-gradient-to-r from-red-500 to-rose-600 text-white px-5 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 hover:opacity-95 shadow-sm shadow-red-500/20 transition-all cursor-pointer disabled:opacity-50"
-            >
-              <Plus size={16} />
-              Add Table
-            </button>
+              <button
+                onClick={openAddTableModal}
+                disabled={!activeRestaurantId}
+                className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-500 to-rose-600 px-5 py-3 text-xs font-black text-white shadow-lg shadow-red-500/20 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
+              >
+                <Plus size={16} />
+                Add Table
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Info Stats Bar */}
-        <div className="flex items-center justify-between px-2">
-          <h3 className="font-black text-slate-800 text-base">All Sections</h3>
-          <span className="text-xs font-bold bg-white px-3 py-1 rounded-full border border-slate-200 text-slate-600 shadow-xs">
-            {tables.length} Total Tables
-          </span>
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                Total Tables
+              </p>
+              <p className="mt-1 text-2xl font-black tracking-tight text-slate-900">
+                {tables.length}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                Sections
+              </p>
+              <p className="mt-1 text-2xl font-black tracking-tight text-slate-900">
+                {sections.length}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-600">
+                Active QR
+              </p>
+              <p className="mt-1 text-2xl font-black tracking-tight text-emerald-800">
+                {tables.filter((table) => !table.isDisabled).length}
+              </p>
+            </div>
+
+            <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4 shadow-sm">
+              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-600">
+                Disabled
+              </p>
+              <p className="mt-1 text-2xl font-black tracking-tight text-amber-800">
+                {tables.filter((table) => table.isDisabled).length}
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Section-wise Tables */}
-        <div className="space-y-10">
-          {groupedBySections.map(({ section, tables: sectionTables }) => (
-            <SectionBlock
-              key={section}
-              section={section}
-              tables={sectionTables}
-              onRenameSection={renameSection}
-              onDeleteSection={deleteSection}
-              renderCard={renderCard}
-            />
-          ))}
+        <div className="mx-auto max-w-7xl px-4 pb-2 pt-7 sm:px-6 lg:px-8">
+          <div className="mb-5 flex items-end justify-between">
+            <div>
+              <h3 className="text-base font-black text-slate-900 sm:text-lg">
+                Sections & Tables
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Organize your dining area and manage each table QR.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-9">
+            {groupedBySections.length === 0 ? (
+              <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center shadow-sm">
+                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
+                  <FolderPlus size={24} />
+                </div>
+                <h3 className="mt-4 text-base font-black text-slate-900">
+                  No sections yet
+                </h3>
+                <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-slate-500">
+                  Create your first section such as AC, Non-AC, Rooftop or VIP,
+                  then add tables inside it.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setShowAddSection(true)}
+                  className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white transition hover:bg-slate-800"
+                >
+                  <FolderPlus size={15} />
+                  Create Section
+                </button>
+              </div>
+            ) : (
+              groupedBySections.map(({ section, tables: sectionTables }) => (
+                <SectionBlock
+                  key={section}
+                  section={section}
+                  tables={sectionTables}
+                  onRenameSection={renameSection}
+                  onDeleteSection={deleteSection}
+                  renderCard={renderCard}
+                />
+              ))
+            )}
+          </div>
         </div>
-
-        {/* Add Table Modal */}
-        {showAddTable && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-3xl p-6 w-full max-w-sm space-y-5 shadow-2xl">
-              <div className="flex items-center justify-between">
-                <h3 className="font-black text-slate-900 text-lg">
-                  Add New Table
-                </h3>
-                <button
-                  onClick={() => setShowAddTable(false)}
-                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">
-                  Table Name
-                </label>
-                <input
-                  autoFocus
-                  value={newTableName}
-                  onChange={(e) => setNewTableName(e.target.value)}
-                  placeholder="e.g. AC1, T5, VIP-2"
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">
-                  Section
-                </label>
-
-                {!creatingNewSection ? (
-                  <select
-                    value={newTableSection}
-                    onChange={(e) => {
-                      if (e.target.value === "__new__") {
-                        setCreatingNewSection(true);
-                      } else {
-                        setNewTableSection(e.target.value);
-                      }
-                    }}
-                    className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400 bg-white"
-                  >
-                    {sections.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                    <option value="__new__">+ Create New Section</option>
-                  </select>
-                ) : (
-                  <div className="flex gap-2">
-                    <input
-                      autoFocus
-                      value={newSectionInline}
-                      onChange={(e) => setNewSectionInline(e.target.value)}
-                      placeholder="e.g. AC, Rooftop"
-                      className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400"
-                    />
-                    <button
-                      onClick={() => {
-                        setCreatingNewSection(false);
-                        setNewSectionInline("");
-                      }}
-                      className="px-3 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 cursor-pointer"
-                    >
-                      <X size={14} />
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <button
-                onClick={submitAddTable}
-                disabled={isSavingTable}
-                className="w-full bg-gradient-to-r from-red-500 to-rose-600 text-white py-3 rounded-xl font-bold text-sm hover:opacity-95 transition-all cursor-pointer disabled:opacity-50"
-              >
-                {isSavingTable ? "Adding..." : "Add Table"}
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Add Section Modal */}
-        {showAddSection && (
-          <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-3xl p-6 w-full max-w-sm space-y-5 shadow-2xl">
-              <div className="flex items-center justify-between">
-                <h3 className="font-black text-slate-900 text-lg">
-                  Add New Section
-                </h3>
-                <button
-                  onClick={() => setShowAddSection(false)}
-                  className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">
-                  Section Name
-                </label>
-                <input
-                  autoFocus
-                  value={newSectionName}
-                  onChange={(e) => setNewSectionName(e.target.value)}
-                  placeholder="e.g. AC, Non-AC, Rooftop"
-                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400"
-                />
-              </div>
-
-              <button
-                onClick={submitAddSection}
-                disabled={isSavingSection}
-                className="w-full bg-gradient-to-r from-red-500 to-rose-600 text-white py-3 rounded-xl font-bold text-sm hover:opacity-95 transition-all cursor-pointer disabled:opacity-50"
-              >
-                {isSavingSection ? "Creating..." : "Create Section"}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* QR STANDEE THEME — secondary setting, kept at the bottom */}
+      <section className="mt-10 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-50 text-violet-600">
+              <QrCode size={20} />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-slate-900 sm:text-base">
+                QR Standee Design
+              </h3>
+              <p className="mt-1 text-xs text-slate-500">
+                Current theme:{" "}
+                <span className="font-bold text-slate-700">
+                  {QR_STANDEE_THEMES.find(
+                    (theme) => theme.id === selectedStandeeTheme,
+                  )?.name || "Classic"}
+                </span>
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowThemeSelector(true)}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-xs font-black text-slate-800 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700 sm:w-auto"
+          >
+            <Palette size={16} />
+            Choose QR Theme
+          </button>
+        </div>
+      </section>
+
+      {/* Add Table Modal */}
+      {showAddTable && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="font-black text-slate-900 text-lg">
+                Add New Table
+              </h3>
+              <button
+                onClick={() => setShowAddTable(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">
+                Table Name
+              </label>
+              <input
+                autoFocus
+                value={newTableName}
+                onChange={(e) => setNewTableName(e.target.value)}
+                placeholder="e.g. AC1, T5, VIP-2"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">
+                Section
+              </label>
+
+              {!creatingNewSection ? (
+                <select
+                  value={newTableSection}
+                  onChange={(e) => {
+                    if (e.target.value === "__new__") {
+                      setCreatingNewSection(true);
+                    } else {
+                      setNewTableSection(e.target.value);
+                    }
+                  }}
+                  className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400 bg-white"
+                >
+                  {sections.map((s) => (
+                    <option key={s} value={s}>
+                      {s}
+                    </option>
+                  ))}
+                  <option value="__new__">+ Create New Section</option>
+                </select>
+              ) : (
+                <div className="flex gap-2">
+                  <input
+                    autoFocus
+                    value={newSectionInline}
+                    onChange={(e) => setNewSectionInline(e.target.value)}
+                    placeholder="e.g. AC, Rooftop"
+                    className="flex-1 border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400"
+                  />
+                  <button
+                    onClick={() => {
+                      setCreatingNewSection(false);
+                      setNewSectionInline("");
+                    }}
+                    className="px-3 rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 cursor-pointer"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={submitAddTable}
+              disabled={isSavingTable}
+              className="w-full bg-gradient-to-r from-red-500 to-rose-600 text-white py-3 rounded-xl font-bold text-sm hover:opacity-95 transition-all cursor-pointer disabled:opacity-50"
+            >
+              {isSavingTable ? "Adding..." : "Add Table"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add Section Modal */}
+      {showAddSection && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="font-black text-slate-900 text-lg">
+                Add New Section
+              </h3>
+              <button
+                onClick={() => setShowAddSection(false)}
+                className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg cursor-pointer"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-slate-600 uppercase tracking-wide">
+                Section Name
+              </label>
+              <input
+                autoFocus
+                value={newSectionName}
+                onChange={(e) => setNewSectionName(e.target.value)}
+                placeholder="e.g. AC, Non-AC, Rooftop"
+                className="w-full border border-slate-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:border-red-400"
+              />
+            </div>
+
+            <button
+              onClick={submitAddSection}
+              disabled={isSavingSection}
+              className="w-full bg-gradient-to-r from-red-500 to-rose-600 text-white py-3 rounded-xl font-bold text-sm hover:opacity-95 transition-all cursor-pointer disabled:opacity-50"
+            >
+              {isSavingSection ? "Creating..." : "Create Section"}
+            </button>
+          </div>
+        </div>
+      )}
     </>
   );
 }
