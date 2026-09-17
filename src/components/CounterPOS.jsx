@@ -1227,6 +1227,9 @@ export default function CounterPOS() {
         orderPayload,
         {
           withCredentials: true,
+          headers: {
+            "Idempotency-Key": crypto.randomUUID(),
+          },
         },
       );
 
@@ -1275,7 +1278,12 @@ export default function CounterPOS() {
           tax: 0,
           total,
         },
-        { withCredentials: true },
+        {
+          withCredentials: true,
+          headers: {
+            "Idempotency-Key": crypto.randomUUID(),
+          },
+        },
       );
 
       showSuccess(`Items successfully added to Table ${selectedTable}!`);
@@ -1328,6 +1336,9 @@ export default function CounterPOS() {
         payload,
         {
           withCredentials: true,
+          headers: {
+            "Idempotency-Key": crypto.randomUUID(),
+          },
           timeout: 15000,
         },
       );

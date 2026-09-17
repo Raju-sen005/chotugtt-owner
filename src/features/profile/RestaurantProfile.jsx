@@ -12,6 +12,7 @@ import {
   MapPin,
   CheckCircle2,
   AlertCircle,
+  Trash2,
   Building,
   Sparkles,
   //   ShieldCheck,
@@ -124,6 +125,10 @@ export default function RestaurantProfile() {
   const [templateSaving, setTemplateSaving] = useState(null);
   const [templateError, setTemplateError] = useState("");
 
+  const [deleteRestaurantOpen, setDeleteRestaurantOpen] = useState(false);
+  const [deleteConfirmation, setDeleteConfirmation] = useState("");
+  const [deleteRestaurantLoading, setDeleteRestaurantLoading] = useState(false);
+  const [deleteRestaurantError, setDeleteRestaurantError] = useState("");
   const restaurantId =
     typeof user?.restaurantId === "object"
       ? user.restaurantId?._id
@@ -530,6 +535,83 @@ export default function RestaurantProfile() {
     ],
   );
 
+  const handleDeleteRestaurant = async () => {
+    if (deleteConfirmation.trim().toUpperCase() !== "DELETE") {
+      setDeleteRestaurantError(
+        'Please type "DELETE" to permanently delete your restaurant.',
+      );
+      return;
+    }
+
+    if (deleteRestaurantLoading) return;
+
+    try {
+      setDeleteRestaurantLoading(true);
+      setDeleteRestaurantError("");
+
+      await axios.delete(
+        `${import.meta.env.VITE_APP_API_BASE}/restaurant/profile`,
+        {
+          data: {
+            confirmation: "DELETE",
+          },
+          withCredentials: true,
+        },
+      );
+
+      /*
+       * Clear tenant-specific local cache.
+       */
+
+      if (typeof window !== "undefined") {
+        try {
+          window.localStorage.removeItem(
+            `food-saas-bill-template:${restaurantId || "default"}`,
+          );
+        } catch (storageError) {
+          console.warn(
+            "Unable to clear restaurant local cache:",
+            storageError?.message,
+          );
+        }
+      }
+
+      /*
+       * Clear React Query cache so deleted restaurant data
+       * does not remain visible after deletion.
+       */
+
+      queryClient.clear();
+
+      /*
+       * Close modal before leaving.
+       */
+
+      setDeleteRestaurantOpen(false);
+      setDeleteConfirmation("");
+
+      /*
+       * IMPORTANT:
+       * We intentionally reload the application.
+       *
+       * Your existing AuthContext owns authentication state.
+       * This avoids changing AuthContext/logout implementation
+       * just for this destructive operation.
+       */
+
+      window.location.replace("/login");
+    } catch (error) {
+      console.error("Delete restaurant failed:", error);
+
+      setDeleteRestaurantError(
+        error.response?.data?.message ||
+          "Unable to delete restaurant. Please try again.",
+      );
+    } finally {
+      setDeleteRestaurantLoading(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
@@ -583,6 +665,218 @@ export default function RestaurantProfile() {
             >
               ×
             </button>
+          </div>
+        </div>
+      )}
+
+      {deleteRestaurantOpen && (
+        <div className="fixed inset-0 z-[11000] flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-slate-950/70 backdrop-blur-sm"
+            onClick={() => {
+              if (!deleteRestaurantLoading) {
+                setDeleteRestaurantOpen(false);
+                setDeleteConfirmation("");
+                setDeleteRestaurantError("");
+              }
+            }}
+          />
+
+          {/* Modal */}
+          <div
+            className="
+        relative
+        w-full
+        max-w-lg
+        bg-white
+        rounded-3xl
+        shadow-2xl
+        border
+        border-red-100
+        overflow-hidden
+      "
+          >
+            {/* Header */}
+            <div className="p-6 sm:p-7 border-b border-slate-100">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-2xl bg-red-100 text-red-600 flex items-center justify-center shrink-0">
+                    <Trash2 size={22} strokeWidth={2.5} />
+                  </div>
+
+                  <div>
+                    <h2 className="text-lg font-black text-slate-900">
+                      Delete Restaurant
+                    </h2>
+
+                    <p className="text-xs text-slate-500 mt-1">
+                      This action is permanent and cannot be undone.
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  disabled={deleteRestaurantLoading}
+                  onClick={() => {
+                    setDeleteRestaurantOpen(false);
+                    setDeleteConfirmation("");
+                    setDeleteRestaurantError("");
+                  }}
+                  className="
+              w-9
+              h-9
+              rounded-xl
+              bg-slate-100
+              hover:bg-slate-200
+              text-slate-500
+              hover:text-slate-800
+              flex
+              items-center
+              justify-center
+              text-xl
+              transition
+              disabled:opacity-50
+            "
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 sm:p-7 space-y-5">
+              <div className="rounded-2xl border border-red-200 bg-red-50 p-4">
+                <p className="text-xs font-black text-red-700 uppercase tracking-wider">
+                  Permanent deletion
+                </p>
+
+                <p className="mt-2 text-xs leading-5 text-red-600">
+                  Your restaurant and its tenant data will be permanently
+                  removed, including orders, payments, menu items, combos,
+                  offers, tables, analysis data and other restaurant-specific
+                  records.
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="delete-restaurant-confirmation"
+                  className="
+              block
+              text-[11px]
+              font-black
+              uppercase
+              tracking-wider
+              text-slate-600
+              mb-2
+            "
+                >
+                  Type DELETE to confirm
+                </label>
+
+                <input
+                  id="delete-restaurant-confirmation"
+                  type="text"
+                  autoFocus
+                  value={deleteConfirmation}
+                  onChange={(e) => {
+                    setDeleteConfirmation(e.target.value);
+                    setDeleteRestaurantError("");
+                  }}
+                  disabled={deleteRestaurantLoading}
+                  placeholder="DELETE"
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="
+              w-full
+              px-4
+              py-3.5
+              rounded-2xl
+              border
+              border-slate-200
+              bg-white
+              text-sm
+              font-bold
+              text-slate-900
+              uppercase
+              tracking-wider
+              outline-none
+              focus:border-red-500
+              focus:ring-4
+              focus:ring-red-500/10
+              disabled:bg-slate-100
+            "
+                />
+              </div>
+
+              {deleteRestaurantError && (
+                <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3">
+                  <p className="text-xs font-bold text-red-600">
+                    {deleteRestaurantError}
+                  </p>
+                </div>
+              )}
+
+              <div className="flex flex-col sm:flex-row gap-3 pt-1">
+                <button
+                  type="button"
+                  disabled={deleteRestaurantLoading}
+                  onClick={() => {
+                    setDeleteRestaurantOpen(false);
+                    setDeleteConfirmation("");
+                    setDeleteRestaurantError("");
+                  }}
+                  className="
+              flex-1
+              px-5
+              py-3.5
+              rounded-2xl
+              border
+              border-slate-200
+              bg-white
+              hover:bg-slate-50
+              text-slate-700
+              text-xs
+              font-black
+              transition
+              disabled:opacity-50
+            "
+                >
+                  Cancel
+                </button>
+
+                <button
+                  type="button"
+                  disabled={
+                    deleteRestaurantLoading ||
+                    deleteConfirmation.trim().toUpperCase() !== "DELETE"
+                  }
+                  onClick={handleDeleteRestaurant}
+                  className="
+              flex-1
+              px-5
+              py-3.5
+              rounded-2xl
+              bg-red-600
+              hover:bg-red-700
+              text-white
+              text-xs
+              font-black
+              transition
+              shadow-lg
+              shadow-red-600/20
+              disabled:opacity-40
+              disabled:cursor-not-allowed
+            "
+                >
+                  {deleteRestaurantLoading
+                    ? "Deleting Restaurant..."
+                    : "Permanently Delete"}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -1271,22 +1565,91 @@ export default function RestaurantProfile() {
           )}
 
           {/* Sticky Action Footer Bar */}
-          <div className="bg-white/80 backdrop-blur-md p-4 rounded-3xl border border-slate-200/80 shadow-lg flex items-center justify-between gap-4">
-            <div className="hidden sm:block text-xs text-slate-500 font-medium pl-2">
-              Changes apply instantly across online menus and payment gateways.
+          {/* Sticky Action Footer Bar */}
+          <div className="bg-white/80 backdrop-blur-md p-4 rounded-3xl border border-slate-200/80 shadow-lg">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div className="hidden sm:block text-xs text-slate-500 font-medium pl-2">
+                Changes apply instantly across online menus and payment
+                gateways.
+              </div>
+
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+                {/* DELETE RESTAURANT */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteRestaurantError("");
+                    setDeleteConfirmation("");
+                    setDeleteRestaurantOpen(true);
+                  }}
+                  disabled={
+                    updateProfileMutation.isPending || deleteRestaurantLoading
+                  }
+                  className="
+          w-full
+          sm:w-auto
+          flex
+          items-center
+          justify-center
+          gap-2
+          bg-red-50
+          hover:bg-red-100
+          text-red-600
+          border
+          border-red-200
+          font-bold
+          text-xs
+          px-6
+          py-4
+          rounded-2xl
+          transition-all
+          shadow-sm
+          cursor-pointer
+          disabled:opacity-50
+          disabled:cursor-not-allowed
+        "
+                >
+                  <Trash2 size={16} strokeWidth={2.5} />
+
+                  <span>Delete Restaurant</span>
+                </button>
+
+                {/* SAVE PROFILE */}
+                <button
+                  type="submit"
+                  disabled={updateProfileMutation.isPending}
+                  className="
+          w-full
+          sm:w-auto
+          flex
+          items-center
+          justify-center
+          gap-2
+          bg-slate-900
+          hover:bg-slate-800
+          text-white
+          font-bold
+          text-xs
+          px-8
+          py-4
+          rounded-2xl
+          transition-all
+          shadow-md
+          cursor-pointer
+          disabled:opacity-50
+          disabled:cursor-not-allowed
+        "
+                >
+                  <Save size={16} strokeWidth={2.5} />
+
+                  <span>
+                    {updateProfileMutation.isPending
+                      ? "Saving..."
+                      : "Save Profile & UPI Details"}
+                  </span>
+                </button>
+              </div>
             </div>
-            <button
-              type="submit"
-              disabled={updateProfileMutation.isPending}
-              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-8 py-4 rounded-2xl transition-all shadow-md cursor-pointer disabled:opacity-50"
-            >
-              <Save size={16} strokeWidth={2.5} />
-              <span>
-                {updateProfileMutation.isPending
-                  ? "Saving..."
-                  : "Save Profile & UPI Details"}
-              </span>
-            </button>
           </div>
         </form>
       </div>
