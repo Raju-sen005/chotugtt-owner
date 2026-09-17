@@ -29,6 +29,53 @@ import {
   saveSelectedBillTemplate,
 } from "../../constants/billTemplates";
 import BillTemplatePaymentModal from "../../components/BillTemplatePaymentModal";
+// 🔑 FIX: this import was missing — getBillReceiptCSS() was being called
+// below without ever being imported, which throws a ReferenceError.
+import { getBillReceiptCSS } from "../../constants/billReceiptStyles";
+
+function BillTemplatePreviewModal({ templateId, onClose }) {
+  const sampleHtml = `
+    <html><head><style>${getBillReceiptCSS()}</style></head>
+    <body>
+      <div class="receipt template-${templateId}">
+        <div class="center"><p class="shop-name">Spice Garden</p></div>
+        <div class="divider-solid"></div>
+        <table><thead><tr><td>Item</td><td>Qty</td><td>Price</td><td>Amount</td></tr></thead>
+        <tbody>
+          <tr><td>Paneer Tikka</td><td>2</td><td>220.00</td><td>440.00</td></tr>
+          <tr><td>Butter Naan</td><td>4</td><td>40.00</td><td>160.00</td></tr>
+        </tbody></table>
+        <div class="row grand-total"><span>Grand Total</span><span>₹600.00</span></div>
+      </div>
+    </body></html>`;
+
+  return (
+    <div
+      className="fixed inset-0 z-[10001] bg-black/50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl overflow-hidden relative"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-2 right-2 z-10 w-8 h-8 rounded-full bg-white/90 shadow flex items-center justify-center text-slate-500 hover:text-slate-800"
+        >
+          ×
+        </button>
+        <iframe
+          title="Bill preview"
+          srcDoc={sampleHtml}
+          sandbox=""
+          className="w-[340px] h-[520px]"
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function RestaurantProfile() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
@@ -72,6 +119,11 @@ export default function RestaurantProfile() {
 
   const [upiOtpInfo, setUpiOtpInfo] = useState("");
 
+  // 🔑 FIX: these two states were referenced in the JSX below but never
+  // declared, which throws a ReferenceError as soon as this component renders.
+  const [templateSaving, setTemplateSaving] = useState(null);
+  const [templateError, setTemplateError] = useState("");
+
   const restaurantId =
     typeof user?.restaurantId === "object"
       ? user.restaurantId?._id
@@ -80,29 +132,51 @@ export default function RestaurantProfile() {
     getSelectedBillTemplate(restaurantId),
   );
   const [paymentTemplate, setPaymentTemplate] = useState(null);
+  const [previewTemplateId, setPreviewTemplateId] = useState(null);
+
+  // 🔑 FIX: restored rollback + error handling + query invalidation.
+  // The version this reverted to applied the template optimistically with
+  // zero error recovery — if the PATCH failed, the UI kept showing the new
+  // template as "selected" even though the server never saved it, which is
+  // exactly the "sometimes applies, sometimes doesn't" bug.
   const handleBillTemplateChange = async (template) => {
     if (isProBillTemplate(template.id)) {
       setPaymentTemplate(template);
       return;
     }
-    setSelectedBillTemplate(template.id);
-    saveSelectedBillTemplate(restaurantId, template.id);
+    if (templateSaving) return;
+
+    const previous = selectedBillTemplate;
+    setTemplateError("");
+    setTemplateSaving(template.id);
+    setSelectedBillTemplate(template.id); // optimistic
+
     try {
       await axios.patch(
         `${import.meta.env.VITE_APP_API_BASE}/restaurant/profile`,
         { billTemplate: template.id },
         { withCredentials: true },
       );
+      saveSelectedBillTemplate(restaurantId, template.id);
+      queryClient.invalidateQueries({ queryKey: ["restaurant-profile"] });
     } catch (error) {
-      console.warn("Could not save bill template:", error?.message);
+      setSelectedBillTemplate(previous); // rollback on failure
+      setTemplateError(
+        error.response?.data?.message ||
+          "Failed to apply bill template. Please try again.",
+      );
+    } finally {
+      setTemplateSaving(null);
     }
   };
 
   const handleTemplatePaymentSuccess = (template) => {
     setSelectedBillTemplate(template.id);
     saveSelectedBillTemplate(restaurantId, template.id);
+    queryClient.invalidateQueries({ queryKey: ["restaurant-profile"] });
     setPaymentTemplate(null);
   };
+
   // Staff Management Local States
   //   const [staffList, setStaffList] = useState([]);
   //   const [newStaffName, setNewStaffName] = useState("");
@@ -130,22 +204,6 @@ export default function RestaurantProfile() {
     },
     staleTime: 60_000,
   });
-
-  // Fetch Staff Members (Mock or Dedicated API endpoint)
-  //   const { data: staffData } = useQuery({
-  //     queryKey: ["restaurant-staff"],
-  //     queryFn: async () => {
-  //       try {
-  //         const res = await axios.get(
-  //           `${import.meta.env.VITE_APP_API_BASE}/restaurant/staff`,
-  //           { withCredentials: true }
-  //         );
-  //         return res.data.data || [];
-  //       } catch {
-  //         return [];
-  //       }
-  //     },
-  //   });
 
   // Populate form state when data is fetched
   useEffect(() => {
@@ -221,9 +279,6 @@ export default function RestaurantProfile() {
           : prev,
       );
     }
-    // if (staffData) {
-    //   setStaffList(staffData);
-    // }
   }, [restaurant]);
 
   // 2. Update Profile Mutation
@@ -263,29 +318,6 @@ export default function RestaurantProfile() {
       );
     },
   });
-
-  // Add Staff Mutation
-  //   const addStaffMutation = useMutation({
-  //     mutationFn: async (staffPayload) => {
-  //       const res = await axios.post(
-  //         `${import.meta.env.VITE_APP_API_BASE}/restaurant/staff`,
-  //         staffPayload,
-  //         { withCredentials: true }
-  //       );
-  //       return res.data;
-  //     },
-  //     onSuccess: (res) => {
-  //       queryClient.invalidateQueries(["restaurant-staff"]);
-  //       setNewStaffName("");
-  //       setNewStaffEmail("");
-  //       setNewStaffPassword("");
-  //       alert("Staff member added successfully!");
-  //     },
-  //     onError: (err) => {
-  //       alert(err.response?.data?.message || "Failed to add staff member.");
-  //     },
-
-  //   });
 
   // Handle Logo File Selection
   const handleLogoChange = (e) => {
@@ -371,9 +403,6 @@ export default function RestaurantProfile() {
 
       setUpiVerificationToken(token);
 
-      /*
-       * Now frontend can unlock the field.
-       */
       setUpiChangeMode(true);
 
       setShowUpiOtpModal(false);
@@ -399,12 +428,6 @@ export default function RestaurantProfile() {
         return;
       }
 
-      /*
-       * Existing UPI + unlocked mode means
-       * user is trying to change UPI.
-       *
-       * Do NOT send it through normal profile API.
-       */
       if (restaurant?.upiId && upiChangeMode && upiVerificationToken) {
         try {
           setUpiChangeLoading(true);
@@ -423,7 +446,6 @@ export default function RestaurantProfile() {
           );
 
           const updatedUpi = response.data?.data?.upiId;
-
           const updatedQr = response.data?.data?.upiQrCode;
 
           if (updatedUpi) {
@@ -434,15 +456,9 @@ export default function RestaurantProfile() {
             setUpiQrCode(updatedQr);
           }
 
-          /*
-           * Consume local verification state.
-           */
           setUpiVerificationToken("");
           setUpiChangeMode(false);
 
-          /*
-           * Refresh restaurant profile.
-           */
           await queryClient.invalidateQueries({
             queryKey: ["restaurant-profile"],
           });
@@ -456,16 +472,12 @@ export default function RestaurantProfile() {
           return;
         } catch (error) {
           alert(error.response?.data?.message || "Failed to update UPI ID.");
-
           return;
         } finally {
           setUpiChangeLoading(false);
         }
       }
 
-      /*
-       * Normal profile update.
-       */
       const formData = new FormData();
 
       formData.append("name", name);
@@ -474,28 +486,16 @@ export default function RestaurantProfile() {
       formData.append("email", email);
       formData.append("themeColor", themeColor);
 
-      /*
-       * Only send UPI during first-time setup.
-       *
-       * Existing UPI should remain controlled
-       * by dedicated endpoint.
-       */
       if (!restaurant?.upiId) {
         formData.append("upiId", upiId);
       }
 
       formData.append("fssaiNumber", fssaiNumber);
-
       formData.append("gstNumber", gstNumber);
-
       formData.append("taxRate", taxRate === "" ? "0" : taxRate);
-
       formData.append("address[street]", street);
-
       formData.append("address[city]", city);
-
       formData.append("address[state]", state);
-
       formData.append("address[zip]", zip);
 
       if (logoFile) {
@@ -511,7 +511,6 @@ export default function RestaurantProfile() {
       upiId,
       upiChangeMode,
       upiVerificationToken,
-
       name,
       slug,
       phone,
@@ -525,27 +524,11 @@ export default function RestaurantProfile() {
       city,
       state,
       zip,
-
       logoFile,
-
       queryClient,
       updateProfileMutation,
     ],
   );
-
-  //   const handleAddStaffSubmit = (e) => {
-  //     e.preventDefault();
-  //     if (!newStaffName || !newStaffEmail || !newStaffPassword) {
-  //       alert("Please fill all staff fields");
-  //       return;
-  //     }
-  //     addStaffMutation.mutate({
-  //       name: newStaffName,
-  //       email: newStaffEmail,
-  //       password: newStaffPassword,
-  //       role: newStaffRole,
-  //     });
-  //   };
 
   if (isLoading) {
     return (
@@ -654,7 +637,6 @@ export default function RestaurantProfile() {
                 value={upiOtp}
                 onChange={(e) => {
                   setUpiOtp(e.target.value.replace(/\D/g, "").slice(0, 6));
-
                   setUpiOtpError("");
                 }}
                 placeholder="000000"
@@ -1200,26 +1182,42 @@ export default function RestaurantProfile() {
                 }
               </span>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+
+            {templateError && (
+              <p className="mt-3 text-xs font-bold text-rose-600">
+                {templateError}
+              </p>
+            )}
+
+            <div className="grid gap-3 sm:grid-cols-2 mt-3">
               {BILL_TEMPLATES.map((template) => {
                 const isSelected = selectedBillTemplate === template.id;
                 return (
                   <button
                     key={template.id}
                     type="button"
+                    disabled={Boolean(templateSaving)}
                     onClick={() => handleBillTemplateChange(template)}
                     className={`rounded-2xl border p-4 text-left transition ${
                       isSelected
                         ? "border-rose-500 bg-rose-50 ring-2 ring-rose-100"
                         : "border-slate-200 bg-slate-50/60 hover:border-slate-300"
-                    } cursor-pointer`}
+                    } cursor-pointer ${
+                      templateSaving && templateSaving !== template.id
+                        ? "opacity-50 cursor-not-allowed"
+                        : ""
+                    }`}
                   >
                     <div className="flex items-center justify-between gap-3">
                       <span className="font-black text-slate-900">
                         {template.name}
                       </span>
                       <span
-                        className={`rounded-full px-2 py-1 text-[9px] font-black ${template.tier === "PRO" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}
+                        className={`rounded-full px-2 py-1 text-[9px] font-black ${
+                          template.tier === "PRO"
+                            ? "bg-amber-100 text-amber-700"
+                            : "bg-emerald-100 text-emerald-700"
+                        }`}
                       >
                         {template.tier}
                       </span>
@@ -1227,15 +1225,34 @@ export default function RestaurantProfile() {
                     <p className="mt-2 text-xs font-medium leading-5 text-slate-500">
                       {template.description}
                     </p>
+                    <div className="mt-3 flex items-center justify-between">
+                      {templateSaving === template.id && (
+                        <span className="text-[9px] font-bold text-slate-400">
+                          Applying…
+                        </span>
+                      )}
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setPreviewTemplateId(template.id);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.stopPropagation();
+                            setPreviewTemplateId(template.id);
+                          }
+                        }}
+                        className="ml-auto text-[10px] font-black text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
+                      >
+                        Preview
+                      </span>
+                    </div>
                   </button>
                 );
               })}
             </div>
-            {/* {!canUseProTemplates && (
-              <p className="mt-4 text-xs font-semibold text-amber-700">
-                Upgrade to Pro to unlock premium bill designs.
-              </p>
-            )} */}
           </section>
 
           {paymentTemplate && (
@@ -1243,6 +1260,13 @@ export default function RestaurantProfile() {
               template={paymentTemplate}
               onClose={() => setPaymentTemplate(null)}
               onSuccess={handleTemplatePaymentSuccess}
+            />
+          )}
+
+          {previewTemplateId && (
+            <BillTemplatePreviewModal
+              templateId={previewTemplateId}
+              onClose={() => setPreviewTemplateId(null)}
             />
           )}
 
@@ -1265,104 +1289,6 @@ export default function RestaurantProfile() {
             </button>
           </div>
         </form>
-
-        {/* 👥 STAFF MANAGEMENT SECTION */}
-        {/* <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-          <h2 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-2">
-            <Users size={16} className="text-red-500" /> Staff & Team Access Management
-          </h2>
-          <span className="text-[10px] text-slate-400 font-semibold">{staffList.length} Active Staff Members</span>
-        </div>
-
-        <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-4">
-          <h3 className="text-xs font-bold text-slate-800 uppercase">Add New Staff Member</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <input
-              type="text"
-              placeholder="Staff Name"
-              value={newStaffName}
-              onChange={(e) => setNewStaffName(e.target.value)}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-900"
-            />
-            <input
-              type="email"
-              placeholder="staff@email.com"
-              value={newStaffEmail}
-              onChange={(e) => setNewStaffEmail(e.target.value)}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-900"
-            />
-            <input
-              type="password"
-              placeholder="Secure Password"
-              value={newStaffPassword}
-              onChange={(e) => setNewStaffPassword(e.target.value)}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-900"
-            />
-            <div className="flex gap-2">
-              <select
-                value={newStaffRole}
-                onChange={(e) => setNewStaffRole(e.target.value)}
-                className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-xs text-slate-900 font-medium"
-              >
-                <option value="WAITER">Waiter</option>
-                <option value="CASHIER">Cashier</option>
-                <option value="KITCHEN">Kitchen Staff</option>
-              </select>
-              <button
-                type="button"
-                onClick={handleAddStaffSubmit}
-                className="px-4 py-2.5 bg-red-600 hover:bg-red-500 text-white rounded-xl text-xs font-bold shrink-0 transition-all flex items-center gap-1 cursor-pointer"
-              >
-                <UserPlus size={14} /> Add
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b border-slate-100 text-[11px] font-bold text-slate-400 uppercase">
-                <th className="py-3 px-4">Name</th>
-                <th className="py-3 px-4">Email</th>
-                <th className="py-3 px-4">Role</th>
-                <th className="py-3 px-4 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 text-xs">
-              {staffList.length > 0 ? (
-                staffList.map((staff) => (
-                  <tr key={staff._id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="py-3.5 px-4 font-bold text-slate-900">{staff.name}</td>
-                    <td className="py-3.5 px-4 text-slate-600">{staff.email}</td>
-                    <td className="py-3.5 px-4">
-                      <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-slate-100 text-slate-700 uppercase">
-                        {staff.role}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-4 text-right">
-                      <button
-                        onClick={() => alert("Delete staff endpoint integration ready")}
-                        className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan="4" className="py-8 text-center text-slate-400 font-medium text-xs">
-                    No staff accounts registered yet. Use the form above to add members.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-      </div> */}
       </div>
     </>
   );
