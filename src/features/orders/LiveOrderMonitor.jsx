@@ -1942,69 +1942,67 @@ ${
     [storeDetails, user, apiBase, showError, selectedBillTemplate],
   );
 
-
   // 🔄 Live-sync bill template & store details when owner updates
-// restaurant profile (e.g. from a different tab/device) or completes
-// a Pro template payment. Without this, cashiers had to refresh the
-// page to pick up the new template — which was the root cause of
-// "sometimes applies, sometimes doesn't".
-useEffect(() => {
-  if (!socket || !restaurantId) return;
+  // restaurant profile (e.g. from a different tab/device) or completes
+  // a Pro template payment. Without this, cashiers had to refresh the
+  // page to pick up the new template — which was the root cause of
+  // "sometimes applies, sometimes doesn't".
+  useEffect(() => {
+    if (!socket || !restaurantId) return;
 
-  const handleProfileUpdated = async (payload) => {
-    // Fast-path: apply template instantly if server sent it in the event
-    if (payload?.restaurant?.billTemplate) {
-      setSelectedBillTemplate(payload.restaurant.billTemplate);
-      saveSelectedBillTemplate(restaurantId, payload.restaurant.billTemplate);
-    }
-
-    // Always re-fetch full profile so logo/address/UPI/GST/tax etc.
-    // used on the printed bill stay accurate too.
-    try {
-      const res = await axios.get(`${apiBase}/restaurant/profile`, {
-        withCredentials: true,
-      });
-      const d = res.data?.data;
-      if (!d) return;
-
-      const formattedAddress = d.address
-        ? [d.address.street, d.address.city, d.address.state, d.address.zip]
-            .filter(Boolean)
-            .join(", ")
-        : "";
-
-      setStoreDetails({
-        name: d.name || "",
-        logo: d.logo || "",
-        address: formattedAddress,
-        contact: d.phone || d.contactNumber || d.contact || "",
-        fssaiNumber: d.fssaiNumber || "",
-        taxRate: Number(d.taxRate || 0),
-        gstin: d.gstin || d.gstNumber || "",
-        upiId: d.upiId || "",
-        upiQrCode: d.upiQrCode || d.qrCodeUrl || "",
-        googleReviewQrCode: d.googleReviewQrCode || "",
-      });
-
-      if (d.billTemplate) {
-        setSelectedBillTemplate(d.billTemplate);
-        saveSelectedBillTemplate(restaurantId, d.billTemplate);
+    const handleProfileUpdated = async (payload) => {
+      // Fast-path: apply template instantly if server sent it in the event
+      if (payload?.restaurant?.billTemplate) {
+        setSelectedBillTemplate(payload.restaurant.billTemplate);
+        saveSelectedBillTemplate(restaurantId, payload.restaurant.billTemplate);
       }
-    } catch (err) {
-      console.warn(
-        "Could not refresh restaurant profile after live update:",
-        err?.message,
-      );
-    }
-  };
 
-  socket.on("RESTAURANT_PROFILE_UPDATED", handleProfileUpdated);
+      // Always re-fetch full profile so logo/address/UPI/GST/tax etc.
+      // used on the printed bill stay accurate too.
+      try {
+        const res = await axios.get(`${apiBase}/restaurant/profile`, {
+          withCredentials: true,
+        });
+        const d = res.data?.data;
+        if (!d) return;
 
-  return () => {
-    socket.off("RESTAURANT_PROFILE_UPDATED", handleProfileUpdated);
-  };
-}, [socket, restaurantId, apiBase]);
+        const formattedAddress = d.address
+          ? [d.address.street, d.address.city, d.address.state, d.address.zip]
+              .filter(Boolean)
+              .join(", ")
+          : "";
 
+        setStoreDetails({
+          name: d.name || "",
+          logo: d.logo || "",
+          address: formattedAddress,
+          contact: d.phone || d.contactNumber || d.contact || "",
+          fssaiNumber: d.fssaiNumber || "",
+          taxRate: Number(d.taxRate || 0),
+          gstin: d.gstin || d.gstNumber || "",
+          upiId: d.upiId || "",
+          upiQrCode: d.upiQrCode || d.qrCodeUrl || "",
+          googleReviewQrCode: d.googleReviewQrCode || "",
+        });
+
+        if (d.billTemplate) {
+          setSelectedBillTemplate(d.billTemplate);
+          saveSelectedBillTemplate(restaurantId, d.billTemplate);
+        }
+      } catch (err) {
+        console.warn(
+          "Could not refresh restaurant profile after live update:",
+          err?.message,
+        );
+      }
+    };
+
+    socket.on("RESTAURANT_PROFILE_UPDATED", handleProfileUpdated);
+
+    return () => {
+      socket.off("RESTAURANT_PROFILE_UPDATED", handleProfileUpdated);
+    };
+  }, [socket, restaurantId, apiBase]);
 
   // Bill & WhatsApp clear table handler added from TableMonitor
   const handleBillAndWhatsApp = useCallback((order) => {
@@ -2109,6 +2107,9 @@ useEffect(() => {
         },
         {
           withCredentials: true,
+          headers: {
+            "Idempotency-Key": crypto.randomUUID(),
+          },
         },
       );
 

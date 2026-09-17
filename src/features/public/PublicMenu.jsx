@@ -348,7 +348,19 @@ export default function PublicMenu() {
   // const [feedbackRating, setFeedbackRating] = useState(0);
   // const [feedbackSent, setFeedbackSent] = useState(false);
   const [lastOrderSnapshot, setLastOrderSnapshot] = useState(null);
-
+  const [isCustomerSessionReady, setIsCustomerSessionReady] = useState(false);
+  const [customerSessionError, setCustomerSessionError] = useState(false);
+  const [customerOrderHistory, setCustomerOrderHistory] = useState([]);
+  const [customerOrderHistoryLoading, setCustomerOrderHistoryLoading] =
+    useState(false);
+  const [showOrderHistory, setShowOrderHistory] = useState(false);
+  const [selectedCustomerOrder, setSelectedCustomerOrder] = useState(null);
+  const [customerOrderDetailLoading, setCustomerOrderDetailLoading] =
+    useState(false);
+  const [customerOrderHistoryCursor, setCustomerOrderHistoryCursor] =
+    useState(null);
+  const [customerOrderHistoryLoadingMore, setCustomerOrderHistoryLoadingMore] =
+    useState(false);
   const isValidName = /^[A-Za-z ]{3,50}$/.test(customerName.trim());
   const isValidPhone =
     customerPhone.trim() === "" || /^[6-9]\d{9}$/.test(customerPhone.trim());
@@ -456,6 +468,48 @@ export default function PublicMenu() {
     } catch {
       // ignore corrupt data
     }
+  }, [restaurantId]);
+
+  useEffect(() => {
+    if (!restaurantId) {
+      setIsCustomerSessionReady(false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const createSession = async () => {
+      try {
+        setCustomerSessionError(false);
+
+        await axios.post(
+          `${import.meta.env.VITE_APP_API_BASE}/customer/session`,
+          {
+            restaurantId,
+          },
+          {
+            withCredentials: true,
+          },
+        );
+
+        if (!cancelled) {
+          setIsCustomerSessionReady(true);
+        }
+      } catch (error) {
+        console.error("Customer session creation failed:", error);
+
+        if (!cancelled) {
+          setIsCustomerSessionReady(false);
+          setCustomerSessionError(true);
+        }
+      }
+    };
+
+    createSession();
+
+    return () => {
+      cancelled = true;
+    };
   }, [restaurantId]);
 
   const addToCart = useCallback((id, name, price, type = "item") => {
@@ -622,6 +676,137 @@ export default function PublicMenu() {
     });
   }, [lastOrderSnapshot]);
 
+  const fetchCustomerOrderHistory = useCallback(
+    async (cursor = null) => {
+      if (!restaurantId || !isCustomerSessionReady) return null;
+
+      try {
+        const params = new URLSearchParams();
+        params.set("restaurantId", restaurantId);
+
+        if (cursor) {
+          params.set("cursor", cursor);
+        }
+
+        const query = params.toString();
+
+        const res = await axios.get(
+          `${import.meta.env.VITE_APP_API_BASE}/customer/orders/history${
+            query ? `?${query}` : ""
+          }`,
+          {
+            withCredentials: true,
+          },
+        );
+
+        return {
+          ...res.data,
+          data: {
+            orders: res.data?.data || [],
+            nextCursor: res.data?.pagination?.nextCursor || null,
+          },
+        };
+      } catch (error) {
+        console.error("Customer order history fetch failed:", error);
+        return null;
+      }
+    },
+    [restaurantId, isCustomerSessionReady],
+  );
+
+  const handleLoadMoreCustomerOrders = useCallback(async () => {
+    if (
+      !customerOrderHistoryCursor ||
+      !isCustomerSessionReady ||
+      customerOrderHistoryLoadingMore
+    ) {
+      return;
+    }
+
+    setCustomerOrderHistoryLoadingMore(true);
+
+    try {
+      const data = await fetchCustomerOrderHistory(customerOrderHistoryCursor);
+
+      if (data?.success) {
+        setCustomerOrderHistory((prev) => [
+          ...prev,
+          ...(data.data?.orders || []),
+        ]);
+
+        setCustomerOrderHistoryCursor(data.data?.nextCursor || null);
+      }
+    } catch (error) {
+      console.error("Customer order history pagination failed:", error);
+    } finally {
+      setCustomerOrderHistoryLoadingMore(false);
+    }
+  }, [
+    customerOrderHistoryCursor,
+    isCustomerSessionReady,
+    customerOrderHistoryLoadingMore,
+    fetchCustomerOrderHistory,
+  ]);
+
+  const fetchCustomerOrderDetail = useCallback(
+    async (orderId) => {
+      if (!restaurantId || !isCustomerSessionReady || !orderId) return null;
+
+      setCustomerOrderDetailLoading(true);
+
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_APP_API_BASE}/customer/orders/history/${orderId}`,
+          {
+            params: {
+              restaurantId,
+            },
+            withCredentials: true,
+          },
+        );
+
+        return res.data;
+      } catch (error) {
+        console.error("Customer order detail fetch failed:", error);
+        return null;
+      } finally {
+        setCustomerOrderDetailLoading(false);
+      }
+    },
+    [restaurantId, isCustomerSessionReady],
+  );
+
+  useEffect(() => {
+    if (!restaurantId || !isCustomerSessionReady) return;
+
+    let cancelled = false;
+
+    const loadCustomerOrderHistory = async () => {
+      setCustomerOrderHistoryLoading(true);
+
+      try {
+        const data = await fetchCustomerOrderHistory();
+
+        if (!cancelled && data?.success) {
+          setCustomerOrderHistory(data.data?.orders || []);
+          setCustomerOrderHistoryCursor(data.data?.nextCursor || null);
+        }
+      } catch (error) {
+        console.error("Customer order history load failed:", error);
+      } finally {
+        if (!cancelled) {
+          setCustomerOrderHistoryLoading(false);
+        }
+      }
+    };
+
+    loadCustomerOrderHistory();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [restaurantId, isCustomerSessionReady, fetchCustomerOrderHistory]);
+
   const handleApplyMergeTable = useCallback(() => {
     if (!mergeTableNumber.trim()) return;
     setAppliedMergeTable(mergeTableNumber.trim());
@@ -665,6 +850,12 @@ export default function PublicMenu() {
         const res = await axios.post(
           `${import.meta.env.VITE_APP_API_BASE}/orders/place`,
           orderPayload,
+          {
+            withCredentials: true,
+            headers: {
+              "Idempotency-Key": crypto.randomUUID(),
+            },
+          },
         );
         if (res.data.success) {
           // reorder ke liye snapshot save karo
@@ -833,6 +1024,16 @@ export default function PublicMenu() {
               </p>
             </div>
             <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => setShowOrderHistory(true)}
+                disabled={!isCustomerSessionReady}
+                aria-label="Order history"
+                title="Order History"
+                className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+              >
+                <ShoppingBag size={15} />
+              </button>
               {/* <button
                 onClick={() => setLanguage((l) => (l === "EN" ? "HI" : "EN"))}
                 aria-label="Toggle language"
@@ -1224,6 +1425,378 @@ export default function PublicMenu() {
                     onAdd={addToCart}
                     onRemove={removeFromCart}
                   />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ---------------- Customer Order History modal ---------------- */}
+        {showOrderHistory && (
+          <>
+            <div
+              className="fixed inset-0 bg-slate-950/70 z-[80] flex items-end sm:items-center justify-center backdrop-blur-sm p-0 sm:p-4 animate-[fadeIn_0.15s_ease-out]"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="order-history-title"
+            >
+              <div className="bg-white w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl shadow-2xl border border-slate-200 max-h-[85vh] overflow-hidden animate-[slideUp_0.2s_ease-out] flex flex-col">
+                {/* Header */}
+                <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-500 flex items-center justify-center">
+                      <ShoppingBag size={18} />
+                    </div>
+
+                    <div>
+                      <h3
+                        id="order-history-title"
+                        className="text-base font-black text-slate-900"
+                      >
+                        Order History
+                      </h3>
+
+                      <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                        Your previous orders
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowOrderHistory(false)}
+                    aria-label="Close order history"
+                    className="p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-600 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                  >
+                    <X size={18} strokeWidth={2.5} />
+                  </button>
+                </div>
+
+                {/* Body */}
+                <div className="p-4 overflow-y-auto flex-1">
+                  {customerOrderHistoryLoading ? (
+                    <div className="space-y-3 animate-pulse">
+                      {[0, 1, 2].map((i) => (
+                        <div
+                          key={i}
+                          className="h-28 bg-slate-100 rounded-2xl"
+                        />
+                      ))}
+                    </div>
+                  ) : customerOrderHistory.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center text-center py-14 px-6">
+                      <div className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mb-4">
+                        <ShoppingBag size={24} />
+                      </div>
+
+                      <h4 className="text-sm font-black text-slate-700">
+                        No orders yet
+                      </h4>
+
+                      <p className="text-xs text-slate-400 font-medium mt-1 max-w-xs">
+                        Your previous orders will appear here.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {customerOrderHistory.map((order) => (
+                        <button
+                          type="button"
+                          key={order._id}
+                          onClick={async () => {
+                            const data = await fetchCustomerOrderDetail(
+                              order._id,
+                            );
+
+                            if (data?.success) {
+                              setSelectedCustomerOrder(
+                                data.data?.order || null,
+                              );
+                            }
+                          }}
+                          className="w-full text-left bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:border-rose-200 hover:shadow-md transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="text-xs font-black text-slate-900">
+                                #{order.orderId}
+                              </p>
+
+                              <p className="text-[10px] text-slate-400 font-medium mt-1">
+                                {order.createdAt
+                                  ? new Date(order.createdAt).toLocaleString(
+                                      "en-IN",
+                                    )
+                                  : ""}
+                              </p>
+                            </div>
+
+                            <span className="text-[10px] font-black px-2 py-1 rounded-lg bg-slate-100 text-slate-600">
+                              {order.status}
+                            </span>
+                          </div>
+
+                          <div className="mt-3 space-y-1.5">
+                            {(order.items || []).slice(0, 3).map((item) => (
+                              <div
+                                key={item._id}
+                                className="flex items-center justify-between gap-3 text-xs"
+                              >
+                                <span className="text-slate-600 font-medium truncate">
+                                  {item.name} × {item.quantity}
+                                </span>
+
+                                <span className="text-slate-900 font-bold shrink-0">
+                                  ₹
+                                  {Number(item.price || 0).toLocaleString(
+                                    "en-IN",
+                                  )}
+                                </span>
+                              </div>
+                            ))}
+
+                            {order.items?.length > 3 && (
+                              <p className="text-[10px] text-slate-400 font-semibold pt-1">
+                                +{order.items.length - 3} more item
+                                {order.items.length - 3 > 1 ? "s" : ""}
+                              </p>
+                            )}
+                          </div>
+
+                          <div className="border-t border-slate-100 mt-3 pt-3 flex items-center justify-between">
+                            <span className="text-[10px] uppercase tracking-wider text-slate-400 font-black">
+                              Total
+                            </span>
+
+                            <span className="text-sm font-black text-slate-900">
+                              ₹
+                              {Number(order.total || 0).toLocaleString("en-IN")}
+                            </span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {customerOrderHistory.length > 0 && customerOrderHistoryCursor && (
+              <button
+                type="button"
+                onClick={handleLoadMoreCustomerOrders}
+                disabled={customerOrderHistoryLoadingMore}
+                className="w-full mt-4 py-3 rounded-xl border border-slate-200 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {customerOrderHistoryLoadingMore
+                  ? "Loading..."
+                  : "Load More Orders"}
+              </button>
+            )}
+          </>
+        )}
+
+        {/* ---------------- Customer Order Details modal ---------------- */}
+        {selectedCustomerOrder && (
+          <div
+            className="fixed inset-0 bg-slate-950/70 z-[90] flex items-end sm:items-center justify-center backdrop-blur-sm p-0 sm:p-4 animate-[fadeIn_0.15s_ease-out]"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="customer-order-details-title"
+          >
+            <div className="bg-white w-full sm:max-w-md sm:rounded-3xl rounded-t-3xl shadow-2xl border border-slate-200 max-h-[88vh] overflow-hidden animate-[slideUp_0.2s_ease-out] flex flex-col">
+              {/* Header */}
+              <div className="p-5 border-b border-slate-100 flex items-center justify-between shrink-0">
+                <div>
+                  <p className="text-[10px] uppercase tracking-widest text-slate-400 font-black">
+                    Order Details
+                  </p>
+
+                  <h3
+                    id="customer-order-details-title"
+                    className="text-lg font-black text-slate-900 mt-0.5"
+                  >
+                    #{selectedCustomerOrder.orderId}
+                  </h3>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedCustomerOrder(null)}
+                  aria-label="Close order details"
+                  className="p-2 text-slate-400 hover:bg-slate-50 hover:text-slate-600 rounded-xl focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-300"
+                >
+                  <X size={18} strokeWidth={2.5} />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-5 overflow-y-auto flex-1 space-y-5">
+                {/* Status + order meta */}
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                      Status
+                    </p>
+
+                    <span className="inline-flex mt-1 text-xs font-black px-2.5 py-1.5 rounded-lg bg-slate-100 text-slate-700">
+                      {selectedCustomerOrder.status}
+                    </span>
+                  </div>
+
+                  <div className="text-right">
+                    <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                      Date
+                    </p>
+
+                    <p className="text-xs font-bold text-slate-700 mt-1">
+                      {selectedCustomerOrder.createdAt
+                        ? new Date(
+                            selectedCustomerOrder.createdAt,
+                          ).toLocaleString("en-IN")
+                        : "—"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Order type / table */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-slate-50 rounded-2xl p-3">
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-wider">
+                      Order Type
+                    </p>
+
+                    <p className="text-xs font-black text-slate-800 mt-1">
+                      {selectedCustomerOrder.orderType || "—"}
+                    </p>
+                  </div>
+
+                  <div className="bg-slate-50 rounded-2xl p-3">
+                    <p className="text-[10px] text-slate-400 font-black uppercase tracking-wider">
+                      Table
+                    </p>
+
+                    <p className="text-xs font-black text-slate-800 mt-1">
+                      {selectedCustomerOrder.tableNumber || "—"}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Items */}
+                <div>
+                  <div className="flex items-center justify-between mb-3">
+                    <h4 className="text-xs font-black text-slate-800 uppercase tracking-wider">
+                      Items
+                    </h4>
+
+                    <span className="text-[10px] text-slate-400 font-bold">
+                      {selectedCustomerOrder.items?.length || 0} item
+                      {(selectedCustomerOrder.items?.length || 0) !== 1
+                        ? "s"
+                        : ""}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {(selectedCustomerOrder.items || []).map((item) => (
+                      <div
+                        key={item._id}
+                        className="flex items-start justify-between gap-3 p-3 rounded-xl bg-slate-50 border border-slate-100"
+                      >
+                        <div className="min-w-0">
+                          <p className="text-xs font-black text-slate-800 truncate">
+                            {item.name}
+                          </p>
+
+                          <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
+                            ₹{Number(item.price || 0).toLocaleString("en-IN")}
+                            {" × "}
+                            {item.quantity}
+                          </p>
+
+                          {Number(item.discount || 0) > 0 && (
+                            <p className="text-[10px] text-emerald-600 font-bold mt-0.5">
+                              Discount: ₹
+                              {Number(item.discount).toLocaleString("en-IN")}
+                            </p>
+                          )}
+                        </div>
+
+                        <p className="text-xs font-black text-slate-900 shrink-0">
+                          ₹
+                          {(
+                            Number(item.price || 0) *
+                              Number(item.quantity || 0) -
+                            Number(item.discount || 0) +
+                            Number(item.taxAmount || 0)
+                          ).toLocaleString("en-IN")}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Rejection reason */}
+                {selectedCustomerOrder.status === "REJECTED" &&
+                  selectedCustomerOrder.rejectReason && (
+                    <div className="p-3 rounded-xl bg-red-50 border border-red-100">
+                      <p className="text-[10px] uppercase tracking-wider text-red-500 font-black">
+                        Rejection Reason
+                      </p>
+
+                      <p className="text-xs text-red-700 font-semibold mt-1">
+                        {selectedCustomerOrder.rejectReason}
+                      </p>
+                    </div>
+                  )}
+
+                {/* Financial summary */}
+                <div className="border-t border-slate-100 pt-4 space-y-2">
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500 font-medium">Subtotal</span>
+
+                    <span className="text-slate-800 font-bold">
+                      ₹
+                      {Number(
+                        selectedCustomerOrder.subtotal || 0,
+                      ).toLocaleString("en-IN")}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500 font-medium">Discount</span>
+
+                    <span className="text-emerald-600 font-bold">
+                      - ₹
+                      {Number(
+                        selectedCustomerOrder.discount || 0,
+                      ).toLocaleString("en-IN")}
+                    </span>
+                  </div>
+
+                  <div className="flex justify-between text-xs">
+                    <span className="text-slate-500 font-medium">Tax</span>
+
+                    <span className="text-slate-800 font-bold">
+                      ₹
+                      {Number(selectedCustomerOrder.tax || 0).toLocaleString(
+                        "en-IN",
+                      )}
+                    </span>
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-3 mt-2 flex items-center justify-between">
+                    <span className="text-xs uppercase tracking-wider text-slate-400 font-black">
+                      Your Total
+                    </span>
+
+                    <span className="text-lg font-black text-slate-900">
+                      ₹
+                      {Number(selectedCustomerOrder.total || 0).toLocaleString(
+                        "en-IN",
+                      )}
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1652,9 +2225,11 @@ export default function PublicMenu() {
                 <div className="pt-2 pb-1 sticky bottom-0 bg-white">
                   <button
                     type="submit"
-                    disabled={!isFormValid || isSubmitting}
+                    disabled={
+                      !isFormValid || isSubmitting || !isCustomerSessionReady
+                    }
                     className={`w-full font-black text-xs py-3.5 rounded-xl shadow-md transition-all tracking-wider uppercase focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 ${
-                      !isFormValid || isSubmitting
+                      !isFormValid || isSubmitting || !isCustomerSessionReady
                         ? "bg-slate-200 text-slate-400 cursor-not-allowed shadow-none"
                         : "bg-gradient-to-r from-rose-500 to-pink-600 text-white cursor-pointer active:scale-[0.99]"
                     }`}
@@ -1666,6 +2241,11 @@ export default function PublicMenu() {
                   {!isFormValid && (
                     <p className="text-center text-[10px] font-bold text-slate-400 mt-2">
                       Enter your name and mobile number to continue
+                    </p>
+                  )}
+                  {!isCustomerSessionReady && !customerSessionError && (
+                    <p className="text-center text-[10px] font-bold text-slate-400 mt-2">
+                      Preparing secure ordering session...
                     </p>
                   )}
                 </div>
