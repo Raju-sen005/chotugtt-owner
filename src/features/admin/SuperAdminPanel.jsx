@@ -11,47 +11,159 @@ import {
   AlertCircle,
   Power,
   Check,
+  History,
+  Search,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  Wallet,
+  Smartphone,
+  Banknote,
+  TrendingUp,
+  UtensilsCrossed,
+  Layers,
+  ShoppingBag,
+  Activity,
+  Table2,
+  Trash2,
+  X,
+  Building2,
+  Users,
 } from "lucide-react";
-import { History } from "lucide-react";
+
+/* ----------------------------------------------------------------------
+   Small presentational primitives
+   ------------------------------------------------------------------- */
+
+const SectionHeading = ({ title, subtitle, action }) => (
+  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div>
+      <h2 className="text-base font-semibold text-stone-900">{title}</h2>
+      {subtitle && (
+        <p className="mt-0.5 text-sm text-stone-500">{subtitle}</p>
+      )}
+    </div>
+    {action}
+  </div>
+);
+
+const SelectField = ({ value, onChange, disabled, children, className = "" }) => (
+  <div className={`relative ${className}`}>
+    <select
+      value={value}
+      onChange={onChange}
+      disabled={disabled}
+      className="h-10 w-full appearance-none rounded-lg border border-stone-200 bg-white pl-3 pr-9 text-sm font-medium text-stone-700 outline-none transition focus:border-stone-400 disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {children}
+    </select>
+    <ChevronDown
+      size={15}
+      className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-stone-400"
+    />
+  </div>
+);
+
+const StatusPill = ({ tone, children, dot = false }) => {
+  const tones = {
+    emerald: "bg-emerald-50 text-emerald-700",
+    amber: "bg-amber-50 text-amber-700",
+    rose: "bg-rose-50 text-rose-700",
+    stone: "bg-stone-100 text-stone-600",
+  };
+  const dots = {
+    emerald: "bg-emerald-500",
+    amber: "bg-amber-500",
+    rose: "bg-rose-500",
+    stone: "bg-stone-400",
+  };
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium ${tones[tone]}`}
+    >
+      {dot && <span className={`h-1.5 w-1.5 rounded-full ${dots[tone]}`} />}
+      {children}
+    </span>
+  );
+};
+
+const PaginationBar = ({ label, page, totalPages, hasPrev, hasNext, onPrev, onNext, disabled }) => (
+  <div className="flex flex-col gap-3 border-t border-stone-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+    <p className="text-xs text-stone-500">{label}</p>
+    <div className="flex items-center gap-2">
+      <button
+        type="button"
+        disabled={!hasPrev || disabled}
+        onClick={onPrev}
+        className="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-600 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <ChevronLeft size={14} />
+        Previous
+      </button>
+      <span className="rounded-lg bg-stone-50 px-3 py-1.5 text-xs font-semibold text-stone-700">
+        {page} / {Math.max(1, totalPages)}
+      </span>
+      <button
+        type="button"
+        disabled={!hasNext || disabled}
+        onClick={onNext}
+        className="inline-flex items-center gap-1 rounded-lg border border-stone-200 px-3 py-1.5 text-xs font-medium text-stone-600 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        Next
+        <ChevronRight size={14} />
+      </button>
+    </div>
+  </div>
+);
+
 const DetailItem = ({ label, value }) => {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4">
-      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-        {label}
-      </p>
-
-      <p className="mt-1.5 text-sm font-bold text-slate-800 break-words">
+    <div className="rounded-xl border border-stone-200 bg-white p-3.5">
+      <p className="text-xs text-stone-400">{label}</p>
+      <p className="mt-1 break-words text-sm font-medium text-stone-800">
         {value || "—"}
       </p>
     </div>
   );
 };
 
-const OverviewCard = ({ label, value }) => {
+const OverviewCard = ({ label, value, icon: Icon }) => {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-        {label}
-      </p>
-
-      <p className="mt-2 text-xl font-black text-slate-900">
+    <div className="rounded-xl border border-stone-200 bg-stone-50 p-3.5">
+      <div className="flex items-center gap-2 text-stone-400">
+        {Icon && <Icon size={13} />}
+        <p className="text-xs">{label}</p>
+      </div>
+      <p className="mt-1.5 text-lg font-semibold tabular-nums text-stone-900">
         {Number(value || 0).toLocaleString()}
       </p>
     </div>
   );
 };
 
-const StatCard = ({ title, value }) => {
+const StatCell = ({ title, value, tone = "stone" }) => {
+  const toneText = {
+    stone: "text-stone-900",
+    emerald: "text-emerald-600",
+    amber: "text-amber-600",
+    rose: "text-rose-600",
+    brand: "text-red-600",
+  };
   return (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-        {title}
+    <div className="flex flex-col gap-1 bg-white p-4">
+      <p className="text-xs text-stone-500">{title}</p>
+      <p className={`text-xl font-semibold tabular-nums ${toneText[tone]}`}>
+        {value}
       </p>
-
-      <p className="mt-2 text-2xl font-black text-slate-900">{value ?? 0}</p>
     </div>
   );
 };
+
+const currency = (value) =>
+  `₹${Number(value || 0).toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 
 const getAuditActionLabel = (action) => {
   switch (action) {
@@ -83,6 +195,28 @@ const getAuditActionLabel = (action) => {
       return action || "Unknown";
   }
 };
+
+const getAuditActionTone = (action) => {
+  switch (action) {
+    case "RESTAURANT_APPROVED":
+    case "RESTAURANT_UNBLOCKED":
+    case "STAFF_ACTIVATED":
+      return "emerald";
+    case "RESTAURANT_APPROVAL_REVOKED":
+    case "SUBSCRIPTION_PLAN_CHANGED":
+    case "SUBSCRIPTION_STATUS_CHANGED":
+      return "amber";
+    case "RESTAURANT_BLOCKED":
+    case "STAFF_DEACTIVATED":
+      return "rose";
+    default:
+      return "stone";
+  }
+};
+
+/* ----------------------------------------------------------------------
+   Main component
+   ------------------------------------------------------------------- */
 
 export default function SuperAdminPanel() {
   const [restaurants, setRestaurants] = useState([]);
@@ -577,8 +711,11 @@ export default function SuperAdminPanel() {
   };
   if (loading)
     return (
-      <div className="flex h-screen items-center justify-center bg-slate-50">
-        <Loader2 className="animate-spin text-red-500" size={48} />
+      <div className="flex h-screen flex-col items-center justify-center gap-3 bg-stone-50">
+        <Loader2 className="animate-spin text-red-600" size={32} />
+        <p className="text-sm font-medium text-stone-500">
+          Loading dashboard…
+        </p>
       </div>
     );
 
@@ -592,42 +729,69 @@ export default function SuperAdminPanel() {
   const totalOrders = platformStats?.orders?.total ?? 0;
   const activeOrders = platformStats?.orders?.active ?? 0;
 
+  // Derived, presentation-only helpers (do not affect fetched data)
+  const growthMax = Math.max(
+    1,
+    ...(platformAnalytics?.restaurantGrowth || []).map((i) => i.count || 0),
+  );
+  const orderTrendMax = Math.max(
+    1,
+    ...(platformAnalytics?.orderTrend || []).map((i) => i.count || 0),
+  );
+  const revenueTrendMax = Math.max(
+    1,
+    ...(platformAnalytics?.revenueTrend || []).map((i) => i.revenue || 0),
+  );
+  const subscriptionTotal = Math.max(
+    1,
+    (platformAnalytics?.subscriptions?.starter || 0) +
+      (platformAnalytics?.subscriptions?.pro || 0) +
+      (platformAnalytics?.subscriptions?.enterprise || 0),
+  );
+
   return (
     <>
       {subscriptionModal && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-4">
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-950/50 p-4 backdrop-blur-sm"
+          onMouseDown={(e) => {
+            if (e.target === e.currentTarget) setSubscriptionModal(null);
+          }}
+        >
           <div
-            className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl"
+            className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl"
             onClick={(event) => event.stopPropagation()}
           >
-            <div className="mb-5">
-              <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                Subscription Management
-              </p>
-
-              <h3 className="mt-1 text-xl font-black text-slate-900">
-                Change{" "}
-                {subscriptionModal.field === "subscriptionPlan"
-                  ? "Plan"
-                  : "Status"}
-              </h3>
-
-              <p className="mt-2 text-sm text-slate-500">
-                Restaurant:{" "}
-                <span className="font-bold text-slate-700">
+            <div className="mb-5 flex items-start justify-between">
+              <div>
+                <h3 className="text-base font-semibold text-stone-900">
+                  Change{" "}
+                  {subscriptionModal.field === "subscriptionPlan"
+                    ? "plan"
+                    : "status"}
+                </h3>
+                <p className="mt-1 text-sm text-stone-500">
                   {selectedRestaurant?.name || "—"}
-                </span>
-              </p>
+                </p>
+              </div>
+              <button
+                type="button"
+                disabled={subscriptionUpdating}
+                onClick={() => setSubscriptionModal(null)}
+                className="rounded-lg p-1.5 text-stone-400 transition hover:bg-stone-100 hover:text-stone-600 disabled:opacity-50"
+              >
+                <X size={16} />
+              </button>
             </div>
 
             <div>
-              <label className="mb-2 block text-[10px] font-black uppercase tracking-wider text-slate-400">
+              <label className="mb-1.5 block text-xs font-medium text-stone-500">
                 {subscriptionModal.field === "subscriptionPlan"
-                  ? "Select Plan"
-                  : "Select Status"}
+                  ? "Plan"
+                  : "Status"}
               </label>
 
-              <select
+              <SelectField
                 value={subscriptionModal.value}
                 disabled={subscriptionUpdating}
                 onChange={(event) =>
@@ -636,30 +800,29 @@ export default function SuperAdminPanel() {
                     value: event.target.value,
                   }))
                 }
-                className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-bold text-slate-800 outline-none transition focus:border-slate-400 disabled:bg-slate-100"
               >
                 {subscriptionModal.field === "subscriptionPlan" ? (
                   <>
-                    <option value="STARTER">STARTER</option>
-                    <option value="PRO">PRO</option>
-                    <option value="ENTERPRISE">ENTERPRISE</option>
+                    <option value="STARTER">Starter</option>
+                    <option value="PRO">Pro</option>
+                    <option value="ENTERPRISE">Enterprise</option>
                   </>
                 ) : (
                   <>
-                    <option value="ACTIVE">ACTIVE</option>
-                    <option value="PAST_DUE">PAST DUE</option>
-                    <option value="CANCELED">CANCELED</option>
+                    <option value="ACTIVE">Active</option>
+                    <option value="PAST_DUE">Past due</option>
+                    <option value="CANCELED">Canceled</option>
                   </>
                 )}
-              </select>
+              </SelectField>
             </div>
 
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="mt-6 flex justify-end gap-2.5">
               <button
                 type="button"
                 disabled={subscriptionUpdating}
                 onClick={() => setSubscriptionModal(null)}
-                className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-black text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+                className="rounded-lg border border-stone-200 px-4 py-2 text-sm font-medium text-stone-600 transition hover:bg-stone-50 disabled:opacity-50"
               >
                 Cancel
               </button>
@@ -672,63 +835,66 @@ export default function SuperAdminPanel() {
                     selectedRestaurant?.[subscriptionModal.field]
                 }
                 onClick={handleSubscriptionUpdate}
-                className="rounded-xl bg-slate-900 px-5 py-2.5 text-xs font-black text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
               >
-                {subscriptionUpdating ? "Updating..." : "Update"}
+                {subscriptionUpdating && (
+                  <Loader2 size={14} className="animate-spin" />
+                )}
+                {subscriptionUpdating ? "Updating…" : "Update"}
               </button>
             </div>
           </div>
         </div>
       )}
+
       {showDetails && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 backdrop-blur-sm p-4"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/40 p-4 backdrop-blur-sm"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) {
               setShowDetails(false);
             }
           }}
         >
-          <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-white rounded-3xl shadow-2xl border border-slate-200">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-stone-200 bg-white shadow-xl">
             {/* Header */}
-            <div className="sticky top-0 z-10 bg-white border-b border-slate-100 px-6 py-5 flex items-center justify-between">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-red-500">
-                  Restaurant Details
-                </p>
-
-                <h2 className="text-xl font-black text-slate-900 mt-1">
-                  {selectedRestaurant?.name || "Restaurant"}
-                </h2>
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-stone-100 bg-white/95 px-6 py-4 backdrop-blur">
+              <div className="flex items-center gap-3">
+                <div className="rounded-xl bg-stone-100 p-2 text-stone-500">
+                  <Building2 size={18} />
+                </div>
+                <div>
+                  <p className="text-xs text-stone-400">Restaurant details</p>
+                  <h2 className="text-base font-semibold text-stone-900">
+                    {selectedRestaurant?.name || "Restaurant"}
+                  </h2>
+                </div>
               </div>
 
               <button
                 type="button"
                 onClick={() => setShowDetails(false)}
-                className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600"
+                className="rounded-lg p-2 text-stone-400 transition hover:bg-stone-100 hover:text-stone-600"
               >
-                <XCircle size={18} />
+                <X size={18} />
               </button>
             </div>
 
             {/* Loading */}
             {detailsLoading ? (
               <div className="flex items-center justify-center py-20">
-                <Loader2 size={32} className="animate-spin text-red-500" />
+                <Loader2 size={28} className="animate-spin text-red-600" />
               </div>
             ) : selectedRestaurant ? (
-              <div className="p-6 space-y-6">
+              <div className="space-y-7 p-6">
                 {/* Status */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                      Approval
-                    </p>
-
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+                    <p className="text-xs text-stone-400">Approval</p>
                     <p
-                      className={`mt-2 text-sm font-black ${
+                      className={`mt-1.5 text-sm font-semibold ${
                         selectedRestaurant.isApproved
-                          ? "text-green-600"
+                          ? "text-emerald-600"
                           : "text-amber-600"
                       }`}
                     >
@@ -736,13 +902,10 @@ export default function SuperAdminPanel() {
                     </p>
                   </div>
 
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                      Access
-                    </p>
-
+                  <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+                    <p className="text-xs text-stone-400">Access</p>
                     <p
-                      className={`mt-2 text-sm font-black ${
+                      className={`mt-1.5 text-sm font-semibold ${
                         selectedRestaurant.isActive !== false
                           ? "text-emerald-600"
                           : "text-rose-600"
@@ -757,13 +920,13 @@ export default function SuperAdminPanel() {
 
                 {/* Restaurant Information */}
                 <div>
-                  <h3 className="text-sm font-black text-slate-900 mb-3">
-                    Restaurant Information
+                  <h3 className="mb-3 text-sm font-semibold text-stone-900">
+                    Restaurant information
                   </h3>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <DetailItem
-                      label="Restaurant Name"
+                      label="Restaurant name"
                       value={selectedRestaurant.name}
                     />
 
@@ -790,13 +953,13 @@ export default function SuperAdminPanel() {
 
                 {/* Owner Information */}
                 <div>
-                  <h3 className="text-sm font-black text-slate-900 mb-3">
-                    Owner Information
+                  <h3 className="mb-3 text-sm font-semibold text-stone-900">
+                    Owner information
                   </h3>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <DetailItem
-                      label="Owner Name"
+                      label="Owner name"
                       value={selectedRestaurant.ownerName || "—"}
                     />
 
@@ -809,65 +972,66 @@ export default function SuperAdminPanel() {
 
                 {/* Operational Overview */}
                 <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-black text-slate-900">
-                      Operational Overview
+                  <div className="mb-3 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-stone-900">
+                      Operational overview
                     </h3>
 
                     {overviewLoading && (
-                      <Loader2
-                        size={16}
-                        className="animate-spin text-red-500"
-                      />
+                      <Loader2 size={15} className="animate-spin text-red-600" />
                     )}
                   </div>
 
                   {overviewLoading ? (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-6 flex items-center justify-center">
-                      <Loader2
-                        size={24}
-                        className="animate-spin text-red-500"
-                      />
+                    <div className="flex items-center justify-center rounded-xl border border-stone-200 bg-stone-50 p-6">
+                      <Loader2 size={22} className="animate-spin text-red-600" />
                     </div>
                   ) : restaurantOverview?.stats ? (
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                       <OverviewCard
                         label="Staff"
                         value={restaurantOverview.stats.staffCount}
+                        icon={Users}
                       />
 
                       <OverviewCard
-                        label="Menu Items"
+                        label="Menu items"
                         value={restaurantOverview.stats.menuItemCount}
+                        icon={UtensilsCrossed}
                       />
 
                       <OverviewCard
                         label="Combos"
                         value={restaurantOverview.stats.comboCount}
+                        icon={Layers}
                       />
 
                       <OverviewCard
                         label="Orders"
                         value={restaurantOverview.stats.orderCount}
+                        icon={ShoppingBag}
                       />
 
                       <OverviewCard
-                        label="Live Orders"
+                        label="Live orders"
                         value={restaurantOverview.stats.activeOrderCount}
+                        icon={Activity}
                       />
 
                       <OverviewCard
                         label="Offers"
                         value={restaurantOverview.stats.offerCount}
+                        icon={TrendingUp}
                       />
 
                       <OverviewCard
                         label="Tables"
                         value={restaurantOverview.stats.tableCount}
+                        icon={Table2}
                       />
                     </div>
                   ) : (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm font-bold text-slate-500">
+                    <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm font-medium text-stone-500">
                       Operational data unavailable.
                     </div>
                   )}
@@ -875,90 +1039,77 @@ export default function SuperAdminPanel() {
 
                 {/* Staff & Users */}
                 <div>
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="mb-3 flex items-center justify-between">
                     <div>
-                      <h3 className="text-sm font-black text-slate-900">
-                        Staff & Users
+                      <h3 className="text-sm font-semibold text-stone-900">
+                        Staff & users
                       </h3>
-
-                      <p className="mt-1 text-[11px] font-medium text-slate-400">
+                      <p className="mt-0.5 text-xs text-stone-400">
                         Manage restaurant users and their access status
                       </p>
                     </div>
 
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                      {restaurantStaff.length} Users
+                    <span className="text-xs font-medium text-stone-400">
+                      {restaurantStaff.length} users
                     </span>
                   </div>
 
                   {staffLoading ? (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-8 flex items-center justify-center">
-                      <Loader2
-                        size={24}
-                        className="animate-spin text-red-500"
-                      />
+                    <div className="flex items-center justify-center rounded-xl border border-stone-200 bg-stone-50 p-8">
+                      <Loader2 size={22} className="animate-spin text-red-600" />
                     </div>
                   ) : restaurantStaff.length === 0 ? (
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50 p-5 text-sm font-bold text-slate-500">
+                    <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm font-medium text-stone-500">
                       No restaurant users found.
                     </div>
                   ) : (
-                    <div className="rounded-2xl border border-slate-200 overflow-hidden bg-white">
+                    <div className="overflow-hidden rounded-xl border border-stone-200">
                       <div className="overflow-x-auto">
-                        <table className="w-full text-left min-w-[850px]">
-                          <thead className="bg-slate-50 border-b border-slate-100">
+                        <table className="w-full min-w-[820px] text-left">
+                          <thead className="border-b border-stone-100 bg-stone-50">
                             <tr>
-                              <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                              <th className="px-4 py-2.5 text-[11px] font-medium uppercase tracking-wide text-stone-400">
                                 User
                               </th>
-
-                              <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                              <th className="px-4 py-2.5 text-[11px] font-medium uppercase tracking-wide text-stone-400">
                                 Role
                               </th>
-
-                              <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                              <th className="px-4 py-2.5 text-[11px] font-medium uppercase tracking-wide text-stone-400">
                                 Phone
                               </th>
-
-                              <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-slate-400">
+                              <th className="px-4 py-2.5 text-[11px] font-medium uppercase tracking-wide text-stone-400">
                                 Status
                               </th>
-
-                              <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-slate-400">
-                                Last Login
+                              <th className="px-4 py-2.5 text-[11px] font-medium uppercase tracking-wide text-stone-400">
+                                Last login
                               </th>
-
-                              <th className="px-4 py-3 text-[10px] font-black uppercase tracking-wider text-slate-400 text-right">
+                              <th className="px-4 py-2.5 text-right text-[11px] font-medium uppercase tracking-wide text-stone-400">
                                 Action
                               </th>
                             </tr>
                           </thead>
 
-                          <tbody className="divide-y divide-slate-100">
+                          <tbody className="divide-y divide-stone-100">
                             {restaurantStaff.map((user) => {
                               const isActive = user.isActive !== false;
 
                               return (
                                 <tr
                                   key={user._id}
-                                  className="hover:bg-slate-50/70 transition-colors"
+                                  className="transition-colors hover:bg-stone-50/70"
                                 >
                                   {/* USER */}
                                   <td className="px-4 py-3">
                                     <div className="flex items-center gap-3">
-                                      <div className="h-9 w-9 shrink-0 rounded-xl bg-slate-100 flex items-center justify-center">
-                                        <User
-                                          size={16}
-                                          className="text-slate-500"
-                                        />
+                                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-stone-100">
+                                        <User size={14} className="text-stone-500" />
                                       </div>
 
                                       <div className="min-w-0">
-                                        <p className="text-sm font-bold text-slate-800 truncate">
+                                        <p className="truncate text-sm font-medium text-stone-800">
                                           {user.name || "—"}
                                         </p>
-
-                                        <p className="text-xs text-slate-400 mt-0.5 truncate">
+                                        <p className="mt-0.5 truncate text-xs text-stone-400">
                                           {user.email || "—"}
                                         </p>
                                       </div>
@@ -968,12 +1119,12 @@ export default function SuperAdminPanel() {
                                   {/* ROLE */}
                                   <td className="px-4 py-3">
                                     <span
-                                      className={`inline-flex px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${
+                                      className={`inline-flex rounded-md px-2 py-1 text-[11px] font-medium ${
                                         user.role === "OWNER"
                                           ? "bg-purple-50 text-purple-700"
                                           : user.role === "MANAGER"
                                             ? "bg-blue-50 text-blue-700"
-                                            : "bg-slate-100 text-slate-700"
+                                            : "bg-stone-100 text-stone-600"
                                       }`}
                                     >
                                       {user.role || "—"}
@@ -981,34 +1132,23 @@ export default function SuperAdminPanel() {
                                   </td>
 
                                   {/* PHONE */}
-                                  <td className="px-4 py-3 text-xs font-medium text-slate-600">
+                                  <td className="px-4 py-3 text-xs text-stone-600">
                                     {user.phone || "—"}
                                   </td>
 
                                   {/* STATUS */}
                                   <td className="px-4 py-3">
-                                    <span
-                                      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase ${
-                                        isActive
-                                          ? "bg-emerald-50 text-emerald-600"
-                                          : "bg-rose-50 text-rose-600"
-                                      }`}
+                                    <StatusPill
+                                      tone={isActive ? "emerald" : "rose"}
+                                      dot
                                     >
-                                      <span
-                                        className={`h-1.5 w-1.5 rounded-full ${
-                                          isActive
-                                            ? "bg-emerald-500"
-                                            : "bg-rose-500"
-                                        }`}
-                                      />
-
                                       {isActive ? "Active" : "Blocked"}
-                                    </span>
+                                    </StatusPill>
                                   </td>
 
                                   {/* LAST LOGIN */}
                                   <td className="px-4 py-3">
-                                    <p className="text-xs font-medium text-slate-600">
+                                    <p className="text-xs text-stone-500">
                                       {user.lastLoginAt
                                         ? new Date(
                                             user.lastLoginAt,
@@ -1031,25 +1171,22 @@ export default function SuperAdminPanel() {
                                           !isActive,
                                         )
                                       }
-                                      className={`inline-flex items-center justify-center gap-2 rounded-lg px-3 py-2 text-[10px] font-black uppercase tracking-wide transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                                      className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
                                         isActive
                                           ? "bg-rose-50 text-rose-700 hover:bg-rose-100"
                                           : "bg-emerald-50 text-emerald-700 hover:bg-emerald-100"
                                       }`}
                                     >
                                       {staffLoading ? (
-                                        <Loader2
-                                          size={14}
-                                          className="animate-spin"
-                                        />
+                                        <Loader2 size={13} className="animate-spin" />
                                       ) : isActive ? (
                                         <>
-                                          <Power size={14} />
+                                          <Power size={13} />
                                           Deactivate
                                         </>
                                       ) : (
                                         <>
-                                          <Check size={14} />
+                                          <Check size={13} />
                                           Activate
                                         </>
                                       )}
@@ -1065,28 +1202,19 @@ export default function SuperAdminPanel() {
                   )}
                 </div>
 
-                {/* Subscription */}
                 {/* Subscription Management */}
                 <div>
-                  <div className="flex items-center justify-between mb-3">
-                    <h3 className="text-sm font-black text-slate-900">
-                      Subscription
-                    </h3>
+                  <h3 className="mb-3 text-sm font-semibold text-stone-900">
+                    Subscription
+                  </h3>
 
-                    <span className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                      SuperAdmin
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {/* Current Plan */}
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        Current Plan
-                      </p>
+                    <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+                      <p className="text-xs text-stone-400">Current plan</p>
 
                       <div className="mt-2 flex items-center justify-between gap-3">
-                        <span className="text-sm font-black text-slate-900">
+                        <span className="text-sm font-semibold text-stone-900">
                           {selectedRestaurant.subscriptionPlan || "STARTER"}
                         </span>
 
@@ -1101,7 +1229,7 @@ export default function SuperAdminPanel() {
                                 "STARTER",
                             })
                           }
-                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Change
                         </button>
@@ -1109,24 +1237,22 @@ export default function SuperAdminPanel() {
                     </div>
 
                     {/* Subscription Status */}
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
-                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        Status
-                      </p>
+                    <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
+                      <p className="text-xs text-stone-400">Status</p>
 
                       <div className="mt-2 flex items-center justify-between gap-3">
-                        <span
-                          className={`inline-flex rounded-xl px-3 py-1.5 text-[10px] font-black uppercase tracking-wider ${
+                        <StatusPill
+                          tone={
                             selectedRestaurant.subscriptionStatus === "ACTIVE"
-                              ? "bg-emerald-50 text-emerald-700"
+                              ? "emerald"
                               : selectedRestaurant.subscriptionStatus ===
                                   "PAST_DUE"
-                                ? "bg-amber-50 text-amber-700"
-                                : "bg-rose-50 text-rose-700"
-                          }`}
+                                ? "amber"
+                                : "rose"
+                          }
                         >
                           {selectedRestaurant.subscriptionStatus || "ACTIVE"}
-                        </span>
+                        </StatusPill>
 
                         <button
                           type="button"
@@ -1139,7 +1265,7 @@ export default function SuperAdminPanel() {
                                 "ACTIVE",
                             })
                           }
-                          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-[10px] font-black uppercase tracking-wider text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                          className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                           Change
                         </button>
@@ -1150,13 +1276,13 @@ export default function SuperAdminPanel() {
 
                 {/* Dates */}
                 <div>
-                  <h3 className="text-sm font-black text-slate-900 mb-3">
-                    Account Timeline
+                  <h3 className="mb-3 text-sm font-semibold text-stone-900">
+                    Account timeline
                   </h3>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <DetailItem
-                      label="Created At"
+                      label="Created at"
                       value={
                         selectedRestaurant.createdAt
                           ? new Date(
@@ -1167,7 +1293,7 @@ export default function SuperAdminPanel() {
                     />
 
                     <DetailItem
-                      label="Updated At"
+                      label="Updated at"
                       value={
                         selectedRestaurant.updatedAt
                           ? new Date(
@@ -1178,15 +1304,15 @@ export default function SuperAdminPanel() {
                     />
                   </div>
                 </div>
+
                 {/* Danger Zone */}
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 p-5">
+                <div className="rounded-xl border border-rose-200 bg-rose-50 p-4">
                   <div className="flex items-start justify-between gap-4">
                     <div>
-                      <h3 className="text-sm font-black text-rose-700">
-                        Danger Zone
+                      <h3 className="text-sm font-semibold text-rose-700">
+                        Danger zone
                       </h3>
-
-                      <p className="mt-1 text-xs font-medium text-rose-600">
+                      <p className="mt-1 text-xs text-rose-600">
                         Permanently delete this restaurant and its tenant data.
                       </p>
                     </div>
@@ -1194,642 +1320,495 @@ export default function SuperAdminPanel() {
                     <button
                       type="button"
                       onClick={handleDeleteRestaurant}
-                      className="shrink-0 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-black text-white transition hover:bg-rose-700"
+                      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-rose-600 px-3.5 py-2 text-xs font-medium text-white transition hover:bg-rose-700"
                     >
-                      Delete Restaurant
+                      <Trash2 size={13} />
+                      Delete restaurant
                     </button>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="py-16 text-center text-sm font-bold text-slate-500">
+              <div className="py-16 text-center text-sm font-medium text-stone-500">
                 Restaurant details unavailable.
               </div>
             )}
           </div>
         </div>
       )}
-      <div className="min-h-screen bg-[#F8F9FA] p-4 sm:p-6 lg:p-10 font-sans">
-        <div className="max-w-7xl mx-auto space-y-6">
-          {/* Header Section */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200 shadow-xs">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-red-50 text-red-600 rounded-2xl border border-red-100">
-                <ShieldCheck size={32} />
+
+      <div className="min-h-screen bg-stone-50 p-4 sm:p-6 lg:p-10">
+        <div className="mx-auto max-w-7xl space-y-6">
+          {/* Header */}
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-3.5">
+              <div className="rounded-xl border border-red-100 bg-red-50 p-2.5 text-red-600">
+                <ShieldCheck size={24} />
               </div>
               <div>
-                <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-                  Super Admin Console
+                <h1 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
+                  Super admin console
                 </h1>
-                <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                  Manage all registered restaurants and tenants on the platform.
+                <p className="mt-0.5 text-sm text-stone-500">
+                  Manage every registered restaurant and tenant on the platform.
                 </p>
               </div>
             </div>
+          </div>
 
-            {/* Quick Metrics Badge */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard
-                title="Total Restaurants"
-                value={statsLoading ? "..." : totalStores}
-              />
-
-              <StatCard
-                title="Approved"
-                value={statsLoading ? "..." : approvedStores}
-              />
-
-              <StatCard
-                title="Pending Approval"
-                value={statsLoading ? "..." : pendingStores}
-              />
-
-              <StatCard
-                title="Blocked"
-                value={statsLoading ? "..." : blockedStores}
-              />
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-4">
-              <StatCard
-                title="Active Restaurants"
-                value={statsLoading ? "..." : activeStores}
-              />
-
-              <StatCard
-                title="Total Orders"
-                value={statsLoading ? "..." : totalOrders}
-              />
-
-              <StatCard
-                title="Live Orders"
-                value={statsLoading ? "..." : activeOrders}
-              />
-            </div>
+          {/* Quick Metrics */}
+          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-stone-200 bg-stone-200 sm:grid-cols-4 lg:grid-cols-7">
+            <StatCell title="Total restaurants" value={statsLoading ? "…" : totalStores} />
+            <StatCell title="Approved" value={statsLoading ? "…" : approvedStores} tone="emerald" />
+            <StatCell title="Pending approval" value={statsLoading ? "…" : pendingStores} tone="amber" />
+            <StatCell title="Blocked" value={statsLoading ? "…" : blockedStores} tone="rose" />
+            <StatCell title="Active restaurants" value={statsLoading ? "…" : activeStores} tone="emerald" />
+            <StatCell title="Total orders" value={statsLoading ? "…" : totalOrders} />
+            <StatCell title="Live orders" value={statsLoading ? "…" : activeOrders} tone="brand" />
           </div>
 
           {/* =========================================================
     REVENUE & PAYMENTS
 ========================================================= */}
 
-          <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-red-500">
-                  Financial Overview
-                </p>
+          <div className="rounded-2xl border border-stone-200 bg-white">
+            <div className="flex flex-col gap-4 border-b border-stone-100 p-5 sm:flex-row sm:items-center sm:justify-between">
+              <SectionHeading
+                title="Revenue & payments"
+                subtitle="Platform-wide completed billing collection"
+              />
 
-                <h2 className="mt-1 text-xl font-black text-slate-900">
-                  Revenue & Payments
-                </h2>
-
-                <p className="mt-1 text-xs font-medium text-slate-500">
-                  Platform-wide completed billing collection
-                </p>
-              </div>
-
-              <select
+              <SelectField
                 value={revenuePeriod}
                 onChange={(event) => setRevenuePeriod(event.target.value)}
                 disabled={revenueLoading}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 outline-none focus:border-slate-400 disabled:cursor-not-allowed disabled:opacity-50"
+                className="sm:w-44"
               >
                 <option value="today">Today</option>
-                <option value="week">Last 7 Days</option>
-                <option value="month">Last 30 Days</option>
-                <option value="year">Last 12 Months</option>
-              </select>
+                <option value="week">Last 7 days</option>
+                <option value="month">Last 30 days</option>
+                <option value="year">Last 12 months</option>
+              </SelectField>
             </div>
 
-            {revenueLoading ? (
-              <div className="mt-5 flex min-h-[180px] items-center justify-center rounded-2xl bg-slate-50">
-                <Loader2 size={28} className="animate-spin text-red-500" />
-              </div>
-            ) : revenueStats ? (
-              <>
-                {/* Revenue Cards */}
-                <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                  <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                      Total Collected
-                    </p>
-
-                    <p className="mt-2 text-2xl font-black text-slate-900">
-                      ₹
-                      {Number(
-                        revenueStats.revenue?.totalCollected || 0,
-                      ).toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                      Cash
-                    </p>
-
-                    <p className="mt-2 text-2xl font-black text-slate-900">
-                      ₹
-                      {Number(revenueStats.revenue?.cash || 0).toLocaleString(
-                        "en-IN",
-                        {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        },
-                      )}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                      UPI
-                    </p>
-
-                    <p className="mt-2 text-2xl font-black text-slate-900">
-                      ₹
-                      {Number(revenueStats.revenue?.upi || 0).toLocaleString(
-                        "en-IN",
-                        {
-                          minimumFractionDigits: 2,
-                          maximumFractionDigits: 2,
-                        },
-                      )}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                      Due Collected
-                    </p>
-
-                    <p className="mt-2 text-2xl font-black text-slate-900">
-                      ₹
-                      {Number(
-                        revenueStats.revenue?.dueCollected || 0,
-                      ).toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </p>
-                  </div>
-
-                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
-                    <p className="text-[10px] font-black uppercase tracking-wider text-amber-600">
-                      Outstanding Due
-                    </p>
-
-                    <p className="mt-2 text-2xl font-black text-amber-800">
-                      ₹
-                      {Number(
-                        revenueStats.revenue?.outstandingDue || 0,
-                      ).toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </p>
-                  </div>
+            <div className="p-5">
+              {revenueLoading ? (
+                <div className="flex min-h-[160px] items-center justify-center rounded-xl bg-stone-50">
+                  <Loader2 size={24} className="animate-spin text-red-600" />
                 </div>
-
-                {/* Payment Breakdown */}
-                <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                  <div className="rounded-2xl border border-slate-200 p-4">
-                    <h3 className="text-sm font-black text-slate-900">
-                      Payment Breakdown
-                    </h3>
-
-                    <div className="mt-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-500">
-                          Cash Bills
-                        </span>
-
-                        <span className="text-sm font-black text-slate-900">
-                          {revenueStats.bills?.cash || 0}
-                        </span>
+              ) : revenueStats ? (
+                <>
+                  {/* Revenue Cards */}
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                    <div className="rounded-xl border border-red-100 bg-red-50 p-4">
+                      <div className="flex items-center gap-1.5 text-red-500">
+                        <Wallet size={13} />
+                        <p className="text-xs">Total collected</p>
                       </div>
+                      <p className="mt-2 text-xl font-semibold tabular-nums text-red-700">
+                        {currency(revenueStats.revenue?.totalCollected)}
+                      </p>
+                    </div>
 
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-500">
-                          UPI Bills
-                        </span>
-
-                        <span className="text-sm font-black text-slate-900">
-                          {revenueStats.bills?.upi || 0}
-                        </span>
+                    <div className="rounded-xl border border-stone-200 bg-white p-4">
+                      <div className="flex items-center gap-1.5 text-stone-400">
+                        <Banknote size={13} />
+                        <p className="text-xs">Cash</p>
                       </div>
+                      <p className="mt-2 text-xl font-semibold tabular-nums text-stone-900">
+                        {currency(revenueStats.revenue?.cash)}
+                      </p>
+                    </div>
 
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-500">
-                          Due Bills
-                        </span>
-
-                        <span className="text-sm font-black text-slate-900">
-                          {revenueStats.bills?.due || 0}
-                        </span>
+                    <div className="rounded-xl border border-stone-200 bg-white p-4">
+                      <div className="flex items-center gap-1.5 text-stone-400">
+                        <Smartphone size={13} />
+                        <p className="text-xs">UPI</p>
                       </div>
+                      <p className="mt-2 text-xl font-semibold tabular-nums text-stone-900">
+                        {currency(revenueStats.revenue?.upi)}
+                      </p>
+                    </div>
 
-                      <div className="border-t border-slate-100 pt-3 flex items-center justify-between">
-                        <span className="text-xs font-black uppercase text-slate-400">
-                          Total Bills
-                        </span>
-
-                        <span className="text-base font-black text-slate-900">
-                          {revenueStats.bills?.total || 0}
-                        </span>
+                    <div className="rounded-xl border border-stone-200 bg-white p-4">
+                      <div className="flex items-center gap-1.5 text-stone-400">
+                        <TrendingUp size={13} />
+                        <p className="text-xs">Due collected</p>
                       </div>
+                      <p className="mt-2 text-xl font-semibold tabular-nums text-stone-900">
+                        {currency(revenueStats.revenue?.dueCollected)}
+                      </p>
+                    </div>
+
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                      <p className="text-xs text-amber-600">Outstanding due</p>
+                      <p className="mt-2 text-xl font-semibold tabular-nums text-amber-700">
+                        {currency(revenueStats.revenue?.outstandingDue)}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Collection Summary */}
-                  <div className="rounded-2xl border border-slate-200 p-4">
-                    <h3 className="text-sm font-black text-slate-900">
-                      Collection Summary
-                    </h3>
+                  {/* Payment Breakdown + Collection Summary */}
+                  <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                    <div className="rounded-xl border border-stone-200 p-4">
+                      <h3 className="text-sm font-semibold text-stone-900">
+                        Payment breakdown
+                      </h3>
 
-                    <div className="mt-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-500">
-                          Cash Collection
-                        </span>
+                      <div className="mt-3.5 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-stone-500">Cash bills</span>
+                          <span className="text-sm font-semibold tabular-nums text-stone-900">
+                            {revenueStats.bills?.cash || 0}
+                          </span>
+                        </div>
 
-                        <span className="text-sm font-black text-slate-900">
-                          ₹
-                          {Number(
-                            revenueStats.revenue?.cash || 0,
-                          ).toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                          })}
-                        </span>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-stone-500">UPI bills</span>
+                          <span className="text-sm font-semibold tabular-nums text-stone-900">
+                            {revenueStats.bills?.upi || 0}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-stone-500">Due bills</span>
+                          <span className="text-sm font-semibold tabular-nums text-stone-900">
+                            {revenueStats.bills?.due || 0}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between border-t border-stone-100 pt-2.5">
+                          <span className="text-xs font-medium text-stone-400">Total bills</span>
+                          <span className="text-base font-semibold tabular-nums text-stone-900">
+                            {revenueStats.bills?.total || 0}
+                          </span>
+                        </div>
                       </div>
+                    </div>
 
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-500">
-                          UPI Collection
-                        </span>
+                    <div className="rounded-xl border border-stone-200 p-4">
+                      <h3 className="text-sm font-semibold text-stone-900">
+                        Collection summary
+                      </h3>
 
-                        <span className="text-sm font-black text-slate-900">
-                          ₹
-                          {Number(
-                            revenueStats.revenue?.upi || 0,
-                          ).toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                          })}
-                        </span>
-                      </div>
+                      <div className="mt-3.5 space-y-2.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-stone-500">Cash collection</span>
+                          <span className="text-sm font-semibold tabular-nums text-stone-900">
+                            {currency(revenueStats.revenue?.cash)}
+                          </span>
+                        </div>
 
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-slate-500">
-                          Due Collection
-                        </span>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-stone-500">UPI collection</span>
+                          <span className="text-sm font-semibold tabular-nums text-stone-900">
+                            {currency(revenueStats.revenue?.upi)}
+                          </span>
+                        </div>
 
-                        <span className="text-sm font-black text-slate-900">
-                          ₹
-                          {Number(
-                            revenueStats.revenue?.dueCollected || 0,
-                          ).toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                          })}
-                        </span>
-                      </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs text-stone-500">Due collection</span>
+                          <span className="text-sm font-semibold tabular-nums text-stone-900">
+                            {currency(revenueStats.revenue?.dueCollected)}
+                          </span>
+                        </div>
 
-                      <div className="border-t border-slate-100 pt-3 flex items-center justify-between">
-                        <span className="text-xs font-black uppercase text-slate-400">
-                          Total Collected
-                        </span>
-
-                        <span className="text-lg font-black text-slate-900">
-                          ₹
-                          {Number(
-                            revenueStats.revenue?.totalCollected || 0,
-                          ).toLocaleString("en-IN", {
-                            minimumFractionDigits: 2,
-                          })}
-                        </span>
+                        <div className="flex items-center justify-between border-t border-stone-100 pt-2.5">
+                          <span className="text-xs font-medium text-stone-400">Total collected</span>
+                          <span className="text-base font-semibold tabular-nums text-stone-900">
+                            {currency(revenueStats.revenue?.totalCollected)}
+                          </span>
+                        </div>
                       </div>
                     </div>
                   </div>
+                </>
+              ) : (
+                <div className="rounded-xl border border-stone-200 bg-stone-50 p-6 text-center">
+                  <p className="text-sm font-medium text-stone-500">
+                    Revenue data unavailable.
+                  </p>
                 </div>
-              </>
-            ) : (
-              <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 p-6 text-center">
-                <p className="text-sm font-bold text-slate-500">
-                  Revenue data unavailable.
-                </p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
           {/* =========================================================
     PLATFORM ANALYTICS
 ========================================================= */}
 
-          <div className="mt-6 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-red-500">
-                  Platform Insights
-                </p>
+          <div className="rounded-2xl border border-stone-200 bg-white">
+            <div className="flex flex-col gap-4 border-b border-stone-100 p-5 sm:flex-row sm:items-center sm:justify-between">
+              <SectionHeading
+                title="Platform analytics"
+                subtitle="Restaurant, order and revenue trends"
+              />
 
-                <h2 className="mt-1 text-xl font-black text-slate-900">
-                  Platform Analytics
-                </h2>
-
-                <p className="mt-1 text-xs font-medium text-slate-500">
-                  Restaurant, order and revenue trends
-                </p>
-              </div>
-
-              <select
+              <SelectField
                 value={analyticsPeriod}
                 onChange={(event) => setAnalyticsPeriod(event.target.value)}
                 disabled={analyticsLoading}
-                className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-700 outline-none focus:border-slate-400 disabled:opacity-50"
+                className="sm:w-44"
               >
-                <option value="7d">Last 7 Days</option>
-                <option value="30d">Last 30 Days</option>
-                <option value="90d">Last 90 Days</option>
-                <option value="1y">Last 1 Year</option>
-              </select>
+                <option value="7d">Last 7 days</option>
+                <option value="30d">Last 30 days</option>
+                <option value="90d">Last 90 days</option>
+                <option value="1y">Last 1 year</option>
+              </SelectField>
             </div>
 
-            {analyticsLoading ? (
-              <div className="mt-5 flex min-h-[220px] items-center justify-center rounded-2xl bg-slate-50">
-                <Loader2 size={28} className="animate-spin text-red-500" />
-              </div>
-            ) : platformAnalytics ? (
-              <>
-                {/* Status Summary */}
-                <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-5">
-                  <StatCard
-                    title="Total Restaurants"
-                    value={platformAnalytics.restaurants?.total}
-                  />
-
-                  <StatCard
-                    title="Approved"
-                    value={platformAnalytics.restaurants?.approved}
-                  />
-
-                  <StatCard
-                    title="Pending"
-                    value={platformAnalytics.restaurants?.pending}
-                  />
-
-                  <StatCard
-                    title="Active"
-                    value={platformAnalytics.restaurants?.active}
-                  />
-
-                  <StatCard
-                    title="Blocked"
-                    value={platformAnalytics.restaurants?.blocked}
-                  />
+            <div className="p-5">
+              {analyticsLoading ? (
+                <div className="flex min-h-[200px] items-center justify-center rounded-xl bg-stone-50">
+                  <Loader2 size={24} className="animate-spin text-red-600" />
                 </div>
+              ) : platformAnalytics ? (
+                <>
+                  {/* Status Summary */}
+                  <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-stone-200 bg-stone-200 md:grid-cols-5">
+                    <StatCell title="Total restaurants" value={platformAnalytics.restaurants?.total ?? 0} />
+                    <StatCell title="Approved" value={platformAnalytics.restaurants?.approved ?? 0} tone="emerald" />
+                    <StatCell title="Pending" value={platformAnalytics.restaurants?.pending ?? 0} tone="amber" />
+                    <StatCell title="Active" value={platformAnalytics.restaurants?.active ?? 0} tone="emerald" />
+                    <StatCell title="Blocked" value={platformAnalytics.restaurants?.blocked ?? 0} tone="rose" />
+                  </div>
 
-                {/* Subscription Distribution */}
-                <div className="mt-5 rounded-2xl border border-slate-200 p-4">
-                  <h3 className="text-sm font-black text-slate-900">
-                    Subscription Distribution
-                  </h3>
+                  {/* Subscription Distribution */}
+                  <div className="mt-5 rounded-xl border border-stone-200 p-4">
+                    <h3 className="text-sm font-semibold text-stone-900">
+                      Subscription distribution
+                    </h3>
 
-                  <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
-                    <div className="rounded-2xl bg-slate-50 p-4">
-                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        Starter
-                      </p>
-
-                      <p className="mt-2 text-2xl font-black text-slate-900">
-                        {platformAnalytics.subscriptions?.starter || 0}
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl bg-slate-50 p-4">
-                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        Pro
-                      </p>
-
-                      <p className="mt-2 text-2xl font-black text-slate-900">
-                        {platformAnalytics.subscriptions?.pro || 0}
-                      </p>
-                    </div>
-
-                    <div className="rounded-2xl bg-slate-50 p-4">
-                      <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                        Enterprise
-                      </p>
-
-                      <p className="mt-2 text-2xl font-black text-slate-900">
-                        {platformAnalytics.subscriptions?.enterprise || 0}
-                      </p>
+                    <div className="mt-4 space-y-3">
+                      {[
+                        { label: "Starter", value: platformAnalytics.subscriptions?.starter || 0, tone: "bg-stone-400" },
+                        { label: "Pro", value: platformAnalytics.subscriptions?.pro || 0, tone: "bg-red-500" },
+                        { label: "Enterprise", value: platformAnalytics.subscriptions?.enterprise || 0, tone: "bg-stone-800" },
+                      ].map((row) => (
+                        <div key={row.label}>
+                          <div className="mb-1 flex items-center justify-between">
+                            <span className="text-xs text-stone-500">{row.label}</span>
+                            <span className="text-xs font-semibold tabular-nums text-stone-800">
+                              {row.value}
+                            </span>
+                          </div>
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-100">
+                            <div
+                              className={`h-full rounded-full ${row.tone}`}
+                              style={{
+                                width: `${Math.min(100, (row.value / subscriptionTotal) * 100)}%`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
-                </div>
 
-                {/* Restaurant Growth */}
-                <div className="mt-5 rounded-2xl border border-slate-200 p-4">
-                  <h3 className="text-sm font-black text-slate-900">
-                    Restaurant Growth
-                  </h3>
+                  {/* Restaurant Growth */}
+                  <div className="mt-5 rounded-xl border border-stone-200 p-4">
+                    <h3 className="text-sm font-semibold text-stone-900">
+                      Restaurant growth
+                    </h3>
 
-                  <div className="mt-4 space-y-2">
-                    {(platformAnalytics.restaurantGrowth || []).length === 0 ? (
-                      <p className="text-xs font-medium text-slate-400">
-                        No restaurant registrations in this period.
-                      </p>
-                    ) : (
-                      platformAnalytics.restaurantGrowth.map((item) => (
-                        <div
-                          key={item._id}
-                          className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3"
-                        >
-                          <span className="text-xs font-bold text-slate-600">
-                            {item._id}
-                          </span>
-
-                          <span className="text-sm font-black text-slate-900">
-                            {item.count}
-                          </span>
-                        </div>
-                      ))
-                    )}
+                    <div className="mt-3.5 space-y-2">
+                      {(platformAnalytics.restaurantGrowth || []).length === 0 ? (
+                        <p className="text-xs text-stone-400">
+                          No restaurant registrations in this period.
+                        </p>
+                      ) : (
+                        platformAnalytics.restaurantGrowth.map((item) => (
+                          <div key={item._id} className="flex items-center gap-3">
+                            <span className="w-24 shrink-0 text-xs text-stone-500">
+                              {item._id}
+                            </span>
+                            <div className="h-2 flex-1 overflow-hidden rounded-full bg-stone-100">
+                              <div
+                                className="h-full rounded-full bg-stone-800"
+                                style={{ width: `${(item.count / growthMax) * 100}%` }}
+                              />
+                            </div>
+                            <span className="w-8 shrink-0 text-right text-sm font-semibold tabular-nums text-stone-900">
+                              {item.count}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                {/* Order Trend */}
-                <div className="mt-5 rounded-2xl border border-slate-200 p-4">
-                  <h3 className="text-sm font-black text-slate-900">
-                    Order Trend
-                  </h3>
+                  {/* Order Trend */}
+                  <div className="mt-5 rounded-xl border border-stone-200 p-4">
+                    <h3 className="text-sm font-semibold text-stone-900">
+                      Order trend
+                    </h3>
 
-                  <div className="mt-4 space-y-2">
-                    {(platformAnalytics.orderTrend || []).length === 0 ? (
-                      <p className="text-xs font-medium text-slate-400">
-                        No orders in this period.
-                      </p>
-                    ) : (
-                      platformAnalytics.orderTrend.map((item) => (
-                        <div
-                          key={item._id}
-                          className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3"
-                        >
-                          <span className="text-xs font-bold text-slate-600">
-                            {item._id}
-                          </span>
-
-                          <span className="text-sm font-black text-slate-900">
-                            {item.count}
-                          </span>
-                        </div>
-                      ))
-                    )}
+                    <div className="mt-3.5 space-y-2">
+                      {(platformAnalytics.orderTrend || []).length === 0 ? (
+                        <p className="text-xs text-stone-400">No orders in this period.</p>
+                      ) : (
+                        platformAnalytics.orderTrend.map((item) => (
+                          <div key={item._id} className="flex items-center gap-3">
+                            <span className="w-24 shrink-0 text-xs text-stone-500">
+                              {item._id}
+                            </span>
+                            <div className="h-2 flex-1 overflow-hidden rounded-full bg-stone-100">
+                              <div
+                                className="h-full rounded-full bg-red-500"
+                                style={{ width: `${(item.count / orderTrendMax) * 100}%` }}
+                              />
+                            </div>
+                            <span className="w-8 shrink-0 text-right text-sm font-semibold tabular-nums text-stone-900">
+                              {item.count}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
-                </div>
 
-                {/* Revenue Trend */}
-                <div className="mt-5 rounded-2xl border border-slate-200 p-4">
-                  <h3 className="text-sm font-black text-slate-900">
-                    Revenue Trend
-                  </h3>
+                  {/* Revenue Trend */}
+                  <div className="mt-5 rounded-xl border border-stone-200 p-4">
+                    <h3 className="text-sm font-semibold text-stone-900">
+                      Revenue trend
+                    </h3>
 
-                  <div className="mt-4 space-y-2">
-                    {(platformAnalytics.revenueTrend || []).length === 0 ? (
-                      <p className="text-xs font-medium text-slate-400">
-                        No revenue data in this period.
-                      </p>
-                    ) : (
-                      platformAnalytics.revenueTrend.map((item) => (
-                        <div
-                          key={item._id}
-                          className="flex items-center justify-between rounded-xl bg-slate-50 px-4 py-3"
-                        >
-                          <span className="text-xs font-bold text-slate-600">
-                            {item._id}
-                          </span>
-
-                          <span className="text-sm font-black text-slate-900">
-                            ₹
-                            {Number(item.revenue || 0).toLocaleString("en-IN", {
-                              minimumFractionDigits: 2,
-                              maximumFractionDigits: 2,
-                            })}
-                          </span>
-                        </div>
-                      ))
-                    )}
+                    <div className="mt-3.5 space-y-2">
+                      {(platformAnalytics.revenueTrend || []).length === 0 ? (
+                        <p className="text-xs text-stone-400">No revenue data in this period.</p>
+                      ) : (
+                        platformAnalytics.revenueTrend.map((item) => (
+                          <div key={item._id} className="flex items-center gap-3">
+                            <span className="w-24 shrink-0 text-xs text-stone-500">
+                              {item._id}
+                            </span>
+                            <div className="h-2 flex-1 overflow-hidden rounded-full bg-stone-100">
+                              <div
+                                className="h-full rounded-full bg-emerald-500"
+                                style={{
+                                  width: `${((item.revenue || 0) / revenueTrendMax) * 100}%`,
+                                }}
+                              />
+                            </div>
+                            <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-stone-900">
+                              {currency(item.revenue)}
+                            </span>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </div>
+                </>
+              ) : (
+                <div className="rounded-xl bg-stone-50 p-6 text-center">
+                  <p className="text-sm font-medium text-stone-500">
+                    Analytics data unavailable.
+                  </p>
                 </div>
-              </>
-            ) : (
-              <div className="mt-5 rounded-2xl bg-slate-50 p-6 text-center">
-                <p className="text-sm font-bold text-slate-500">
-                  Analytics data unavailable.
-                </p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
 
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-xs p-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+          {/* Filters */}
+          <div className="rounded-2xl border border-stone-200 bg-white p-4">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
               {/* Search */}
-              <div className="lg:col-span-2">
-                <div className="relative">
-                  <input
-                    type="text"
-                    value={search}
-                    onChange={(e) => {
-                      setSearch(e.target.value);
-                      setPage(1);
-                    }}
-                    placeholder="Search restaurant, owner, email, phone..."
-                    className="w-full h-11 rounded-xl border border-slate-200 bg-slate-50 px-4 text-sm outline-none focus:border-red-400 focus:ring-2 focus:ring-red-100"
-                  />
-                </div>
+              <div className="relative lg:col-span-2">
+                <Search
+                  size={16}
+                  className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400"
+                />
+                <input
+                  type="text"
+                  value={search}
+                  onChange={(e) => {
+                    setSearch(e.target.value);
+                    setPage(1);
+                  }}
+                  placeholder="Search restaurant, owner, email, phone…"
+                  className="h-10 w-full rounded-lg border border-stone-200 bg-stone-50 pl-10 pr-4 text-sm outline-none transition focus:border-stone-400 focus:bg-white"
+                />
               </div>
 
               {/* Status */}
-              <select
+              <SelectField
                 value={statusFilter}
                 onChange={(e) => {
                   setStatusFilter(e.target.value);
                   setPage(1);
                 }}
-                className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-red-400"
               >
-                <option value="all">All Access Status</option>
+                <option value="all">All access status</option>
                 <option value="active">Active</option>
                 <option value="blocked">Blocked</option>
-              </select>
+              </SelectField>
 
               {/* Approval */}
-              <select
+              <SelectField
                 value={approvalFilter}
                 onChange={(e) => {
                   setApprovalFilter(e.target.value);
                   setPage(1);
                 }}
-                className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-red-400"
               >
-                <option value="all">All Approval</option>
+                <option value="all">All approval</option>
                 <option value="approved">Approved</option>
                 <option value="pending">Pending</option>
-              </select>
+              </SelectField>
 
               {/* Sort */}
-              <select
+              <SelectField
                 value={sortBy}
                 onChange={(e) => {
                   setSortBy(e.target.value);
                   setPage(1);
                 }}
-                className="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-red-400"
               >
-                <option value="newest">Newest First</option>
-                <option value="oldest">Oldest First</option>
-                <option value="name_asc">Name A-Z</option>
-                <option value="name_desc">Name Z-A</option>
-              </select>
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="name_asc">Name A–Z</option>
+                <option value="name_desc">Name Z–A</option>
+              </SelectField>
             </div>
           </div>
 
-          {/* Content Section: Table for Desktop / Cards for Mobile */}
-          <div className="bg-white rounded-3xl border border-slate-200 shadow-xs overflow-hidden">
+          {/* Restaurants table */}
+          <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white">
             {restaurants.length === 0 ? (
-              <div className="text-center py-16 space-y-3">
-                <Store className="mx-auto text-slate-300" size={48} />
-                <p className="text-slate-600 font-bold text-sm">
+              <div className="space-y-3 py-16 text-center">
+                <Store className="mx-auto text-stone-300" size={40} />
+                <p className="text-sm font-medium text-stone-500">
                   No restaurants registered yet.
                 </p>
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead className="bg-slate-50 text-slate-400 text-[10px] uppercase font-black tracking-wider border-b border-slate-100">
+                <table className="w-full border-collapse text-left">
+                  <thead className="border-b border-stone-100 bg-stone-50 text-[11px] font-medium uppercase tracking-wide text-stone-400">
                     <tr>
-                      <th className="p-4 sm:p-5">Store Details</th>
-                      <th className="p-4 sm:p-5">Owner Info</th>
+                      <th className="p-4 sm:p-5">Store details</th>
+                      <th className="p-4 sm:p-5">Owner info</th>
                       <th className="p-4 sm:p-5">Status</th>
-                      <th className="p-4 sm:p-5 text-right">Access Control</th>
+                      <th className="p-4 text-right sm:p-5">Access control</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-100 text-xs sm:text-sm">
+                  <tbody className="divide-y divide-stone-100 text-xs sm:text-sm">
                     {restaurants.map((store) => (
                       <tr
                         key={store._id}
-                        className="hover:bg-slate-50/80 transition-colors group"
+                        className="group transition-colors hover:bg-stone-50/80"
                       >
                         {/* Store Details */}
                         <td className="p-4 sm:p-5">
                           <div className="flex items-center gap-3">
-                            <div className="p-2.5 bg-slate-100 group-hover:bg-red-50 text-slate-600 group-hover:text-red-500 rounded-xl transition-colors">
-                              <Store size={20} />
+                            <div className="rounded-lg bg-stone-100 p-2.5 text-stone-500 transition-colors group-hover:bg-red-50 group-hover:text-red-600">
+                              <Store size={18} />
                             </div>
                             <div>
-                              <p className="font-bold text-slate-900 text-sm">
+                              <p className="text-sm font-semibold text-stone-900">
                                 {store.name}
                               </p>
-                              <p className="text-xs text-slate-400 font-mono mt-0.5">
+                              <p className="mt-0.5 font-mono text-xs text-stone-400">
                                 /{store.slug}
                               </p>
                             </div>
@@ -1839,12 +1818,12 @@ export default function SuperAdminPanel() {
                         {/* Owner Info */}
                         <td className="p-4 sm:p-5">
                           <div className="flex flex-col gap-1">
-                            <span className="flex items-center gap-2 text-slate-700 font-medium">
-                              <User size={14} className="text-slate-400" />
+                            <span className="flex items-center gap-1.5 font-medium text-stone-700">
+                              <User size={13} className="text-stone-400" />
                               {store.ownerName || store.name}
                             </span>
-                            <span className="flex items-center gap-2 text-slate-400 text-xs">
-                              <Mail size={14} className="text-slate-400" />
+                            <span className="flex items-center gap-1.5 text-xs text-stone-400">
+                              <Mail size={13} className="text-stone-400" />
                               {store.email}
                             </span>
                           </div>
@@ -1852,44 +1831,33 @@ export default function SuperAdminPanel() {
 
                         {/* Status Badge */}
                         <td className="p-4 sm:p-5">
-                          <div className="flex flex-col gap-1.5 items-start">
-                            <span
-                              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
-                                store.isApproved
-                                  ? "bg-green-50 text-green-600 border border-green-200"
-                                  : "bg-amber-50 text-amber-600 border border-amber-200"
-                              }`}
-                            >
+                          <div className="flex flex-col items-start gap-1.5">
+                            <StatusPill tone={store.isApproved ? "emerald" : "amber"}>
                               {store.isApproved ? (
                                 <CheckCircle2 size={12} />
                               ) : (
                                 <AlertCircle size={12} />
                               )}
                               {store.isApproved ? "Approved" : "Pending"}
-                            </span>
+                            </StatusPill>
 
-                            <span
-                              className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[9px] font-bold uppercase ${
-                                store.isActive !== false
-                                  ? "bg-emerald-50 text-emerald-600"
-                                  : "bg-rose-50 text-rose-600"
-                              }`}
-                            >
+                            <StatusPill tone={store.isActive !== false ? "emerald" : "rose"} dot>
                               {store.isActive !== false ? "Active" : "Blocked"}
-                            </span>
+                            </StatusPill>
                           </div>
                         </td>
 
                         {/* Access Control Action Buttons */}
-                        <td className="p-4 sm:p-5 text-right">
+                        <td className="p-4 text-right sm:p-5">
                           <div className="flex items-center justify-end gap-2">
                             <button
                               type="button"
                               onClick={() => handleViewDetails(store._id)}
-                              className="px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                              className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 transition hover:bg-stone-50"
                             >
                               View
                             </button>
+
                             {/* Block/Unblock Button */}
                             <button
                               onClick={() =>
@@ -1899,15 +1867,15 @@ export default function SuperAdminPanel() {
                                   store.isActive === true,
                                 )
                               }
-                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
                                 store.isActive !== false
-                                  ? "bg-white text-rose-600 border-rose-200 hover:bg-rose-50"
-                                  : "bg-white text-emerald-600 border-emerald-200 hover:bg-emerald-50"
+                                  ? "border-rose-200 bg-white text-rose-600 hover:bg-rose-50"
+                                  : "border-emerald-200 bg-white text-emerald-600 hover:bg-emerald-50"
                               }`}
                               title={
                                 store.isActive !== false
-                                  ? "Block Restaurant Access"
-                                  : "Unblock Restaurant"
+                                  ? "Block restaurant access"
+                                  : "Unblock restaurant"
                               }
                             >
                               <Power size={13} />
@@ -1923,10 +1891,10 @@ export default function SuperAdminPanel() {
                                   store.isApproved === true,
                                 )
                               }
-                              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border flex items-center gap-1.5 cursor-pointer ${
+                              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
                                 store.isApproved
-                                  ? "bg-white text-amber-600 border-amber-200 hover:bg-amber-50"
-                                  : "bg-gradient-to-r from-red-500 to-rose-600 text-white border-transparent hover:opacity-95 shadow-sm shadow-red-500/20"
+                                  ? "border border-amber-200 bg-white text-amber-600 hover:bg-amber-50"
+                                  : "bg-red-600 text-white hover:bg-red-700"
                               }`}
                             >
                               {store.isApproved ? (
@@ -1944,141 +1912,112 @@ export default function SuperAdminPanel() {
                 </table>
               </div>
             )}
+
+            {pagination.totalPages > 0 && (
+              <PaginationBar
+                label={
+                  <>
+                    Showing{" "}
+                    <span className="font-semibold text-stone-700">
+                      {Math.min(
+                        (pagination.page - 1) * pagination.limit + 1,
+                        pagination.total,
+                      )}
+                    </span>
+                    {" – "}
+                    <span className="font-semibold text-stone-700">
+                      {Math.min(pagination.page * pagination.limit, pagination.total)}
+                    </span>
+                    {" of "}
+                    <span className="font-semibold text-stone-700">{pagination.total}</span>
+                    {" restaurants"}
+                  </>
+                }
+                page={pagination.page}
+                totalPages={pagination.totalPages}
+                hasPrev={pagination.hasPreviousPage}
+                hasNext={pagination.hasNextPage}
+                disabled={loading}
+                onPrev={() => setPage((prev) => Math.max(1, prev - 1))}
+                onNext={() => setPage((prev) => prev + 1)}
+              />
+            )}
           </div>
-          {pagination.totalPages > 0 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-5 py-4 border-t border-slate-100">
-              <p className="text-xs text-slate-500">
-                Showing{" "}
-                <span className="font-bold text-slate-700">
-                  {Math.min(
-                    (pagination.page - 1) * pagination.limit + 1,
-                    pagination.total,
-                  )}
-                </span>
-                {" - "}
-                <span className="font-bold text-slate-700">
-                  {Math.min(
-                    pagination.page * pagination.limit,
-                    pagination.total,
-                  )}
-                </span>
-                {" of "}
-                <span className="font-bold text-slate-700">
-                  {pagination.total}
-                </span>
-                {" restaurants"}
-              </p>
 
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={!pagination.hasPreviousPage || loading}
-                  onClick={() => setPage((prev) => Math.max(1, prev - 1))}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
-                >
-                  Previous
-                </button>
-
-                <span className="px-3 py-2 rounded-xl bg-slate-50 text-xs font-black text-slate-700">
-                  {pagination.page} / {pagination.totalPages}
-                </span>
-
-                <button
-                  type="button"
-                  disabled={!pagination.hasNextPage || loading}
-                  onClick={() => setPage((prev) => prev + 1)}
-                  className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
-          )}
-          <div className="mt-8 rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-200 p-5">
+          {/* Audit logs */}
+          <div className="rounded-2xl border border-stone-200 bg-white">
+            <div className="border-b border-stone-100 p-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <History className="h-5 w-5 text-slate-700" />
-
-                    <h2 className="text-lg font-black text-slate-900">
-                      Audit Logs
-                    </h2>
-                  </div>
-
-                  <p className="mt-1 text-sm text-slate-500">
-                    History of sensitive SuperAdmin restaurant actions.
-                  </p>
+                <div className="flex items-center gap-2.5">
+                  <History className="h-4 w-4 text-stone-400" />
+                  <SectionHeading
+                    title="Audit logs"
+                    subtitle="History of sensitive super-admin restaurant actions"
+                  />
                 </div>
 
                 <div className="flex flex-wrap gap-2">
-                  <select
+                  <SelectField
                     value={auditAction}
                     onChange={(e) => {
                       setAuditAction(e.target.value);
                       setAuditPage(1);
                     }}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold outline-none"
+                    className="w-44"
                   >
-                    <option value="">All Actions</option>
+                    <option value="">All actions</option>
                     <option value="RESTAURANT_APPROVED">Approved</option>
                     <option value="RESTAURANT_APPROVAL_REVOKED">
-                      Approval Revoked
+                      Approval revoked
                     </option>
                     <option value="RESTAURANT_BLOCKED">Blocked</option>
                     <option value="RESTAURANT_UNBLOCKED">Unblocked</option>
-                  </select>
+                  </SelectField>
 
-                  <select
+                  <SelectField
                     value={auditSort}
                     onChange={(e) => {
                       setAuditSort(e.target.value);
                       setAuditPage(1);
                     }}
-                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-semibold outline-none"
+                    className="w-40"
                   >
-                    <option value="newest">Newest First</option>
-
-                    <option value="oldest">Oldest First</option>
-                  </select>
+                    <option value="newest">Newest first</option>
+                    <option value="oldest">Oldest first</option>
+                  </SelectField>
                 </div>
               </div>
             </div>
 
             <div className="overflow-x-auto">
               {auditLoading ? (
-                <div className="p-10 text-center text-sm font-semibold text-slate-500">
-                  Loading audit logs...
+                <div className="p-10 text-center text-sm font-medium text-stone-500">
+                  Loading audit logs…
                 </div>
               ) : auditLogs.length === 0 ? (
-                <div className="p-10 text-center text-sm font-semibold text-slate-500">
+                <div className="p-10 text-center text-sm font-medium text-stone-500">
                   No audit logs found.
                 </div>
               ) : (
                 <table className="min-w-full">
                   <thead>
-                    <tr className="border-b border-slate-100 bg-slate-50">
-                      <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
+                    <tr className="border-b border-stone-100 bg-stone-50">
+                      <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-stone-400">
                         Restaurant
                       </th>
-
-                      <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-stone-400">
                         Action
                       </th>
-
-                      <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-stone-400">
                         Admin
                       </th>
-
-                      <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-stone-400">
                         Change
                       </th>
-
-                      <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-stone-400">
                         IP
                       </th>
-
-                      <th className="px-5 py-3 text-left text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-stone-400">
                         Date
                       </th>
                     </tr>
@@ -2088,47 +2027,45 @@ export default function SuperAdminPanel() {
                     {auditLogs.map((log) => (
                       <tr
                         key={log._id}
-                        className="border-b border-slate-100 last:border-0"
+                        className="border-b border-stone-100 transition-colors last:border-0 hover:bg-stone-50/70"
                       >
                         <td className="px-5 py-4">
-                          <p className="font-bold text-slate-900">
-                            {log.restaurantId?.name || "Deleted Restaurant"}
+                          <p className="font-semibold text-stone-900">
+                            {log.restaurantId?.name || "Deleted restaurant"}
                           </p>
-
                           {log.restaurantId?.email && (
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-stone-400">
                               {log.restaurantId.email}
                             </p>
                           )}
                         </td>
 
                         <td className="px-5 py-4">
-                          <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700">
+                          <StatusPill tone={getAuditActionTone(log.action)}>
                             {getAuditActionLabel(log.action)}
-                          </span>
+                          </StatusPill>
                         </td>
 
                         <td className="px-5 py-4">
-                          <p className="font-semibold text-slate-800">
+                          <p className="font-medium text-stone-700">
                             {log.adminUserId?.name || "Unknown"}
                           </p>
-
                           {log.adminUserId?.email && (
-                            <p className="text-xs text-slate-500">
+                            <p className="text-xs text-stone-400">
                               {log.adminUserId.email}
                             </p>
                           )}
                         </td>
 
-                        <td className="px-5 py-4 text-sm font-semibold text-slate-700">
+                        <td className="px-5 py-4 text-sm text-stone-600">
                           {String(log.previousValue)} → {String(log.newValue)}
                         </td>
 
-                        <td className="px-5 py-4 text-xs font-mono text-slate-500">
+                        <td className="px-5 py-4 font-mono text-xs text-stone-400">
                           {log.ipAddress || "N/A"}
                         </td>
 
-                        <td className="px-5 py-4 text-xs font-semibold text-slate-500">
+                        <td className="px-5 py-4 text-xs text-stone-500">
                           {log.createdAt
                             ? new Date(log.createdAt).toLocaleString()
                             : "N/A"}
@@ -2140,39 +2077,15 @@ export default function SuperAdminPanel() {
               )}
             </div>
 
-            {/* Pagination */}
-            <div className="flex flex-col gap-3 border-t border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm font-semibold text-slate-500">
-                {auditPagination.total} total audit records
-              </p>
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  disabled={!auditPagination.hasPreviousPage}
-                  onClick={() =>
-                    setAuditPage((current) => Math.max(1, current - 1))
-                  }
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Previous
-                </button>
-
-                <span className="px-2 text-sm font-bold text-slate-600">
-                  Page {auditPagination.page} of{" "}
-                  {Math.max(1, auditPagination.totalPages)}
-                </span>
-
-                <button
-                  type="button"
-                  disabled={!auditPagination.hasNextPage}
-                  onClick={() => setAuditPage((current) => current + 1)}
-                  className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Next
-                </button>
-              </div>
-            </div>
+            <PaginationBar
+              label={`${auditPagination.total} total audit records`}
+              page={auditPagination.page}
+              totalPages={auditPagination.totalPages}
+              hasPrev={auditPagination.hasPreviousPage}
+              hasNext={auditPagination.hasNextPage}
+              onPrev={() => setAuditPage((current) => Math.max(1, current - 1))}
+              onNext={() => setAuditPage((current) => current + 1)}
+            />
           </div>
         </div>
       </div>
