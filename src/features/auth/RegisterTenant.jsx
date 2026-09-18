@@ -19,6 +19,35 @@ export default function RegisterTenant({ onSwitchToLogin }) {
   const [error, setError] = useState("");
   const [successData, setSuccessData] = useState(null);
 
+  // --------------------------------------------------
+  // REGISTER FORM VALIDATION
+  // --------------------------------------------------
+
+  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+  email.trim(),
+);
+
+const isValidPhone = /^[0-9]{10}$/.test(
+  phone.trim(),
+);
+
+const isValidRestaurantName =
+  restaurantName.trim().length >= 2;
+
+const isValidOwnerName =
+  name.trim().length >= 2;
+
+const isValidPassword =
+  password.length >= 8;
+
+const isFormValid =
+  isValidRestaurantName &&
+  isValidOwnerName &&
+  isValidEmail &&
+  isValidPhone &&
+  isValidPassword &&
+  legalAccepted;
+
   // Automatic unique URL generator logic
   const generatedSlug = restaurantName
     .trim()
@@ -37,29 +66,65 @@ export default function RegisterTenant({ onSwitchToLogin }) {
 
   const handleRegister = async (e) => {
     e.preventDefault();
+
+    // --------------------------------------------------
+    // CLIENT-SIDE VALIDATION
+    // --------------------------------------------------
+
+    if (!restaurantName.trim()) {
+      setError("Restaurant name is required.");
+      return;
+    }
+
+    if (!name.trim()) {
+      setError("Owner full name is required.");
+      return;
+    }
+
+    if (!email.trim()) {
+      setError("Business email address is required.");
+      return;
+    }
+
+    if (!isValidEmail) {
+      setError("Please enter a valid business email address.");
+      return;
+    }
+
+    if (!password) {
+      setError("Password is required.");
+      return;
+    }
+
+    if (!isValidPhone) {
+      setError("The mobile number must be exactly 10 digits long.");
+      return;
+    }
+
+    if (!legalAccepted) {
+      setError(
+        "Please read and agree to the Terms & Conditions, Privacy Policy, and Owner Agreement.",
+      );
+      return;
+    }
+
+    // --------------------------------------------------
+    // START REGISTRATION
+    // --------------------------------------------------
+
+    setError("");
+    setIsRegistering(true);
+
     try {
-      if (!legalAccepted) {
-        alert.error(
-          "Please read and agree to the Terms & Conditions, Privacy Policy, and Owner Agreement.",
-        );
-        return;
-      }
-      setError("");
-      setIsRegistering(true);
-
-      const phoneRegex = /^[0-9]{10}$/;
-      if (!phoneRegex.test(phone)) {
-        setError("The mobile number must be exactly 10 digits long.");
-        return;
-      }
-
       const formData = new FormData();
-      formData.append("restaurantName", restaurantName);
+
+      formData.append("restaurantName", restaurantName.trim());
       formData.append("slug", generatedSlug);
-      formData.append("name", name);
-      formData.append("email", email);
+      formData.append("name", name.trim());
+      formData.append("email", email.trim().toLowerCase());
       formData.append("password", password);
       formData.append("phone", phone);
+
       formData.append(
         "legalAgreement",
         JSON.stringify({
@@ -68,6 +133,7 @@ export default function RegisterTenant({ onSwitchToLogin }) {
           ownerAgreementAccepted: legalAccepted,
         }),
       );
+
       if (logoFile) {
         formData.append("logo", logoFile);
       }
@@ -75,8 +141,13 @@ export default function RegisterTenant({ onSwitchToLogin }) {
       const response = await registerTenant(formData);
 
       if (response && response.success) {
-        const liveMenuUrl = `${import.meta.env.VITE_APP_API_BASE || window.location.origin}/?store=${generatedSlug}`;
-        const qrCodeApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(liveMenuUrl)}`;
+        const liveMenuUrl = `${
+          import.meta.env.VITE_APP_API_BASE || window.location.origin
+        }/?store=${generatedSlug}`;
+
+        const qrCodeApiUrl =
+          `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=` +
+          encodeURIComponent(liveMenuUrl);
 
         setSuccessData({
           url: liveMenuUrl,
@@ -354,7 +425,7 @@ export default function RegisterTenant({ onSwitchToLogin }) {
 
             <button
               type="submit"
-              disabled={isRegistering || !legalAccepted}
+              disabled={isRegistering || !isFormValid}
               className="w-full bg-gradient-to-r from-red-500 to-rose-600 text-white py-3.5 rounded-xl font-bold hover:opacity-95 active:scale-[0.99] transition-all shadow-md shadow-red-500/20 text-sm mt-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
               {isRegistering ? (
