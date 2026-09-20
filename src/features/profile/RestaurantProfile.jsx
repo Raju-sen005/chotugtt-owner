@@ -1258,6 +1258,103 @@ export default function RestaurantProfile() {
                     />
                   </div>
                 </div>
+                <div className="mt-4">
+                  {(() => {
+                    const expiryDate = restaurant?.subscriptionExpiresAt
+                      ? new Date(restaurant.subscriptionExpiresAt)
+                      : null;
+
+                    if (!expiryDate || Number.isNaN(expiryDate.getTime())) {
+                      return (
+                        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-200 text-slate-500">
+                            <AlertCircle size={18} strokeWidth={2.5} />
+                          </div>
+
+                          <div>
+                            <p className="text-xs font-black text-slate-800">
+                              Plan Expiry
+                            </p>
+                            <p className="mt-0.5 text-[11px] font-medium text-slate-500">
+                              Plan expiry date unavailable
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    const isExpired = expiryDate.getTime() <= Date.now();
+
+                    const formattedDate = expiryDate.toLocaleString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                      hour12: true,
+                    });
+
+                    return (
+                      <div
+                        className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition-all ${
+                          isExpired
+                            ? "border-red-200 bg-red-50"
+                            : "border-emerald-200 bg-emerald-50"
+                        }`}
+                      >
+                        {/* Status Icon */}
+                        <div
+                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
+                            isExpired
+                              ? "bg-red-100 text-red-600"
+                              : "bg-emerald-100 text-emerald-600"
+                          }`}
+                        >
+                          {isExpired ? (
+                            <AlertCircle size={19} strokeWidth={2.5} />
+                          ) : (
+                            <CheckCircle2 size={19} strokeWidth={2.5} />
+                          )}
+                        </div>
+
+                        {/* Status Content */}
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p
+                              className={`text-xs font-black ${
+                                isExpired ? "text-red-800" : "text-emerald-800"
+                              }`}
+                            >
+                              {isExpired
+                                ? "Subscription Expired"
+                                : "Subscription Active"}
+                            </p>
+
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${
+                                isExpired
+                                  ? "bg-red-100 text-red-700"
+                                  : "bg-emerald-100 text-emerald-700"
+                              }`}
+                            >
+                              {isExpired ? "Expired" : "Active"}
+                            </span>
+                          </div>
+
+                          <p
+                            className={`mt-1 text-[11px] font-semibold ${
+                              isExpired ? "text-red-600" : "text-emerald-600"
+                            }`}
+                          >
+                            {isExpired
+                              ? `Your plan expired on ${formattedDate}`
+                              : `Your plan expires on ${formattedDate}`}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
             </div>
 

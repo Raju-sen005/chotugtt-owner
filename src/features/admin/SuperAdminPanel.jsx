@@ -39,15 +39,19 @@ const SectionHeading = ({ title, subtitle, action }) => (
   <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
     <div>
       <h2 className="text-base font-semibold text-stone-900">{title}</h2>
-      {subtitle && (
-        <p className="mt-0.5 text-sm text-stone-500">{subtitle}</p>
-      )}
+      {subtitle && <p className="mt-0.5 text-sm text-stone-500">{subtitle}</p>}
     </div>
     {action}
   </div>
 );
 
-const SelectField = ({ value, onChange, disabled, children, className = "" }) => (
+const SelectField = ({
+  value,
+  onChange,
+  disabled,
+  children,
+  className = "",
+}) => (
   <div className={`relative ${className}`}>
     <select
       value={value}
@@ -87,7 +91,16 @@ const StatusPill = ({ tone, children, dot = false }) => {
   );
 };
 
-const PaginationBar = ({ label, page, totalPages, hasPrev, hasNext, onPrev, onNext, disabled }) => (
+const PaginationBar = ({
+  label,
+  page,
+  totalPages,
+  hasPrev,
+  hasNext,
+  onPrev,
+  onNext,
+  disabled,
+}) => (
   <div className="flex flex-col gap-3 border-t border-stone-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
     <p className="text-xs text-stone-500">{label}</p>
     <div className="flex items-center gap-2">
@@ -713,9 +726,7 @@ export default function SuperAdminPanel() {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-3 bg-stone-50">
         <Loader2 className="animate-spin text-red-600" size={32} />
-        <p className="text-sm font-medium text-stone-500">
-          Loading dashboard…
-        </p>
+        <p className="text-sm font-medium text-stone-500">Loading dashboard…</p>
       </div>
     );
 
@@ -978,13 +989,19 @@ export default function SuperAdminPanel() {
                     </h3>
 
                     {overviewLoading && (
-                      <Loader2 size={15} className="animate-spin text-red-600" />
+                      <Loader2
+                        size={15}
+                        className="animate-spin text-red-600"
+                      />
                     )}
                   </div>
 
                   {overviewLoading ? (
                     <div className="flex items-center justify-center rounded-xl border border-stone-200 bg-stone-50 p-6">
-                      <Loader2 size={22} className="animate-spin text-red-600" />
+                      <Loader2
+                        size={22}
+                        className="animate-spin text-red-600"
+                      />
                     </div>
                   ) : restaurantOverview?.stats ? (
                     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -1056,7 +1073,10 @@ export default function SuperAdminPanel() {
 
                   {staffLoading ? (
                     <div className="flex items-center justify-center rounded-xl border border-stone-200 bg-stone-50 p-8">
-                      <Loader2 size={22} className="animate-spin text-red-600" />
+                      <Loader2
+                        size={22}
+                        className="animate-spin text-red-600"
+                      />
                     </div>
                   ) : restaurantStaff.length === 0 ? (
                     <div className="rounded-xl border border-stone-200 bg-stone-50 p-4 text-sm font-medium text-stone-500">
@@ -1102,7 +1122,10 @@ export default function SuperAdminPanel() {
                                   <td className="px-4 py-3">
                                     <div className="flex items-center gap-3">
                                       <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-stone-100">
-                                        <User size={14} className="text-stone-500" />
+                                        <User
+                                          size={14}
+                                          className="text-stone-500"
+                                        />
                                       </div>
 
                                       <div className="min-w-0">
@@ -1178,7 +1201,10 @@ export default function SuperAdminPanel() {
                                       }`}
                                     >
                                       {staffLoading ? (
-                                        <Loader2 size={13} className="animate-spin" />
+                                        <Loader2
+                                          size={13}
+                                          className="animate-spin"
+                                        />
                                       ) : isActive ? (
                                         <>
                                           <Power size={13} />
@@ -1358,13 +1384,39 @@ export default function SuperAdminPanel() {
 
           {/* Quick Metrics */}
           <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-stone-200 bg-stone-200 sm:grid-cols-4 lg:grid-cols-7">
-            <StatCell title="Total restaurants" value={statsLoading ? "…" : totalStores} />
-            <StatCell title="Approved" value={statsLoading ? "…" : approvedStores} tone="emerald" />
-            <StatCell title="Pending approval" value={statsLoading ? "…" : pendingStores} tone="amber" />
-            <StatCell title="Blocked" value={statsLoading ? "…" : blockedStores} tone="rose" />
-            <StatCell title="Active restaurants" value={statsLoading ? "…" : activeStores} tone="emerald" />
-            <StatCell title="Total orders" value={statsLoading ? "…" : totalOrders} />
-            <StatCell title="Live orders" value={statsLoading ? "…" : activeOrders} tone="brand" />
+            <StatCell
+              title="Total restaurants"
+              value={statsLoading ? "…" : totalStores}
+            />
+            <StatCell
+              title="Approved"
+              value={statsLoading ? "…" : approvedStores}
+              tone="emerald"
+            />
+            <StatCell
+              title="Pending approval"
+              value={statsLoading ? "…" : pendingStores}
+              tone="amber"
+            />
+            <StatCell
+              title="Blocked"
+              value={statsLoading ? "…" : blockedStores}
+              tone="rose"
+            />
+            <StatCell
+              title="Active restaurants"
+              value={statsLoading ? "…" : activeStores}
+              tone="emerald"
+            />
+            <StatCell
+              title="Total orders"
+              value={statsLoading ? "…" : totalOrders}
+            />
+            <StatCell
+              title="Live orders"
+              value={statsLoading ? "…" : activeOrders}
+              tone="brand"
+            />
           </div>
 
           {/* =========================================================
@@ -1457,28 +1509,36 @@ export default function SuperAdminPanel() {
 
                       <div className="mt-3.5 space-y-2.5">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-stone-500">Cash bills</span>
+                          <span className="text-xs text-stone-500">
+                            Cash bills
+                          </span>
                           <span className="text-sm font-semibold tabular-nums text-stone-900">
                             {revenueStats.bills?.cash || 0}
                           </span>
                         </div>
 
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-stone-500">UPI bills</span>
+                          <span className="text-xs text-stone-500">
+                            UPI bills
+                          </span>
                           <span className="text-sm font-semibold tabular-nums text-stone-900">
                             {revenueStats.bills?.upi || 0}
                           </span>
                         </div>
 
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-stone-500">Due bills</span>
+                          <span className="text-xs text-stone-500">
+                            Due bills
+                          </span>
                           <span className="text-sm font-semibold tabular-nums text-stone-900">
                             {revenueStats.bills?.due || 0}
                           </span>
                         </div>
 
                         <div className="flex items-center justify-between border-t border-stone-100 pt-2.5">
-                          <span className="text-xs font-medium text-stone-400">Total bills</span>
+                          <span className="text-xs font-medium text-stone-400">
+                            Total bills
+                          </span>
                           <span className="text-base font-semibold tabular-nums text-stone-900">
                             {revenueStats.bills?.total || 0}
                           </span>
@@ -1493,28 +1553,36 @@ export default function SuperAdminPanel() {
 
                       <div className="mt-3.5 space-y-2.5">
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-stone-500">Cash collection</span>
+                          <span className="text-xs text-stone-500">
+                            Cash collection
+                          </span>
                           <span className="text-sm font-semibold tabular-nums text-stone-900">
                             {currency(revenueStats.revenue?.cash)}
                           </span>
                         </div>
 
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-stone-500">UPI collection</span>
+                          <span className="text-xs text-stone-500">
+                            UPI collection
+                          </span>
                           <span className="text-sm font-semibold tabular-nums text-stone-900">
                             {currency(revenueStats.revenue?.upi)}
                           </span>
                         </div>
 
                         <div className="flex items-center justify-between">
-                          <span className="text-xs text-stone-500">Due collection</span>
+                          <span className="text-xs text-stone-500">
+                            Due collection
+                          </span>
                           <span className="text-sm font-semibold tabular-nums text-stone-900">
                             {currency(revenueStats.revenue?.dueCollected)}
                           </span>
                         </div>
 
                         <div className="flex items-center justify-between border-t border-stone-100 pt-2.5">
-                          <span className="text-xs font-medium text-stone-400">Total collected</span>
+                          <span className="text-xs font-medium text-stone-400">
+                            Total collected
+                          </span>
                           <span className="text-base font-semibold tabular-nums text-stone-900">
                             {currency(revenueStats.revenue?.totalCollected)}
                           </span>
@@ -1533,6 +1601,93 @@ export default function SuperAdminPanel() {
             </div>
           </div>
 
+          <div className="mt-6 rounded-2xl border border-red-100 bg-red-50/40 p-5">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest text-red-500">
+                  ChotuGTT Earnings
+                </p>
+
+                <h3 className="mt-1 text-base font-black text-slate-900">
+                  Platform Revenue
+                </h3>
+
+                <p className="mt-1 text-xs font-medium text-slate-500">
+                  Actual platform transactions received from restaurants
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Net Platform Revenue
+                </p>
+
+                <p className="mt-2 text-2xl font-black text-red-600">
+                  {currency(revenueStats.platformRevenue?.net || 0)}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Subscription
+                </p>
+
+                <p className="mt-2 text-xl font-black text-slate-900">
+                  {currency(revenueStats.platformRevenue?.subscription || 0)}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Commission
+                </p>
+
+                <p className="mt-2 text-xl font-black text-slate-900">
+                  {currency(revenueStats.platformRevenue?.commission || 0)}
+                </p>
+              </div>
+
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                  Platform Fees
+                </p>
+
+                <p className="mt-2 text-xl font-black text-slate-900">
+                  {currency(revenueStats.platformRevenue?.platformFee || 0)}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-xl bg-white/80 p-3">
+                <p className="text-xs text-slate-500">Gross Platform Revenue</p>
+
+                <p className="mt-1 text-sm font-black text-slate-900">
+                  {currency(revenueStats.platformRevenue?.gross || 0)}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-white/80 p-3">
+                <p className="text-xs text-slate-500">Refunds</p>
+
+                <p className="mt-1 text-sm font-black text-rose-600">
+                  {currency(revenueStats.platformRevenue?.refunds || 0)}
+                </p>
+              </div>
+
+              <div className="rounded-xl bg-white/80 p-3">
+                <p className="text-xs text-slate-500">Platform Transactions</p>
+
+                <p className="mt-1 text-sm font-black text-slate-900">
+                  {Number(
+                    revenueStats.platformRevenue?.transactionCount || 0,
+                  ).toLocaleString("en-IN")}
+                </p>
+              </div>
+            </div>
+          </div>
           {/* =========================================================
     PLATFORM ANALYTICS
 ========================================================= */}
@@ -1566,11 +1721,30 @@ export default function SuperAdminPanel() {
                 <>
                   {/* Status Summary */}
                   <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-stone-200 bg-stone-200 md:grid-cols-5">
-                    <StatCell title="Total restaurants" value={platformAnalytics.restaurants?.total ?? 0} />
-                    <StatCell title="Approved" value={platformAnalytics.restaurants?.approved ?? 0} tone="emerald" />
-                    <StatCell title="Pending" value={platformAnalytics.restaurants?.pending ?? 0} tone="amber" />
-                    <StatCell title="Active" value={platformAnalytics.restaurants?.active ?? 0} tone="emerald" />
-                    <StatCell title="Blocked" value={platformAnalytics.restaurants?.blocked ?? 0} tone="rose" />
+                    <StatCell
+                      title="Total restaurants"
+                      value={platformAnalytics.restaurants?.total ?? 0}
+                    />
+                    <StatCell
+                      title="Approved"
+                      value={platformAnalytics.restaurants?.approved ?? 0}
+                      tone="emerald"
+                    />
+                    <StatCell
+                      title="Pending"
+                      value={platformAnalytics.restaurants?.pending ?? 0}
+                      tone="amber"
+                    />
+                    <StatCell
+                      title="Active"
+                      value={platformAnalytics.restaurants?.active ?? 0}
+                      tone="emerald"
+                    />
+                    <StatCell
+                      title="Blocked"
+                      value={platformAnalytics.restaurants?.blocked ?? 0}
+                      tone="rose"
+                    />
                   </div>
 
                   {/* Subscription Distribution */}
@@ -1581,13 +1755,28 @@ export default function SuperAdminPanel() {
 
                     <div className="mt-4 space-y-3">
                       {[
-                        { label: "Starter", value: platformAnalytics.subscriptions?.starter || 0, tone: "bg-stone-400" },
-                        { label: "Pro", value: platformAnalytics.subscriptions?.pro || 0, tone: "bg-red-500" },
-                        { label: "Enterprise", value: platformAnalytics.subscriptions?.enterprise || 0, tone: "bg-stone-800" },
+                        {
+                          label: "Starter",
+                          value: platformAnalytics.subscriptions?.starter || 0,
+                          tone: "bg-stone-400",
+                        },
+                        {
+                          label: "Pro",
+                          value: platformAnalytics.subscriptions?.pro || 0,
+                          tone: "bg-red-500",
+                        },
+                        {
+                          label: "Enterprise",
+                          value:
+                            platformAnalytics.subscriptions?.enterprise || 0,
+                          tone: "bg-stone-800",
+                        },
                       ].map((row) => (
                         <div key={row.label}>
                           <div className="mb-1 flex items-center justify-between">
-                            <span className="text-xs text-stone-500">{row.label}</span>
+                            <span className="text-xs text-stone-500">
+                              {row.label}
+                            </span>
                             <span className="text-xs font-semibold tabular-nums text-stone-800">
                               {row.value}
                             </span>
@@ -1612,20 +1801,26 @@ export default function SuperAdminPanel() {
                     </h3>
 
                     <div className="mt-3.5 space-y-2">
-                      {(platformAnalytics.restaurantGrowth || []).length === 0 ? (
+                      {(platformAnalytics.restaurantGrowth || []).length ===
+                      0 ? (
                         <p className="text-xs text-stone-400">
                           No restaurant registrations in this period.
                         </p>
                       ) : (
                         platformAnalytics.restaurantGrowth.map((item) => (
-                          <div key={item._id} className="flex items-center gap-3">
+                          <div
+                            key={item._id}
+                            className="flex items-center gap-3"
+                          >
                             <span className="w-24 shrink-0 text-xs text-stone-500">
                               {item._id}
                             </span>
                             <div className="h-2 flex-1 overflow-hidden rounded-full bg-stone-100">
                               <div
                                 className="h-full rounded-full bg-stone-800"
-                                style={{ width: `${(item.count / growthMax) * 100}%` }}
+                                style={{
+                                  width: `${(item.count / growthMax) * 100}%`,
+                                }}
                               />
                             </div>
                             <span className="w-8 shrink-0 text-right text-sm font-semibold tabular-nums text-stone-900">
@@ -1645,17 +1840,24 @@ export default function SuperAdminPanel() {
 
                     <div className="mt-3.5 space-y-2">
                       {(platformAnalytics.orderTrend || []).length === 0 ? (
-                        <p className="text-xs text-stone-400">No orders in this period.</p>
+                        <p className="text-xs text-stone-400">
+                          No orders in this period.
+                        </p>
                       ) : (
                         platformAnalytics.orderTrend.map((item) => (
-                          <div key={item._id} className="flex items-center gap-3">
+                          <div
+                            key={item._id}
+                            className="flex items-center gap-3"
+                          >
                             <span className="w-24 shrink-0 text-xs text-stone-500">
                               {item._id}
                             </span>
                             <div className="h-2 flex-1 overflow-hidden rounded-full bg-stone-100">
                               <div
                                 className="h-full rounded-full bg-red-500"
-                                style={{ width: `${(item.count / orderTrendMax) * 100}%` }}
+                                style={{
+                                  width: `${(item.count / orderTrendMax) * 100}%`,
+                                }}
                               />
                             </div>
                             <span className="w-8 shrink-0 text-right text-sm font-semibold tabular-nums text-stone-900">
@@ -1675,10 +1877,15 @@ export default function SuperAdminPanel() {
 
                     <div className="mt-3.5 space-y-2">
                       {(platformAnalytics.revenueTrend || []).length === 0 ? (
-                        <p className="text-xs text-stone-400">No revenue data in this period.</p>
+                        <p className="text-xs text-stone-400">
+                          No revenue data in this period.
+                        </p>
                       ) : (
                         platformAnalytics.revenueTrend.map((item) => (
-                          <div key={item._id} className="flex items-center gap-3">
+                          <div
+                            key={item._id}
+                            className="flex items-center gap-3"
+                          >
                             <span className="w-24 shrink-0 text-xs text-stone-500">
                               {item._id}
                             </span>
@@ -1832,7 +2039,9 @@ export default function SuperAdminPanel() {
                         {/* Status Badge */}
                         <td className="p-4 sm:p-5">
                           <div className="flex flex-col items-start gap-1.5">
-                            <StatusPill tone={store.isApproved ? "emerald" : "amber"}>
+                            <StatusPill
+                              tone={store.isApproved ? "emerald" : "amber"}
+                            >
                               {store.isApproved ? (
                                 <CheckCircle2 size={12} />
                               ) : (
@@ -1841,7 +2050,12 @@ export default function SuperAdminPanel() {
                               {store.isApproved ? "Approved" : "Pending"}
                             </StatusPill>
 
-                            <StatusPill tone={store.isActive !== false ? "emerald" : "rose"} dot>
+                            <StatusPill
+                              tone={
+                                store.isActive !== false ? "emerald" : "rose"
+                              }
+                              dot
+                            >
                               {store.isActive !== false ? "Active" : "Blocked"}
                             </StatusPill>
                           </div>
@@ -1926,10 +2140,15 @@ export default function SuperAdminPanel() {
                     </span>
                     {" – "}
                     <span className="font-semibold text-stone-700">
-                      {Math.min(pagination.page * pagination.limit, pagination.total)}
+                      {Math.min(
+                        pagination.page * pagination.limit,
+                        pagination.total,
+                      )}
                     </span>
                     {" of "}
-                    <span className="font-semibold text-stone-700">{pagination.total}</span>
+                    <span className="font-semibold text-stone-700">
+                      {pagination.total}
+                    </span>
                     {" restaurants"}
                   </>
                 }
