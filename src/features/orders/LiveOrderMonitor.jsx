@@ -36,9 +36,15 @@ const OrderRow = memo(function OrderRow({
   onView,
   onClear,
   onCancelItem,
+  onItemReadyStatus,
 }) {
   const hasMergedTables = order.mergedTables && order.mergedTables.length > 0;
   const [showAllItems, setShowAllItems] = useState(false);
+  const hasUnreadyItems = (order.items || []).some(
+    (item) =>
+      item?.status !== "REJECTED" &&
+      !["READY", "SERVED"].includes(item?.itemReadyStatus),
+  );
   return (
     <tr className="hover:bg-slate-50/80 transition-all duration-150">
       <td className="px-6 py-4 font-mono font-bold text-rose-600 text-xs sm:text-sm whitespace-nowrap">
@@ -72,15 +78,76 @@ const OrderRow = memo(function OrderRow({
                 }
                 className="flex items-center gap-1.5 group"
               >
-                <span
-                  className={`truncate ${
-                    item.status === "REJECTED"
-                      ? "line-through text-rose-400 text-[11px] opacity-50"
-                      : ""
-                  }`}
-                >
-                  • {item.quantity}x {item.name}
-                </span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span
+                    className={`truncate ${
+                      item.status === "REJECTED"
+                        ? "line-through text-rose-400 text-[11px] opacity-50"
+                        : ""
+                    }`}
+                  >
+                    • {item.quantity}x {item.name}
+                  </span>
+
+                  {item.status !== "REJECTED" && (
+                    <span
+                      className={`shrink-0 text-[9px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-md border ${
+                        item.itemReadyStatus === "SERVED"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          : item.itemReadyStatus === "READY"
+                            ? "bg-blue-50 text-blue-700 border-blue-200"
+                            : "bg-amber-50 text-amber-700 border-amber-200"
+                      }`}
+                    >
+                      {item.itemReadyStatus === "SERVED"
+                        ? "Served"
+                        : item.itemReadyStatus === "READY"
+                          ? "Ready"
+                          : "Preparing"}
+                    </span>
+                  )}
+                </div>
+
+                {Boolean(item?._id) &&
+                  item.status !== "REJECTED" &&
+                  order.status === "ACCEPTED" && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onItemReadyStatus(
+                          order._id,
+                          item._id,
+                          item.itemReadyStatus === "READY" ? "SERVED" : "READY",
+                        )
+                      }
+                      title={
+                        item.itemReadyStatus === "PREPARING"
+                          ? "Mark item READY"
+                          : item.itemReadyStatus === "READY"
+                            ? "Mark item SERVED"
+                            : "Item already SERVED"
+                      }
+                      disabled={item.itemReadyStatus === "SERVED"}
+                      className={`shrink-0 inline-flex items-center justify-center gap-1 px-1.5 py-1 rounded-lg border transition ${
+                        item.itemReadyStatus === "SERVED"
+                          ? "bg-emerald-50 text-emerald-600 border-emerald-200 cursor-default"
+                          : item.itemReadyStatus === "READY"
+                            ? "bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 cursor-pointer"
+                            : "bg-slate-50 text-slate-500 border-slate-200 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-200 cursor-pointer"
+                      }`}
+                    >
+                      <Check size={11} strokeWidth={3} />
+
+                      <span className="text-[9px] font-black">
+                        {item.itemReadyStatus === "PREPARING"
+                          ? "Ready"
+                          : item.itemReadyStatus === "READY"
+                            ? "Serve"
+                            : "Done"}
+                      </span>
+                    </button>
+                  )}
+
                 {Boolean(item?._id) &&
                   item.status !== "REJECTED" &&
                   order.status !== "COMPLETED" &&
@@ -145,9 +212,24 @@ const OrderRow = memo(function OrderRow({
           {/* Generate Bill & Clear Table Button */}
           {order.status === "ACCEPTED" && order.tableNumber !== "N/A" && (
             <button
-              onClick={() => onClear(order)}
-              className="p-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition shadow-2xs cursor-pointer"
-              title="Generate Bill & Clear Table"
+              disabled={hasUnreadyItems}
+              onClick={() => {
+                if (hasUnreadyItems) {
+                  return;
+                }
+
+                onClear(order);
+              }}
+              className={`p-2 rounded-xl transition shadow-2xs ${
+                hasUnreadyItems
+                  ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                  : "bg-slate-900 text-white hover:bg-slate-800 cursor-pointer"
+              }`}
+              title={
+                hasUnreadyItems
+                  ? "All active items must be READY before billing"
+                  : "Generate Bill & Clear Table"
+              }
             >
               <IndianRupee size={15} strokeWidth={2.5} />
             </button>
@@ -175,10 +257,15 @@ const OrderCard = memo(function OrderCard({
   onView,
   onClear,
   onCancelItem,
+  onItemReadyStatus,
 }) {
   const hasMergedTables = order.mergedTables && order.mergedTables.length > 0;
   const [showAllItems, setShowAllItems] = useState(false);
-
+  const hasUnreadyItems = (order.items || []).some(
+    (item) =>
+      item?.status !== "REJECTED" &&
+      !["READY", "SERVED"].includes(item?.itemReadyStatus),
+  );
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
       <div className="flex justify-between items-start gap-2">
@@ -215,15 +302,75 @@ const OrderCard = memo(function OrderCard({
                 }
                 className="flex items-center justify-between gap-2"
               >
-                <span
-                  className={`truncate ${
-                    item.status === "REJECTED"
-                      ? "line-through text-rose-400 opacity-50"
-                      : ""
-                  }`}
-                >
-                  • {item.quantity}x {item.name}
-                </span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <span
+                    className={`truncate ${
+                      item.status === "REJECTED"
+                        ? "line-through text-rose-400 opacity-50"
+                        : ""
+                    }`}
+                  >
+                    • {item.quantity}x {item.name}
+                  </span>
+
+                  {item.status !== "REJECTED" && (
+                    <span
+                      className={`shrink-0 text-[8px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-md border ${
+                        item.itemReadyStatus === "SERVED"
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                          : item.itemReadyStatus === "READY"
+                            ? "bg-blue-50 text-blue-700 border-blue-200"
+                            : "bg-amber-50 text-amber-700 border-amber-200"
+                      }`}
+                    >
+                      {item.itemReadyStatus === "SERVED"
+                        ? "Served"
+                        : item.itemReadyStatus === "READY"
+                          ? "Ready"
+                          : "Preparing"}
+                    </span>
+                  )}
+                </div>
+
+                {Boolean(item?._id) &&
+                  item.status !== "REJECTED" &&
+                  order.status === "ACCEPTED" && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onItemReadyStatus(
+                          order._id,
+                          item._id,
+                          item.itemReadyStatus === "READY" ? "SERVED" : "READY",
+                        )
+                      }
+                      disabled={item.itemReadyStatus === "SERVED"}
+                      title={
+                        item.itemReadyStatus === "PREPARING"
+                          ? "Mark item READY"
+                          : item.itemReadyStatus === "READY"
+                            ? "Mark item SERVED"
+                            : "Item already SERVED"
+                      }
+                      className={`shrink-0 inline-flex items-center gap-1 px-2 py-1 rounded-lg border ${
+                        item.itemReadyStatus === "SERVED"
+                          ? "bg-emerald-50 text-emerald-600 border-emerald-200"
+                          : item.itemReadyStatus === "READY"
+                            ? "bg-blue-50 text-blue-600 border-blue-200"
+                            : "bg-slate-50 text-slate-500 border-slate-200"
+                      }`}
+                    >
+                      <Check size={11} strokeWidth={3} />
+
+                      <span className="text-[9px] font-black">
+                        {item.itemReadyStatus === "PREPARING"
+                          ? "Ready"
+                          : item.itemReadyStatus === "READY"
+                            ? "Serve"
+                            : "Done"}
+                      </span>
+                    </button>
+                  )}
                 {Boolean(item?._id) &&
                   item.status !== "REJECTED" &&
                   order.status !== "COMPLETED" &&
@@ -284,11 +431,26 @@ const OrderCard = memo(function OrderCard({
         <div className="flex items-center gap-2">
           {order.status === "ACCEPTED" && order.tableNumber !== "N/A" && (
             <button
-              onClick={() => onClear(order)}
-              className="p-2 bg-slate-900 text-white rounded-xl active:bg-slate-800 transition"
-              title="Generate Bill & Clear Table"
+              disabled={hasUnreadyItems}
+              onClick={() => {
+                if (hasUnreadyItems) {
+                  return;
+                }
+
+                onClear(order);
+              }}
+              className={`p-2 rounded-xl transition shadow-2xs ${
+                hasUnreadyItems
+                  ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                  : "bg-slate-900 text-white hover:bg-slate-800 cursor-pointer"
+              }`}
+              title={
+                hasUnreadyItems
+                  ? "All active items must be READY before billing"
+                  : "Generate Bill & Clear Table"
+              }
             >
-              <IndianRupee size={16} strokeWidth={2.5} />
+              <IndianRupee size={15} strokeWidth={2.5} />
             </button>
           )}
           <button
@@ -1452,6 +1614,7 @@ export default function LiveOrderMonitor() {
 
     socket.on("RUNNING_ORDER_UPDATED", handleRunningOrderUpdated);
 
+    socket.on("ORDER_ITEM_READY_STATUS_UPDATED", handleItemReadyStatusUpdated);
     // ==========================================
     // CLEANUP
     // ==========================================
@@ -1461,9 +1624,162 @@ export default function LiveOrderMonitor() {
       socket.off("ORDER_STATUS_UPDATED", handleOrderUpdated);
 
       socket.off("RUNNING_ORDER_UPDATED", handleRunningOrderUpdated);
+      socket.off(
+        "ORDER_ITEM_READY_STATUS_UPDATED",
+        handleItemReadyStatusUpdated,
+      );
     };
   }, [socket, restaurantId, queryClient]);
 
+  // ==========================================
+  // ITEM READY / SERVED UPDATE
+  // ==========================================
+  const handleItemReadyStatusUpdated = (payload) => {
+    const orderId = payload?.orderId;
+    const itemId = payload?.itemId;
+
+    if (!orderId || !itemId) {
+      return;
+    }
+
+    queryClient.setQueryData(["live-orders", restaurantId], (oldOrders = []) =>
+      oldOrders.map((order) => {
+        if (String(order?._id) !== String(orderId)) {
+          return order;
+        }
+
+        return {
+          ...order,
+          items: (order.items || []).map((item) =>
+            String(item?._id) === String(itemId)
+              ? {
+                  ...item,
+                  itemReadyStatus:
+                    payload.itemReadyStatus || item.itemReadyStatus,
+                  readyAt: payload.readyAt ?? item.readyAt ?? null,
+                  readyBy: payload.readyBy ?? item.readyBy ?? null,
+                  servedAt: payload.servedAt ?? item.servedAt ?? null,
+                  servedBy: payload.servedBy ?? item.servedBy ?? null,
+                }
+              : item,
+          ),
+        };
+      }),
+    );
+  };
+
+  // ==========================================================
+  // ITEM READY / SERVED STATUS
+  // ==========================================================
+  // PREPARING -> READY -> SERVED
+  //
+  // Backend is the final authority for:
+  // - authentication
+  // - tenant isolation
+  // - order ownership
+  // - item ownership
+  // - allowed state transition
+  //
+  // Frontend only sends the requested next state.
+  // ==========================================================
+
+  // ==========================================================
+  // ITEM READY / SERVED STATUS
+  // PREPARING -> READY -> SERVED
+  // ==========================================================
+
+  const handleItemReadyStatus = useCallback(
+    async (orderId, itemId, nextStatus) => {
+      if (!orderId || !itemId) {
+        showError("Invalid order item. Please refresh and try again.");
+        return;
+      }
+
+      if (!["READY", "SERVED"].includes(nextStatus)) {
+        showError("Invalid item status.");
+        return;
+      }
+
+      try {
+        const res = await axios.patch(
+          `${apiBase}/orders/${orderId}/item/${itemId}/ready-status`,
+          {
+            status: nextStatus,
+          },
+          {
+            withCredentials: true,
+          },
+        );
+
+        // Backend currently returns:
+        // data: {
+        //   orderId,
+        //   itemId,
+        //   itemReadyStatus,
+        //   readyAt,
+        //   readyBy,
+        //   servedAt,
+        //   servedBy
+        // }
+        const updatedData = res.data?.data;
+
+        if (!updatedData?.itemId) {
+          throw new Error("Updated item was not returned by server.");
+        }
+
+        // ------------------------------------------------------
+        // Update ONLY the changed item in React Query cache
+        // ------------------------------------------------------
+
+        queryClient.setQueryData(
+          ["live-orders", restaurantId],
+          (oldOrders = []) =>
+            oldOrders.map((order) => {
+              if (String(order?._id) !== String(orderId)) {
+                return order;
+              }
+
+              return {
+                ...order,
+
+                items: (order.items || []).map((item) => {
+                  if (String(item?._id) !== String(itemId)) {
+                    return item;
+                  }
+
+                  return {
+                    ...item,
+
+                    itemReadyStatus: updatedData.itemReadyStatus || nextStatus,
+
+                    readyAt: updatedData.readyAt ?? item.readyAt ?? null,
+
+                    readyBy: updatedData.readyBy ?? item.readyBy ?? null,
+
+                    servedAt: updatedData.servedAt ?? item.servedAt ?? null,
+
+                    servedBy: updatedData.servedBy ?? item.servedBy ?? null,
+                  };
+                }),
+              };
+            }),
+        );
+
+        showSuccess(
+          nextStatus === "READY" ? "Item marked READY" : "Item marked SERVED",
+        );
+      } catch (err) {
+        console.error("❌ Failed to update item ready status:", err);
+
+        showError(
+          err.response?.data?.message ||
+            err.message ||
+            "Failed to update item status",
+        );
+      }
+    },
+    [apiBase, queryClient, restaurantId, showError, showSuccess],
+  );
   // 🆕 Cancel a single item — hits the real backend endpoint and refreshes
   // subtotal/tax/total from the response (backend does the recalculation).
   //
@@ -2912,6 +3228,7 @@ ${
                   onView={handleView}
                   onClear={handleBillAndWhatsApp}
                   onCancelItem={handleCancelItem}
+                  onItemReadyStatus={handleItemReadyStatus}
                 />
               ))}
             </div>
@@ -2944,6 +3261,7 @@ ${
                       onView={handleView}
                       onClear={handleBillAndWhatsApp}
                       onCancelItem={handleCancelItem}
+                      onItemReadyStatus={handleItemReadyStatus}
                     />
                   ))}
                 </tbody>
