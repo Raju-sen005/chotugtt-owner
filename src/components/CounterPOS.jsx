@@ -1228,7 +1228,7 @@ export default function CounterPOS() {
         {
           withCredentials: true,
           headers: {
-            "Idempotency-Key": crypto.randomUUID(),
+            "Idempotency-Key": crypto.randomUUID,
           },
         },
       );
@@ -1281,7 +1281,7 @@ export default function CounterPOS() {
         {
           withCredentials: true,
           headers: {
-            "Idempotency-Key": crypto.randomUUID(),
+            "Idempotency-Key": crypto.randomUUID,
           },
         },
       );
@@ -1337,7 +1337,7 @@ export default function CounterPOS() {
         {
           withCredentials: true,
           headers: {
-            "Idempotency-Key": crypto.randomUUID(),
+            "Idempotency-Key": crypto.randomUUID,
           },
           timeout: 15000,
         },
