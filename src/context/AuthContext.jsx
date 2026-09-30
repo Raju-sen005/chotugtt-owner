@@ -216,13 +216,51 @@ export const AuthProvider = ({ children }) => {
   |--------------------------------------------------------------------------
   */
 
-  const redirectToSubscription = useCallback(() => {
-    if (window.location.pathname === "/subscription") {
-      return;
-    }
+  /*
+|--------------------------------------------------------------------------
+| Redirect To Subscription
+|--------------------------------------------------------------------------
+|
+| IMPORTANT:
+| `/subscription-checkout` is the ONLY canonical subscription route.
+|
+| Never redirect to `/subscription`.
+|
+| Also do not reload the page if the owner is already on
+| the subscription checkout page.
+|
+|--------------------------------------------------------------------------
+*/
 
-    window.location.replace("/subscription");
-  }, []);
+const redirectToSubscription = useCallback(() => {
+  const currentPath = window.location.pathname;
+
+  /*
+  |--------------------------------------------------------------------------
+  | Already on checkout page
+  |--------------------------------------------------------------------------
+  |
+  | Do absolutely nothing.
+  |
+  | This is critical because verifySession() may run while the
+  | owner is already waiting on the checkout page.
+  |
+  */
+
+  if (currentPath === "/subscription-checkout") {
+    return;
+  }
+
+  /*
+  |--------------------------------------------------------------------------
+  | Canonical subscription route
+  |--------------------------------------------------------------------------
+  */
+
+  window.location.replace(
+    "/subscription-checkout",
+  );
+}, []);
 
   /*
   |--------------------------------------------------------------------------
@@ -832,25 +870,25 @@ export const AuthProvider = ({ children }) => {
   |--------------------------------------------------------------------------
   */
 
-  useEffect(() => {
-    if (!user) {
-      return undefined;
-    }
+  // useEffect(() => {
+  //   if (!user) {
+  //     return undefined;
+  //   }
 
-    const interval =
-      window.setInterval(() => {
-        verifySession();
-      }, SUBSCRIPTION_CHECK_INTERVAL);
+  //   const interval =
+  //     window.setInterval(() => {
+  //       verifySession();
+  //     }, SUBSCRIPTION_CHECK_INTERVAL);
 
-    return () => {
-      window.clearInterval(
-        interval,
-      );
-    };
-  }, [
-    user,
-    verifySession,
-  ]);
+  //   return () => {
+  //     window.clearInterval(
+  //       interval,
+  //     );
+  //   };
+  // }, [
+  //   user,
+  //   verifySession,
+  // ]);
 
   /*
   |--------------------------------------------------------------------------
@@ -858,33 +896,33 @@ export const AuthProvider = ({ children }) => {
   |--------------------------------------------------------------------------
   */
 
-  useEffect(() => {
-    const handleVisibilityChange =
-      () => {
-        if (
-          document.visibilityState ===
-            "visible" &&
-          user
-        ) {
-          verifySession();
-        }
-      };
+  // useEffect(() => {
+  //   const handleVisibilityChange =
+  //     () => {
+  //       if (
+  //         document.visibilityState ===
+  //           "visible" &&
+  //         user
+  //       ) {
+  //         verifySession();
+  //       }
+  //     };
 
-    document.addEventListener(
-      "visibilitychange",
-      handleVisibilityChange,
-    );
+  //   document.addEventListener(
+  //     "visibilitychange",
+  //     handleVisibilityChange,
+  //   );
 
-    return () => {
-      document.removeEventListener(
-        "visibilitychange",
-        handleVisibilityChange,
-      );
-    };
-  }, [
-    user,
-    verifySession,
-  ]);
+  //   return () => {
+  //     document.removeEventListener(
+  //       "visibilitychange",
+  //       handleVisibilityChange,
+  //     );
+  //   };
+  // }, [
+  //   user,
+  //   verifySession,
+  // ]);
 
   /*
   |--------------------------------------------------------------------------
@@ -916,21 +954,23 @@ export const AuthProvider = ({ children }) => {
   */
 
   const value = useMemo(
-    () => ({
-      user,
-      login,
-      registerTenant,
-      logout,
-      loading,
-    }),
-    [
-      user,
-      login,
-      registerTenant,
-      logout,
-      loading,
-    ],
-  );
+  () => ({
+    user,
+    login,
+    registerTenant,
+    logout,
+    refreshSession: verifySession,
+    loading,
+  }),
+  [
+    user,
+    login,
+    registerTenant,
+    logout,
+    verifySession,
+    loading,
+  ],
+);
 
   /*
   |--------------------------------------------------------------------------

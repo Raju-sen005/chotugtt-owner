@@ -6,18 +6,15 @@ import {
   useState,
 } from "react";
 import axios from "axios";
+import { useAuth } from "../context/AuthContext";
 import {
   ArrowRight,
-  Building2,
   Check,
-  ChevronLeft,
   CircleCheck,
-  CreditCard,
   Loader2,
   LockKeyhole,
   ShieldCheck,
   Sparkles,
-  Zap,
 } from "lucide-react";
 
 import logo from "../assets/cho.png";
@@ -33,7 +30,7 @@ const RAZORPAY_SCRIPT_URL =
 
 /*
 |--------------------------------------------------------------------------
-| Subscription Plans
+| Subscription Plan
 |--------------------------------------------------------------------------
 |
 | IMPORTANT:
@@ -45,56 +42,36 @@ const RAZORPAY_SCRIPT_URL =
 | - currency
 | - subscription activation
 |
+| STARTER code is intentionally retained because the backend/database
+| already uses STARTER as the stable subscription plan code.
 |--------------------------------------------------------------------------
 */
 
 const PLANS = Object.freeze({
   STARTER: {
     code: "STARTER",
-    name: "Starter",
-    amount: 999,
-    description: "For small restaurants getting started.",
+    name: "ChotuGTT",
+    amount: 3000,
+    currency: "INR",
+    durationMonths: 15,
+    durationLabel: "15 Months",
+    description:
+      "Complete restaurant management platform for your business.",
     features: [
-      "QR menu & ordering",
-      "Kitchen display system",
-      "WhatsApp invoicing",
-      "Email support",
+      "QR menu & table ordering",
+      "POS & billing management",
+      "Captain App & live orders",
+      "Kitchen KOT management",
+      "Restaurant menu management",
+      "Offers & discount management",
+      "Live order monitoring",
+      "Analytics & business reports",
+      "Customer & table management",
+      "Secure multi-tenant platform",
     ],
-    icon: CreditCard,
-    popular: false,
-    buttonText: "Choose Starter",
-  },
-
-  PRO: {
-    code: "PRO",
-    name: "Pro",
-    amount: 2499,
-    description: "For growing restaurants that need more control.",
-    features: [
-      "Everything in Starter",
-      "Live order analytics",
-      "Menu & inventory sync",
-      "Priority WhatsApp support",
-    ],
-    icon: Zap,
+    icon: Sparkles,
     popular: true,
-    buttonText: "Choose Pro",
-  },
-
-  ENTERPRISE: {
-    code: "ENTERPRISE",
-    name: "Enterprise",
-    amount: 4999,
-    description: "For multi-outlet restaurants and larger operations.",
-    features: [
-      "Everything in Pro",
-      "Multi-outlet management",
-      "Custom POS integrations",
-      "Dedicated account support",
-    ],
-    icon: Building2,
-    popular: false,
-    buttonText: "Choose Enterprise",
+    buttonText: "Activate ChotuGTT",
   },
 });
 
@@ -120,7 +97,7 @@ const IDEMPOTENCY_PREFIX = "subscription";
 | - Reuses existing Razorpay instance
 | - Reuses an existing script
 | - Prevents duplicate script insertion
-| - Resolves only once
+| - Allows retry if loading fails
 |
 |--------------------------------------------------------------------------
 */
@@ -181,11 +158,9 @@ const loadRazorpayScript = () => {
       return;
     }
 
-    const script =
-      document.createElement("script");
+    const script = document.createElement("script");
 
-    script.src =
-      RAZORPAY_SCRIPT_URL;
+    script.src = RAZORPAY_SCRIPT_URL;
 
     script.async = true;
 
@@ -232,14 +207,11 @@ const createIdempotencyKey = (planCode) => {
 };
 
 const formatPrice = (amount) => {
-  return new Intl.NumberFormat(
-    "en-IN",
-    {
-      style: "currency",
-      currency: PAYMENT_CURRENCY,
-      maximumFractionDigits: 0,
-    },
-  ).format(amount);
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: PAYMENT_CURRENCY,
+    maximumFractionDigits: 0,
+  }).format(amount);
 };
 
 /*
@@ -249,6 +221,8 @@ const formatPrice = (amount) => {
 */
 
 export default function SubscriptionCheckout() {
+  const { refreshSession } = useAuth();
+
   const [loadingPlan, setLoadingPlan] =
     useState(null);
 
@@ -275,7 +249,7 @@ export default function SubscriptionCheckout() {
 
   /*
   |--------------------------------------------------------------------------
-  | Plans
+  | Plan
   |--------------------------------------------------------------------------
   */
 
@@ -297,8 +271,7 @@ export default function SubscriptionCheckout() {
           paymentTimeoutRef.current,
         );
 
-        paymentTimeoutRef.current =
-          null;
+        paymentTimeoutRef.current = null;
       }
     }, []);
 
@@ -321,11 +294,17 @@ export default function SubscriptionCheckout() {
         const loaded =
           await loadRazorpayScript();
 
-        if (cancelled || !mountedRef.current) {
+        if (
+          cancelled ||
+          !mountedRef.current
+        ) {
           return;
         }
 
-        if (!loaded || !window.Razorpay) {
+        if (
+          !loaded ||
+          !window.Razorpay
+        ) {
           setRazorpayReady(false);
 
           setError(
@@ -338,6 +317,7 @@ export default function SubscriptionCheckout() {
         }
 
         setRazorpayReady(true);
+
         setIsInitializing(false);
       };
 
@@ -345,6 +325,7 @@ export default function SubscriptionCheckout() {
 
     return () => {
       cancelled = true;
+
       mountedRef.current = false;
 
       clearPaymentTimeout();
@@ -356,8 +337,7 @@ export default function SubscriptionCheckout() {
           // Ignore Razorpay cleanup errors.
         }
 
-        razorpayInstanceRef.current =
-          null;
+        razorpayInstanceRef.current = null;
       }
     };
   }, [clearPaymentTimeout]);
@@ -367,25 +347,14 @@ export default function SubscriptionCheckout() {
   | Redirect After Successful Payment
   |--------------------------------------------------------------------------
   |
-  | IMPORTANT:
-  |
-  | Full page navigation is intentional.
-  |
-  | It forces AuthContext to call /auth/me again and receive
-  | the newly activated subscription from the backend.
-  |
+  | Full page navigation forces AuthContext to call /auth/me again
+  | and receive the newly activated subscription.
   |--------------------------------------------------------------------------
   */
 
   const redirectToDashboard =
     useCallback(() => {
       clearPaymentTimeout();
-
-      /*
-      |--------------------------------------------------------------------------
-      | Replace current history entry.
-      |--------------------------------------------------------------------------
-      */
 
       window.location.replace(
         "/dashboard",
@@ -440,7 +409,9 @@ export default function SubscriptionCheckout() {
         }
 
         setLoadingPlan(planCode);
+
         setError("");
+
         setPaymentStage(
           "Creating secure payment order...",
         );
@@ -461,6 +432,7 @@ export default function SubscriptionCheckout() {
           | - restaurant
           | - amount
           | - currency
+          | - validity
           |
           |--------------------------------------------------------------------------
           */
@@ -562,7 +534,7 @@ export default function SubscriptionCheckout() {
             name: "ChotuGTT",
 
             description:
-              `${selectedPlan.name} Plan Subscription`,
+              "ChotuGTT - 15 Months Subscription",
 
             order_id:
               orderId,
@@ -657,17 +629,13 @@ export default function SubscriptionCheckout() {
                   |
                   | Backend has verified and activated the subscription.
                   |
-                  | Do NOT just navigate with React Router because the
-                  | AuthContext may still contain the old subscription state.
-                  |
                   | Full reload ensures:
                   |
                   | /auth/me
-                  |    ↓
+                  |     ↓
                   | latest DB subscription
-                  |    ↓
+                  |     ↓
                   | dashboard
-                  |
                   |--------------------------------------------------------------------------
                   */
 
@@ -677,22 +645,19 @@ export default function SubscriptionCheckout() {
 
                   clearPaymentTimeout();
 
-                  /*
-                  |--------------------------------------------------------------------------
-                  | Small delay only for UI feedback.
-                  |
-                  | This is NOT required for payment processing.
-                  | Backend verification has already completed.
-                  |--------------------------------------------------------------------------
-                  */
+                  // Refresh the authenticated user exactly once after
+                  // backend payment verification. This updates the
+                  // AuthContext with the newly ACTIVE subscription.
+                  await refreshSession();
 
-                  window.setTimeout(() => {
-                    if (
-                      mountedRef.current
-                    ) {
-                      redirectToDashboard();
-                    }
-                  }, 350);
+                  if (!mountedRef.current) {
+                    return;
+                  }
+
+                  // Only a successful, backend-verified payment reaches
+                  // this point. Navigate to dashboard once; there is no
+                  // polling/reload loop on the subscription page.
+                  redirectToDashboard();
                 } catch (verifyError) {
                   console.error(
                     "Payment verification failed:",
@@ -714,19 +679,13 @@ export default function SubscriptionCheckout() {
 
                   setPaymentStage("");
 
-                  setLoadingPlan(
-                    null,
-                  );
+                  setLoadingPlan(null);
                 }
               },
 
             /*
             |--------------------------------------------------------------------------
-            | Prefill
-            |--------------------------------------------------------------------------
-            |
-            | Backend remains responsible for identity.
-            | Razorpay prefill is only a checkout convenience.
+            | Razorpay Prefill
             |--------------------------------------------------------------------------
             */
 
@@ -749,6 +708,9 @@ export default function SubscriptionCheckout() {
 
             notes: {
               plan: planCode,
+
+              duration:
+                "15_MONTHS",
             },
 
             /*
@@ -779,9 +741,7 @@ export default function SubscriptionCheckout() {
                   return;
                 }
 
-                setLoadingPlan(
-                  null,
-                );
+                setLoadingPlan(null);
 
                 setPaymentStage("");
 
@@ -835,9 +795,7 @@ export default function SubscriptionCheckout() {
 
               setPaymentStage("");
 
-              setLoadingPlan(
-                null,
-              );
+              setLoadingPlan(null);
 
               razorpayInstanceRef.current =
                 null;
@@ -858,8 +816,7 @@ export default function SubscriptionCheckout() {
           |--------------------------------------------------------------------------
           |
           | This does NOT cancel the Razorpay transaction.
-          | It only prevents the UI from remaining indefinitely in
-          | a loading state if something unexpected happens.
+          | It only prevents the UI from remaining indefinitely in loading state.
           |--------------------------------------------------------------------------
           */
 
@@ -873,9 +830,7 @@ export default function SubscriptionCheckout() {
                 return;
               }
 
-              setLoadingPlan(
-                null,
-              );
+              setLoadingPlan(null);
 
               setPaymentStage("");
 
@@ -914,6 +869,7 @@ export default function SubscriptionCheckout() {
         loadingPlan,
         razorpayReady,
         redirectToDashboard,
+        refreshSession,
       ],
     );
 
@@ -939,7 +895,7 @@ export default function SubscriptionCheckout() {
           ================================================================ */}
 
       <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/95 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-full max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white">
               <img
@@ -951,7 +907,10 @@ export default function SubscriptionCheckout() {
 
             <div>
               <div className="text-[17px] font-black tracking-tight text-slate-950">
-                Chotu<span className="text-rose-600">GTT</span>
+                Chotu
+                <span className="text-rose-600">
+                  GTT
+                </span>
               </div>
 
               <div className="hidden text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 sm:block">
@@ -962,7 +921,10 @@ export default function SubscriptionCheckout() {
 
           <div className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-bold text-amber-700 sm:px-4">
             <LockKeyhole size={13} />
-            <span>Subscription required</span>
+
+            <span>
+              Subscription required
+            </span>
           </div>
         </div>
       </header>
@@ -971,7 +933,7 @@ export default function SubscriptionCheckout() {
           MAIN
           ================================================================ */}
 
-      <main className="mx-auto w-full max-w-7xl px-4 pb-12 pt-8 sm:px-6 lg:px-8 lg:pt-12">
+      <main className="mx-auto w-full max-w-6xl px-4 pb-12 pt-8 sm:px-6 lg:px-8 lg:pt-12">
         {/* ============================================================
             HERO
             ============================================================ */}
@@ -980,19 +942,20 @@ export default function SubscriptionCheckout() {
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-rose-100 bg-white px-3.5 py-1.5 text-[11px] font-bold text-rose-600 shadow-sm">
             <ShieldCheck size={14} />
 
-            Secure monthly subscription
+            One simple subscription
           </div>
 
           <h1 className="text-3xl font-black tracking-[-0.03em] text-slate-950 sm:text-4xl lg:text-5xl">
-            Choose the plan that
+            Everything your restaurant
             <span className="block text-rose-600">
-              fits your restaurant
+              needs in ChotuGTT
             </span>
           </h1>
 
           <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
-            Activate your ChotuGTT workspace and get
-            access to restaurant operations, ordering,
+            Activate your ChotuGTT workspace with
+            one simple subscription and get access
+            to restaurant operations, ordering,
             billing, analytics and automation.
           </p>
 
@@ -1014,7 +977,7 @@ export default function SubscriptionCheckout() {
                 size={14}
                 className="text-emerald-500"
               />
-              Monthly billing
+              15 months validity
             </span>
 
             <span className="hidden h-3 w-px bg-slate-200 sm:block" />
@@ -1078,13 +1041,12 @@ export default function SubscriptionCheckout() {
         )}
 
         {/* ============================================================
-            PLANS
+            SINGLE PLAN
             ============================================================ */}
 
-        <section className="mt-10 grid gap-6 lg:grid-cols-3 lg:items-stretch">
+        <section className="mx-auto mt-10 max-w-3xl">
           {planList.map((plan) => {
-            const Icon =
-              plan.icon;
+            const Icon = plan.icon;
 
             const isLoading =
               loadingPlan ===
@@ -1098,111 +1060,127 @@ export default function SubscriptionCheckout() {
             return (
               <article
                 key={plan.code}
-                className={[
-                  "relative flex flex-col overflow-visible rounded-3xl border bg-white shadow-sm transition-all duration-200",
-                  plan.popular
-                    ? "border-slate-900 shadow-xl shadow-slate-200/70 lg:-translate-y-2"
-                    : "border-slate-200 hover:-translate-y-1 hover:border-slate-300 hover:shadow-lg",
-                ].join(" ")}
+                className="relative overflow-visible rounded-[2rem] border border-slate-900 bg-white shadow-2xl shadow-slate-300/50"
               >
-                {/* Popular badge */}
+                {/* Premium badge */}
 
-                {plan.popular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-950 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-white shadow-lg">
-                      <Sparkles
-                        size={12}
-                        className="text-rose-400"
-                      />
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-950 px-5 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-white shadow-lg">
+                    <Sparkles
+                      size={12}
+                      className="text-rose-400"
+                    />
 
-                      Most popular
-                    </div>
+                    ChotuGTT
                   </div>
-                )}
+                </div>
 
-                <div className="flex flex-1 flex-col p-6 sm:p-7">
-                  {/* Plan heading */}
+                <div className="p-6 sm:p-8 lg:p-10">
+                  {/* Header */}
 
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={[
-                            "flex h-10 w-10 items-center justify-center rounded-xl",
-                            plan.popular
-                              ? "bg-rose-50 text-rose-600"
-                              : "bg-slate-100 text-slate-700",
-                          ].join(" ")}
-                        >
-                          <Icon size={19} />
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
+                          <Icon size={23} />
                         </div>
 
-                        <h2 className="text-xl font-black tracking-tight text-slate-950">
-                          {plan.name}
-                        </h2>
+                        <div>
+                          <h2 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
+                            {plan.name}
+                          </h2>
+
+                          <p className="mt-1 text-xs font-semibold text-slate-400">
+                            Complete restaurant management
+                          </p>
+                        </div>
                       </div>
 
-                      <p className="mt-4 min-h-[40px] text-xs leading-5 text-slate-500">
+                      <p className="mt-5 max-w-xl text-sm leading-6 text-slate-500">
                         {plan.description}
                       </p>
                     </div>
+
+                    {/* Price */}
+
+                    <div className="shrink-0 rounded-2xl bg-slate-50 px-5 py-4 sm:text-right">
+                      <div className="text-4xl font-black tracking-[-0.04em] text-slate-950">
+                        {formatPrice(
+                          plan.amount,
+                        )}
+                      </div>
+
+                      <div className="mt-1 text-xs font-bold text-rose-600">
+                        Valid for 15 months
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Price */}
+                  <div className="my-7 h-px bg-slate-100" />
 
-                  <div className="mt-7 flex items-end gap-2">
-                    <span className="text-4xl font-black tracking-[-0.04em] text-slate-950">
-                      {formatPrice(
-                        plan.amount,
-                      )}
-                    </span>
+                  {/* Validity highlight */}
 
-                    <span className="pb-1 text-xs font-semibold text-slate-400">
-                      / month
-                    </span>
+                  <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-rose-600 shadow-sm">
+                          <CircleCheck
+                            size={19}
+                          />
+                        </div>
+
+                        <div>
+                          <p className="text-sm font-black text-slate-900">
+                            15 Months Access
+                          </p>
+
+                          <p className="mt-0.5 text-[11px] font-medium text-slate-500">
+                            One-time subscription payment
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="text-left sm:text-right">
+                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
+                          Total
+                        </p>
+
+                        <p className="text-lg font-black text-slate-950">
+                          {formatPrice(
+                            plan.amount,
+                          )}
+                        </p>
+                      </div>
+                    </div>
                   </div>
-
-                  <p className="mt-1 text-[11px] font-medium text-slate-400">
-                    Billed monthly
-                  </p>
-
-                  <div className="my-6 h-px bg-slate-100" />
 
                   {/* Features */}
 
-                  <div className="flex-1">
-                    <p className="mb-4 text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">
-                      Included
+                  <div className="mt-8">
+                    <p className="mb-5 text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">
+                      Everything included
                     </p>
 
-                    <ul className="space-y-3">
+                    <div className="grid gap-3 sm:grid-cols-2">
                       {plan.features.map(
                         (feature) => (
-                          <li
-                            key={
-                              feature
-                            }
-                            className="flex items-start gap-2.5 text-xs font-medium leading-5 text-slate-600"
+                          <div
+                            key={feature}
+                            className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3"
                           >
-                            <Check
-                              size={15}
-                              className={[
-                                "mt-0.5 shrink-0",
-                                plan.popular
-                                  ? "text-rose-500"
-                                  : "text-emerald-500",
-                              ].join(
-                                " ",
-                              )}
-                            />
+                            <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                              <Check
+                                size={13}
+                              />
+                            </div>
 
-                            <span>
+                            <span className="text-xs font-semibold leading-5 text-slate-600">
                               {feature}
                             </span>
-                          </li>
+                          </div>
                         ),
                       )}
-                    </ul>
+                    </div>
                   </div>
 
                   {/* CTA */}
@@ -1217,37 +1195,45 @@ export default function SubscriptionCheckout() {
                     disabled={
                       isDisabled
                     }
-                    className={[
-                      "mt-8 flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 text-sm font-bold transition-all",
-                      "disabled:cursor-not-allowed disabled:opacity-50",
-                      plan.popular
-                        ? "bg-slate-950 text-white shadow-lg shadow-slate-300/50 hover:bg-slate-800"
-                        : "border border-slate-900 bg-white text-slate-900 hover:bg-slate-950 hover:text-white",
-                    ].join(" ")}
+                    className="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-4 text-sm font-black text-white shadow-xl shadow-slate-300/50 transition-all hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     {isLoading ? (
                       <>
                         <Loader2
-                          size={17}
+                          size={18}
                           className="animate-spin"
                         />
 
-                        Processing...
+                        Processing secure payment...
                       </>
                     ) : (
                       <>
                         {plan.buttonText}
 
                         <ArrowRight
-                          size={16}
+                          size={17}
                         />
                       </>
                     )}
                   </button>
 
-                  <p className="mt-3 text-center text-[10px] font-medium text-slate-400">
-                    Secure payment powered by Razorpay
-                  </p>
+                  <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[10px] font-semibold text-slate-400">
+                    <span className="inline-flex items-center gap-1.5">
+                      <LockKeyhole
+                        size={12}
+                      />
+                      Secure Razorpay checkout
+                    </span>
+
+                    <span className="hidden h-3 w-px bg-slate-200 sm:block" />
+
+                    <span className="inline-flex items-center gap-1.5">
+                      <ShieldCheck
+                        size={12}
+                      />
+                      Backend verified payment
+                    </span>
+                  </div>
                 </div>
               </article>
             );
@@ -1273,8 +1259,8 @@ export default function SubscriptionCheckout() {
                 </h3>
 
                 <p className="mt-1 text-[11px] leading-5 text-slate-500">
-                  Payment signatures are verified on
-                  the ChotuGTT backend.
+                  Payment signatures are verified
+                  on the ChotuGTT backend.
                 </p>
               </div>
             </div>
@@ -1292,8 +1278,9 @@ export default function SubscriptionCheckout() {
                 </h3>
 
                 <p className="mt-1 text-[11px] leading-5 text-slate-500">
-                  Your restaurant identity is derived
-                  from your authenticated session.
+                  Your restaurant identity is
+                  derived from your authenticated
+                  session.
                 </p>
               </div>
             </div>
@@ -1311,8 +1298,9 @@ export default function SubscriptionCheckout() {
                 </h3>
 
                 <p className="mt-1 text-[11px] leading-5 text-slate-500">
-                  After successful verification, your
-                  subscription is activated automatically.
+                  After successful verification,
+                  your 15-month subscription is
+                  activated automatically.
                 </p>
               </div>
             </div>
