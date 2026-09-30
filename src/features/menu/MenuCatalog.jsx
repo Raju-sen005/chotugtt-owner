@@ -35,6 +35,8 @@ export default function MenuCatalog() {
   const [formMode, setFormMode] = useState("DISH");
   const [selectedItems, setSelectedItems] = useState([]);
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  // const [isAiLocked, setIsAiLocked] = useState(false);
+  // const [aiNextAvailableDate, setAiNextAvailableDate] = useState(null);
   const [aiImageFile, setAiImageFile] = useState(null);
   const [aiImagePreview, setAiImagePreview] = useState("");
   const [name, setName] = useState("");
@@ -68,6 +70,23 @@ export default function MenuCatalog() {
   });
 
   const isApproved = restaurantProfile?.isApproved === true;
+
+  const { data: aiStatus } = useQuery({
+    queryKey: ["ai-menu-status"],
+    queryFn: async () => {
+      const res = await axios.get(
+        `${import.meta.env.VITE_APP_API_BASE}/menu/admin/menu/ai-status`,
+        { withCredentials: true },
+      );
+      return res.data.data;
+    },
+    staleTime: 60_000,
+  });
+
+  const isAiLocked = aiStatus?.locked === true;
+  const aiNextAvailableDate = aiStatus?.nextAvailableAt
+    ? new Date(aiStatus.nextAvailableAt)
+    : null;
 
   const { data: menuItems = { items: [], combos: [] }, isLoading } = useQuery({
     queryKey: ["menu-items"],
@@ -182,6 +201,34 @@ export default function MenuCatalog() {
     };
   }, [socket, restaurantId, queryClient]);
 
+  // useEffect(() => {
+  //   if (!restaurantId) return;
+
+  //   const storageKey = `ai_menu_upload_${restaurantId}`;
+  //   const lastUsedAt = localStorage.getItem(storageKey);
+
+  //   if (!lastUsedAt) {
+  //     setIsAiLocked(false);
+  //     setAiNextAvailableDate(null);
+  //     return;
+  //   }
+
+  //   const lastUsedDate = new Date(lastUsedAt);
+  //   const nextAvailableDate = new Date(lastUsedDate);
+  //   nextAvailableDate.setDate(nextAvailableDate.getDate() + 30);
+
+  //   const now = new Date();
+
+  //   if (now < nextAvailableDate) {
+  //     setIsAiLocked(true);
+  //     setAiNextAvailableDate(nextAvailableDate);
+  //   } else {
+  //     localStorage.removeItem(storageKey);
+  //     setIsAiLocked(false);
+  //     setAiNextAvailableDate(null);
+  //   }
+  // }, [restaurantId]);
+
   const showSuccess = useCallback((message) => {
     setSuccessMessage(message);
     setShowSuccessPopup(true);
@@ -206,22 +253,25 @@ export default function MenuCatalog() {
         formData,
         {
           withCredentials: true,
-          headers: { "Content-Type": "multipart/form-data" },
         },
       );
     },
 
     onSuccess: (res) => {
-      queryClient.invalidateQueries(["menu-items"]);
+      queryClient.invalidateQueries({ queryKey: ["menu-items"] });
+      queryClient.invalidateQueries({ queryKey: ["ai-menu-status"] }); // lock server se aayega
 
       setIsAiModalOpen(false);
       setAiImageFile(null);
       setAiImagePreview("");
-
       showSuccess(res.data?.message || "Menu items imported successfully!");
     },
 
     onError: (err) => {
+      if (err.response?.data?.code === "AI_MONTHLY_LIMIT_REACHED") {
+        queryClient.invalidateQueries({ queryKey: ["ai-menu-status"] });
+        setIsAiModalOpen(false);
+      }
       showError(
         err.response?.data?.message || "Error processing AI menu extraction.",
       );
@@ -660,40 +710,131 @@ export default function MenuCatalog() {
         </div>
       )}
 
+      {/* <div className="flex items-start gap-3 bg-amber-50 border border-amber-200 rounded-2xl p-4">
+        <div className="text-amber-600 text-lg">⚠️</div>
+
+        <div>
+          <p className="text-xs font-black text-amber-800">
+            Important: AI can be used only once every 30 days
+          </p>
+
+          <p className="text-[11px] text-amber-700 mt-1 leading-relaxed">
+            Please upload a clear and complete menu image. Once the AI menu
+            upload is completed, you will not be able to use AI menu upload
+            again for 30 days.
+          </p>
+        </div>
+      </div> */}
       <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-10 space-y-8 font-sans bg-[#F8F9FA] min-h-screen">
         {/* Header Section */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs">
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-red-50 text-red-600 rounded-2xl border border-red-100">
-              <Layers size={28} />
+        <div className="flex flex-col gap-4 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs">
+          {/* Header */}
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-red-50 text-red-600 rounded-2xl border border-red-100">
+                <Layers size={28} />
+              </div>
+
+              <div>
+                <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
+                  Digital Menu Catalog
+                </h1>
+
+                <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+                  Configure categories, single dishes, and active operational
+                  items pricing.
+                </p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
-                Digital Menu Catalog
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                Configure categories, single dishes, and active operational
-                items pricing.
-              </p>
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              {/* Add Dish */}
+              <button
+                onClick={handleOpenAddModal}
+                disabled={!isApproved}
+                title={
+                  !isApproved ? "Restaurant pending verification" : undefined
+                }
+                className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-6 py-3.5 rounded-2xl transition-all shadow-xs shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Plus size={16} strokeWidth={3} />
+                Add New Dish
+              </button>
+
+              {/* AI Upload */}
+              <button
+                onClick={() => {
+                  if (isAiLocked) {
+                    showError(
+                      "AI menu upload can be used only once every 30 days. Please wait until your next available date.",
+                    );
+                    return;
+                  }
+
+                  setIsAiModalOpen(true);
+                }}
+                disabled={!isApproved || isAiLocked}
+                title={
+                  !isApproved
+                    ? "Restaurant pending verification"
+                    : isAiLocked
+                      ? "AI menu upload is available only once every 30 days"
+                      : "Upload restaurant menu using AI"
+                }
+                className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs px-5 py-3.5 rounded-2xl transition-all shadow-xs shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Sparkles size={16} strokeWidth={2.5} />
+
+                {isAiLocked
+                  ? "AI Upload Used — Wait 30 Days"
+                  : "Upload Menu Image via AI"}
+              </button>
             </div>
           </div>
-          <button
-            onClick={handleOpenAddModal}
-            disabled={!isApproved}
-            title={!isApproved ? "Restaurant pending verification" : undefined}
-            className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-6 py-3.5 rounded-2xl transition-all shadow-xs shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <Plus size={16} strokeWidth={3} /> Add New Dish
-          </button>
 
-          <button
-            onClick={() => setIsAiModalOpen(true)}
-            disabled={!isApproved}
-            title={!isApproved ? "Restaurant pending verification" : undefined}
-            className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs px-5 py-3.5 rounded-2xl transition-all shadow-xs shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          {/* AI Usage Information */}
+          <div
+            className={`flex items-start gap-3 px-4 py-3.5 rounded-2xl border ${
+              isAiLocked
+                ? "bg-amber-50 border-amber-200 text-amber-800"
+                : "bg-purple-50 border-purple-200 text-purple-700"
+            }`}
           >
-            <Sparkles size={16} strokeWidth={2.5} /> Upload Menu Image via AI
-          </button>
+            <Sparkles size={16} className="mt-0.5 shrink-0" strokeWidth={2.5} />
+
+            <div>
+              <p className="text-xs font-black">
+                AI Menu Upload — Once Every 30 Days
+              </p>
+
+              <p className="text-[11px] font-medium mt-1 leading-relaxed">
+                The AI menu upload feature can be used only once every 30 days.
+                Please review your menu image carefully before uploading.
+              </p>
+
+              {isAiLocked && aiNextAvailableDate && (
+                <p className="text-[11px] font-bold mt-1.5">
+                  🔒 AI upload is currently unavailable. You can use it again
+                  from{" "}
+                  <strong>
+                    {aiNextAvailableDate.toLocaleDateString("en-IN", {
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                    })}
+                  </strong>
+                  .
+                </p>
+              )}
+
+              {!isAiLocked && (
+                <p className="text-[11px] font-bold mt-1.5 text-purple-800">
+                  ✨ Your AI upload is available for this period.
+                </p>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Category Filter Pills */}
@@ -1123,8 +1264,17 @@ export default function MenuCatalog() {
               </button>
               <button
                 type="button"
-                disabled={!aiImageFile || aiExtractMutation.isPending}
+                disabled={
+                  !aiImageFile || aiExtractMutation.isPending || isAiLocked
+                }
                 onClick={() => {
+                  if (isAiLocked) {
+                    showError(
+                      "AI menu upload can be used only once every 30 days.",
+                    );
+                    return;
+                  }
+
                   const formData = new FormData();
                   formData.append("image", aiImageFile);
                   aiExtractMutation.mutate(formData);
