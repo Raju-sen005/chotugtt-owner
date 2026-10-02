@@ -2392,7 +2392,11 @@ ${
           paymentMethod: splitCollectMethod,
           paidAmount: amount,
         },
-        { withCredentials: true },
+        { withCredentials: true,
+          headers: {
+            "Idempotency-Key": crypto.randomUUID(),
+          },
+         },
       );
 
       const completedOrder = res.data?.data;
