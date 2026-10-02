@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback, memo } from "react";
 import { useLocation } from "react-router-dom";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
-import QRCode from "qrcode";
+// import QRCode from "qrcode";
 import { useAuth } from "../../context/AuthContext";
 import { useSocket } from "../../context/SocketContext";
 import { getBillReceiptCSS } from "../../constants/billReceiptStyles";
@@ -20,7 +20,14 @@ import {
   Loader2,
 } from "lucide-react";
 import OrderDetailsModal from "../../components/OrderDetailsModal";
-import { getSelectedBillTemplate } from "../../constants/billTemplates";
+import {
+  getSelectedBillTemplate,
+  saveSelectedBillTemplate,
+} from "../../constants/billTemplates";
+import {
+  prepareImageForThermal,
+  generateThermalQr,
+} from "../../utils/thermalImage";
 
 // Shared status → badge style map (used by both the desktop row and mobile card
 // so ACCEPTED / COMPLETED / REJECTED are visually distinct at a glance)
@@ -745,23 +752,22 @@ export default function LiveOrderMonitor() {
     }
 
     .kot {
-      width: 80mm;
-      max-width: 80mm;
-
-      padding:
-        10px
-        9px
-        14px;
-    }
+  width: 72mm;
+  max-width: 72mm;
+  margin: 0;
+  padding: 0 1mm 10mm 1mm;
+}
 
     /* ================================
        HEADER
     ================================= */
 
-    .header {
-      text-align: center;
-      margin-bottom: 8px;
-    }
+   .header {
+  text-align: center;
+  margin-top: 0;
+  padding-top: 0;
+  margin-bottom: 8px;
+}
 
     .brand {
       font-size: 9px;
@@ -910,14 +916,10 @@ export default function LiveOrderMonitor() {
     }
 
     td {
-      vertical-align: top;
-
-      padding:
-        7px
-        0;
-
-      border-bottom: 1px dotted #777;
-    }
+  vertical-align: top;
+  padding: 7px 0;
+  border-bottom: 1px solid #000;
+}
 
     .sr-col {
       width: 8%;
@@ -936,32 +938,33 @@ export default function LiveOrderMonitor() {
       text-align: left;
     }
 
-    .qty-col {
-      width: 22%;
-
-      text-align: right;
-
-      font-size: 15px;
-      font-weight: 900;
-    }
+.qty-col {
+  width: 22%;
+  text-align: right;
+  font-size: 20px;
+  font-weight: 900;
+  color: #000;
+  -webkit-text-stroke: 0.4px #000;
+}
 
     .item-name {
-      font-size: 12px;
-
-      line-height: 1.3;
-
-      font-weight: 900;
-    }
+  font-size: 16px;
+  line-height: 1.25;
+  font-weight: 900;
+  color: #000;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  -webkit-text-stroke: 0.4px #000;
+  word-break: break-word;
+}
 
     .item-meta {
-      margin-top: 2px;
-
-      font-size: 9px;
-
-      line-height: 1.3;
-
-      font-weight: 600;
-    }
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 1.3;
+  font-weight: 700;
+  color: #000;
+}
 
     .note-text {
       font-style: italic;
@@ -1064,36 +1067,40 @@ export default function LiveOrderMonitor() {
 
       border-top: 1px dashed #999;
 
-      font-size: 8px;
+      font-size: 12px;
+      font-weight: 700;
 
-      color: #777;
+      color: #000;
 
-      letter-spacing: 0.4px;
+      letter-spacing: 0.5px;
     }
 
     .powered-by b {
-      color: #333;
+      color: #000;
 
       font-weight: 900;
+      font-size: 14px;
+
     }
 
     /* ================================
        PRINT
     ================================= */
 
-    @media print {
-
-      html,
-      body {
-        width: 80mm;
-        margin: 0;
-        padding: 0;
-      }
-
-      .kot {
-        width: 80mm;
-      }
-    }
+   @media print {
+  html,
+  body {
+    width: 72mm !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+  .kot {
+    width: 72mm;
+    margin: 0;
+  }
+}
 
   </style>
 </head>
@@ -1275,24 +1282,28 @@ export default function LiveOrderMonitor() {
 
   </div>
 
-  <script>
+ <script>
+  window.focus();
 
-    window.focus();
+  const fitPageToContent = () => {
+    const el = document.querySelector(".kot");
+    if (!el) return;
+    const px = Math.ceil(el.getBoundingClientRect().height);
+    const mm = Math.ceil((px * 25.4) / 96) + 1;
+    const s = document.createElement("style");
+    s.textContent = "@page { size: 80mm " + mm + "mm; margin: 0; }";
+    document.head.appendChild(s);
+  };
 
-    window.addEventListener("load", () => {
+  window.addEventListener("load", () => {
+    setTimeout(() => {
+      fitPageToContent();
+      window.print();
+    }, 150);
+  });
 
-      setTimeout(() => {
-        window.print();
-      }, 150);
-
-    });
-
-    window.onafterprint = () => {
-      window.close();
-    };
-
-  </script>
-
+  window.onafterprint = () => window.close();
+</script>
 </body>
 </html>
 `;
@@ -1968,49 +1979,80 @@ export default function LiveOrderMonitor() {
       // SPLIT    -> based on splitPaymentMethod
       // =========================================================
 
-      const effectivePaymentMethod =
-        order.paymentMethod === "SPLIT"
-          ? order.splitPaymentMethod
-          : order.paymentMethod;
+      const isSplit = order.paymentMethod === "SPLIT" || order.isSplitBill;
+      const effectivePaymentMethod = isSplit
+        ? order.splitPaymentMethod
+        : order.paymentMethod;
 
-      let billQrUrl = "";
-      let billQrType = "";
+      // Never let an image failure block printing — just skip that image.
+      const safe = async (fn) => {
+        try {
+          return await fn();
+        } catch (e) {
+          console.warn("Thermal image prep failed:", e);
+          return null;
+        }
+      };
 
-      if (effectivePaymentMethod === "UPI") {
-        // Prefer restaurant's uploaded/static UPI QR.
-        // Fallback to dynamically generated amount-based QR.
-        if (storeDetails.upiQrCode) {
-          billQrUrl = storeDetails.upiQrCode;
-          billQrType = "UPI";
-        } else if (storeDetails.upiId && Number(grandTotal) > 0) {
-          const amount = Number(grandTotal).toFixed(2);
+      const buildQr = async () => {
+        if (effectivePaymentMethod === "UPI") {
+          // Split bill: QR amount must be what is being collected NOW, not the full total
+          const payable = isSplit
+            ? Number(order.paidAmount || 0)
+            : Number(grandTotal);
 
-          const upiString =
-            `upi://pay?pa=${encodeURIComponent(storeDetails.upiId)}` +
-            `&pn=${encodeURIComponent(storeDetails.name || "Restaurant")}` +
-            `&am=${amount}` +
-            `&cu=INR`;
+          if (storeDetails.upiId && payable > 0) {
+            const upiString =
+              `upi://pay?pa=${encodeURIComponent(String(storeDetails.upiId).trim())}` +
+              `&pn=${encodeURIComponent(String(storeDetails.name || "Restaurant").trim())}` +
+              `&am=${payable.toFixed(2)}` +
+              `&cu=INR` +
+              `&tn=${encodeURIComponent(`Bill ${order.orderId || ""}`.trim())}`;
 
-          try {
-            billQrUrl = await QRCode.toDataURL(upiString, {
-              errorCorrectionLevel: "H",
-              margin: 2,
-              width: 300,
-            });
-
-            billQrType = "UPI";
-          } catch (error) {
-            console.error("Failed to generate bill UPI QR:", error);
+            const generated = await safe(async () => ({
+              ...generateThermalQr(upiString, { targetMm: 42, ecl: "M" }),
+              type: "UPI",
+            }));
+            if (generated) return generated;
           }
+
+          if (storeDetails.upiQrCode) {
+            return safe(async () => ({
+              ...(await prepareImageForThermal(storeDetails.upiQrCode, {
+                mode: "qr",
+                widthMm: 42,
+              })),
+              type: "UPI",
+            }));
+          }
+          return null;
         }
-      } else {
-        // Any non-UPI payment method:
-        // CASH / DUE / SPLIT-CASH etc.
+
         if (storeDetails.googleReviewQrCode) {
-          billQrUrl = storeDetails.googleReviewQrCode;
-          billQrType = "GOOGLE_REVIEW";
+          return safe(async () => ({
+            ...(await prepareImageForThermal(storeDetails.googleReviewQrCode, {
+              mode: "qr",
+              widthMm: 28,
+            })),
+            type: "GOOGLE_REVIEW",
+          }));
         }
-      }
+        return null;
+      };
+
+      const buildLogo = async () => {
+        if (!storeDetails.logo || selectedBillTemplate === "minimal")
+          return null;
+        return safe(() =>
+          prepareImageForThermal(storeDetails.logo, {
+            mode: "logo",
+            widthMm: 20,
+          }),
+        );
+      };
+
+      const [qr, logo] = await Promise.all([buildQr(), buildLogo()]);
+      const billQrType = qr?.type || "";
 
       const itemRows = items
         .map(
@@ -2024,9 +2066,10 @@ export default function LiveOrderMonitor() {
         )
         .join("");
 
-      const windowContent = `
+      const windowContent = `<!DOCTYPE html>
   <html>
     <head>
+      <meta charset="UTF-8" />
       <title>Bill - Table ${escapeHtml(tableLabel)}</title>
       <style>${getBillReceiptCSS()}</style>
     </head>
@@ -2034,15 +2077,12 @@ export default function LiveOrderMonitor() {
       <div class="receipt template-${escapeHtml(selectedBillTemplate)}">
         <div class="center">
 
-  ${
-    storeDetails.logo
-      ? `<img
-           class="shop-logo"
-           src="${escapeHtml(storeDetails.logo)}"
-           alt="Restaurant Logo"
-         />`
-      : ""
-  }
+   ${
+     logo
+       ? `<img class="shop-logo thermal-img" src="${logo.src}" alt="Logo"
+           style="width:${logo.widthMm}mm !important;height:auto !important;" />`
+       : ""
+   }
 
   <p class="shop-name">
     ${escapeHtml(storeDetails.name || "OUR RESTAURANT")}
@@ -2178,19 +2218,16 @@ ${
       </div>
     `
         }
-       ${
-         billQrUrl
-           ? `<div class="upi-block">
+      ${
+        qr
+          ? `<div class="upi-block">
         <div class="divider"></div>
-
         <p class="scan-label">
           ${billQrType === "UPI" ? "Scan &amp; Pay" : "Scan &amp; Review Us"}
         </p>
 
-        <img
-          src="${escapeHtml(billQrUrl)}"
-          alt="${billQrType === "UPI" ? "UPI QR" : "Google Review QR"}"
-        />
+        <img class="thermal-img" src="${qr.src}" alt="QR"
+             style="width:${qr.widthMm}mm !important;height:auto !important;" />
 
         ${
           billQrType === "UPI" && storeDetails.upiId
@@ -2208,8 +2245,8 @@ ${
             : ""
         }
       </div>`
-           : ""
-       }
+          : ""
+      }
 
         <div class="footer-line">Thank you for visiting!<br/>Visit again 🙏</div>
 
@@ -2218,27 +2255,27 @@ ${
 <script>
   window.focus();
 
+  const fitPageToContent = () => {
+    const el = document.querySelector(".receipt");
+    if (!el) return;
+    const px = Math.ceil(el.getBoundingClientRect().height);
+    const mm = Math.ceil((px * 25.4) / 96) + 1;
+    const s = document.createElement("style");
+    s.textContent = "@page { size: 80mm " + mm + "mm; margin: 0; }";
+    document.head.appendChild(s);
+  };
+
   const printWhenReady = async () => {
-    const images = Array.from(document.images);
-
-    await Promise.all(
-      images.map((img) => {
-        if (img.complete) {
-          return Promise.resolve();
-        }
-
-        return new Promise((resolve) => {
-          img.onload = resolve;
-          img.onerror = resolve;
-        });
-      })
-    );
-
+    const imgs = Array.from(document.images);
+    await Promise.race([
+      Promise.all(imgs.map((img) => img.decode ? img.decode().catch(() => {}) : Promise.resolve())),
+      new Promise((r) => setTimeout(r, 3000)),
+    ]);
+    fitPageToContent();
     window.print();
   };
 
   window.addEventListener("load", printWhenReady);
-
   window.onafterprint = () => window.close();
 </script>
     </body>
