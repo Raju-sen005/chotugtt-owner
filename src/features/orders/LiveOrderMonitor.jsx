@@ -47,10 +47,8 @@ const OrderRow = memo(function OrderRow({
 }) {
   const hasMergedTables = order.mergedTables && order.mergedTables.length > 0;
   const [showAllItems, setShowAllItems] = useState(false);
-  const hasUnreadyItems = (order.items || []).some(
-    (item) =>
-      item?.status !== "REJECTED" &&
-      !["READY", "SERVED"].includes(item?.itemReadyStatus),
+  const hasUnservedItems = (order.items || []).some(
+    (item) => item?.status !== "REJECTED" && item?.itemReadyStatus !== "SERVED",
   );
   return (
     <tr className="hover:bg-slate-50/80 transition-all duration-150">
@@ -219,22 +217,22 @@ const OrderRow = memo(function OrderRow({
           {/* Generate Bill & Clear Table Button */}
           {order.status === "ACCEPTED" && order.tableNumber !== "N/A" && (
             <button
-              disabled={hasUnreadyItems}
+              disabled={hasUnservedItems}
               onClick={() => {
-                if (hasUnreadyItems) {
+                if (hasUnservedItems) {
                   return;
                 }
 
                 onClear(order);
               }}
               className={`p-2 rounded-xl transition shadow-2xs ${
-                hasUnreadyItems
+                hasUnservedItems
                   ? "bg-slate-200 text-slate-400 cursor-not-allowed"
                   : "bg-slate-900 text-white hover:bg-slate-800 cursor-pointer"
               }`}
               title={
-                hasUnreadyItems
-                  ? "All active items must be READY before billing"
+                hasUnservedItems
+                  ? "All active items must be SERVED before billing"
                   : "Generate Bill & Clear Table"
               }
             >
@@ -268,10 +266,8 @@ const OrderCard = memo(function OrderCard({
 }) {
   const hasMergedTables = order.mergedTables && order.mergedTables.length > 0;
   const [showAllItems, setShowAllItems] = useState(false);
-  const hasUnreadyItems = (order.items || []).some(
-    (item) =>
-      item?.status !== "REJECTED" &&
-      !["READY", "SERVED"].includes(item?.itemReadyStatus),
+  const hasUnservedItems = (order.items || []).some(
+    (item) => item?.status !== "REJECTED" && item?.itemReadyStatus !== "SERVED",
   );
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
@@ -438,22 +434,22 @@ const OrderCard = memo(function OrderCard({
         <div className="flex items-center gap-2">
           {order.status === "ACCEPTED" && order.tableNumber !== "N/A" && (
             <button
-              disabled={hasUnreadyItems}
+              disabled={hasUnservedItems}
               onClick={() => {
-                if (hasUnreadyItems) {
+                if (hasUnservedItems) {
                   return;
                 }
 
                 onClear(order);
               }}
               className={`p-2 rounded-xl transition shadow-2xs ${
-                hasUnreadyItems
+                hasUnservedItems
                   ? "bg-slate-200 text-slate-400 cursor-not-allowed"
                   : "bg-slate-900 text-white hover:bg-slate-800 cursor-pointer"
               }`}
               title={
-                hasUnreadyItems
-                  ? "All active items must be READY before billing"
+                hasUnservedItems
+                  ? "All active items must be SERVED before billing"
                   : "Generate Bill & Clear Table"
               }
             >
@@ -563,6 +559,15 @@ export default function LiveOrderMonitor() {
   const [selectedBillTemplate, setSelectedBillTemplate] = useState(() =>
     getSelectedBillTemplate(restaurantId),
   );
+
+  // ============================================================
+  // MIXED PAYMENT
+  // CASH + UPI
+  // ============================================================
+
+  const [mixedCashAmount, setMixedCashAmount] = useState("");
+  const [mixedUpiAmount, setMixedUpiAmount] = useState("");
+  const [isMixedSubmitting, setIsMixedSubmitting] = useState(false);
 
   // 🔒 XSS-safe interpolation — customer-controlled data (name, notes, variant, etc.)
   // ko HTML mein daalne se pehle escape karo taaki koi injected <script>/onerror na chal sake
@@ -1980,10 +1985,21 @@ export default function LiveOrderMonitor() {
       // =========================================================
 
       const isSplit = order.paymentMethod === "SPLIT" || order.isSplitBill;
-      const effectivePaymentMethod = isSplit
-        ? order.splitPaymentMethod
-        : order.paymentMethod;
 
+      const isMixed = order.paymentMethod === "MIXED";
+
+      const effectivePaymentMethod = isMixed
+        ? "UPI"
+        : isSplit
+          ? order.splitPaymentMethod
+          : order.paymentMethod;
+
+      const mixedUpiAmount = isMixed
+        ? Number(
+            order.payments?.find((payment) => payment.method === "UPI")
+              ?.amount || 0,
+          )
+        : 0;
       // Never let an image failure block printing — just skip that image.
       const safe = async (fn) => {
         try {
@@ -1999,7 +2015,9 @@ export default function LiveOrderMonitor() {
           // Split bill: QR amount must be what is being collected NOW, not the full total
           const payable = isSplit
             ? Number(order.paidAmount || 0)
-            : Number(grandTotal);
+            : isMixed
+              ? mixedUpiAmount
+              : Number(grandTotal);
 
           if (storeDetails.upiId && payable > 0) {
             const upiString =
@@ -2192,32 +2210,54 @@ ${
           <span>${escapeHtml(order.paymentMethod || "N/A")}</span>
         </div>
 
-        ${
-          order.isSplitBill
-            ? `
+      ${
+        order.paymentMethod === "MIXED"
+          ? `
       <div class="payment-paid">
-        <span>Paid Now (${escapeHtml(order.splitPaymentMethod || "")})</span>
+        <span>Cash</span>
+        <span>₹${Number(
+          order.payments?.find((p) => p.method === "CASH")?.amount || 0,
+        ).toFixed(2)}</span>
+      </div>
+
+      <div class="payment-paid">
+        <span>UPI</span>
+        <span>₹${Number(
+          order.payments?.find((p) => p.method === "UPI")?.amount || 0,
+        ).toFixed(2)}</span>
+      </div>
+
+      <div class="payment-paid">
+        <span>Total Paid</span>
         <span>₹${Number(order.paidAmount || 0).toFixed(2)}</span>
       </div>
-      <div class="payment-due">
-        <span>Remaining Due</span>
-        <span>₹${Number(order.dueAmount || 0).toFixed(2)}</span>
-      </div>
     `
+          : order.isSplitBill
+            ? `
+        <div class="payment-paid">
+          <span>Paid Now (${escapeHtml(order.splitPaymentMethod || "")})</span>
+          <span>₹${Number(order.paidAmount || 0).toFixed(2)}</span>
+        </div>
+
+        <div class="payment-due">
+          <span>Remaining Due</span>
+          <span>₹${Number(order.dueAmount || 0).toFixed(2)}</span>
+        </div>
+      `
             : order.paymentMethod === "DUE"
               ? `
-      <div class="payment-due">
-        <span>Amount Due</span>
-        <span>₹${Number(order.dueAmount || 0).toFixed(2)}</span>
-      </div>
-    `
+          <div class="payment-due">
+            <span>Amount Due</span>
+            <span>₹${Number(order.dueAmount || 0).toFixed(2)}</span>
+          </div>
+        `
               : `
-      <div class="payment-paid">
-        <span>Amount Paid</span>
-        <span>₹${Number(order.paidAmount || 0).toFixed(2)}</span>
-      </div>
-    `
-        }
+          <div class="payment-paid">
+            <span>Amount Paid</span>
+            <span>₹${Number(order.paidAmount || 0).toFixed(2)}</span>
+          </div>
+        `
+      }
       ${
         qr
           ? `<div class="upi-block">
@@ -2357,13 +2397,36 @@ ${
     };
   }, [socket, restaurantId, apiBase]);
 
+  const initializeMixedPayment = useCallback(() => {
+    const total = Number(billOrder?.total || 0);
+
+    if (!Number.isFinite(total) || total <= 0) {
+      setMixedCashAmount("");
+      setMixedUpiAmount("");
+      return;
+    }
+
+    const half = (total / 2).toFixed(2);
+
+    setMixedCashAmount(half);
+    setMixedUpiAmount(half);
+  }, [billOrder]);
+
   // Bill & WhatsApp clear table handler added from TableMonitor
   const handleBillAndWhatsApp = useCallback((order) => {
     setBillOrder(order);
+
     setSelectedPaymentMethod(null);
-    setSplitMode(false); // 🆕
-    setSplitCollectMethod("CASH"); // 🆕
-    setSplitAmount(""); // 🆕
+
+    // Existing split state
+    setSplitMode(false);
+    setSplitCollectMethod("CASH");
+    setSplitAmount("");
+
+    // Mixed payment state
+    setMixedCashAmount("");
+    setMixedUpiAmount("");
+    setIsMixedSubmitting(false);
   }, []);
 
   const confirmSplitBill = useCallback(async () => {
@@ -2392,11 +2455,12 @@ ${
           paymentMethod: splitCollectMethod,
           paidAmount: amount,
         },
-        { withCredentials: true,
+        {
+          withCredentials: true,
           headers: {
             "Idempotency-Key": crypto.randomUUID(),
           },
-         },
+        },
       );
 
       const completedOrder = res.data?.data;
@@ -2446,12 +2510,137 @@ ${
     showError,
   ]);
 
+  const confirmMixedPayment = useCallback(async () => {
+    if (!billOrder) return;
+
+    if (isMixedSubmitting) return;
+
+    const total = Number(billOrder.total || 0);
+    const cash = Number(mixedCashAmount);
+    const upi = Number(mixedUpiAmount);
+
+    if (!Number.isFinite(total) || total <= 0) {
+      showError("Invalid bill total.");
+      return;
+    }
+
+    if (!Number.isFinite(cash) || !Number.isFinite(upi)) {
+      showError("Enter valid Cash and UPI amounts.");
+      return;
+    }
+
+    if (cash <= 0 || upi <= 0) {
+      showError("Both Cash and UPI amounts must be greater than zero.");
+      return;
+    }
+
+    const collected = Number((cash + upi).toFixed(2));
+
+    if (collected !== Number(total.toFixed(2))) {
+      showError(`Cash + UPI must exactly equal ₹${total.toFixed(2)}.`);
+      return;
+    }
+
+    setIsMixedSubmitting(true);
+
+    try {
+      const res = await axios.patch(
+        `${apiBase}/orders/${billOrder._id}/mixed-payment`,
+        {
+          cashAmount: Number(cash.toFixed(2)),
+          upiAmount: Number(upi.toFixed(2)),
+        },
+        {
+          withCredentials: true,
+          headers: {
+            "Idempotency-Key": crypto.randomUUID(),
+          },
+        },
+      );
+
+      const completedOrder = res.data?.data;
+
+      if (!completedOrder) {
+        throw new Error("Payment completed but bill data was not returned.");
+      }
+
+      // Print ONLY after server confirms payment.
+      await printBillReceipt(completedOrder);
+
+      // Remove from local live orders immediately.
+      queryClient.setQueryData(["live-orders", restaurantId], (prev) =>
+        (prev || []).filter((o) => o._id !== billOrder._id),
+      );
+
+      // Refresh related data.
+      queryClient.invalidateQueries({
+        queryKey: ["table-status", restaurantId],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["table-monitor-orders"],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["bills"],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["bills-prev"],
+      });
+
+      // Reset modal state.
+      setBillOrder(null);
+      setSelectedPaymentMethod(null);
+
+      setSplitMode(false);
+      setSplitAmount("");
+
+      setMixedCashAmount("");
+      setMixedUpiAmount("");
+
+      showSuccess(
+        `₹${cash.toFixed(2)} Cash + ₹${upi.toFixed(
+          2,
+        )} UPI collected successfully.`,
+      );
+    } catch (err) {
+      console.error("Failed to process mixed payment:", err);
+
+      showError(
+        err.response?.data?.message || "Failed to process mixed payment.",
+      );
+
+      // Re-sync live state from server.
+      queryClient.invalidateQueries({
+        queryKey: ["live-orders", restaurantId],
+      });
+    } finally {
+      setIsMixedSubmitting(false);
+    }
+  }, [
+    billOrder,
+    mixedCashAmount,
+    mixedUpiAmount,
+    isMixedSubmitting,
+    apiBase,
+    printBillReceipt,
+    queryClient,
+    restaurantId,
+    showSuccess,
+    showError,
+  ]);
+
   const confirmGenerateBill = useCallback(async () => {
     if (!billOrder || !selectedPaymentMethod) {
       showError("Please select a payment method.");
       return;
     }
 
+    if (selectedPaymentMethod === "MIXED") {
+      await confirmMixedPayment();
+      return;
+    }
     if (isGeneratingBill) return;
 
     setIsGeneratingBill(true);
@@ -2527,6 +2716,7 @@ ${
     queryClient,
     showSuccess,
     showError,
+    confirmMixedPayment,
   ]);
 
   const handleView = useCallback(
@@ -2797,11 +2987,28 @@ ${
                     <button
                       type="button"
                       onClick={() => {
-                        setSelectedPaymentMethod("CASH");
                         setSplitMode(false);
+
+                        if (
+                          selectedPaymentMethod === "UPI" ||
+                          selectedPaymentMethod === "MIXED"
+                        ) {
+                          setSelectedPaymentMethod("MIXED");
+
+                          const total = Number(billOrder?.total || 0);
+
+                          if (total > 0) {
+                            const half = (total / 2).toFixed(2);
+
+                            setMixedCashAmount(half);
+                            setMixedUpiAmount(half);
+                          }
+                        } else {
+                          setSelectedPaymentMethod("CASH");
+                        }
                       }}
                       className={`
-                  p-4 rounded-2xl border-2 transition-all
+                  p-2 rounded-2xl border-2 transition-all
                   active:scale-[0.98]
                   ${
                     selectedPaymentMethod === "CASH"
@@ -2810,7 +3017,7 @@ ${
                   }
                 `}
                     >
-                      <div className="text-xl mb-2">💵</div>
+                      {/* <div className="text-xl mb-2">💵</div> */}
 
                       <p className="text-xs font-black">Cash</p>
 
@@ -2823,11 +3030,28 @@ ${
                     <button
                       type="button"
                       onClick={() => {
-                        setSelectedPaymentMethod("UPI");
                         setSplitMode(false);
+
+                        if (
+                          selectedPaymentMethod === "CASH" ||
+                          selectedPaymentMethod === "MIXED"
+                        ) {
+                          setSelectedPaymentMethod("MIXED");
+
+                          const total = Number(billOrder?.total || 0);
+
+                          if (total > 0) {
+                            const half = (total / 2).toFixed(2);
+
+                            setMixedCashAmount(half);
+                            setMixedUpiAmount(half);
+                          }
+                        } else {
+                          setSelectedPaymentMethod("UPI");
+                        }
                       }}
                       className={`
-                  p-4 rounded-2xl border-2 transition-all
+                  p-2 rounded-2xl border-2 transition-all
                   active:scale-[0.98]
                   ${
                     selectedPaymentMethod === "UPI"
@@ -2836,7 +3060,7 @@ ${
                   }
                 `}
                     >
-                      <div className="text-xl mb-2">🏦</div>
+                      {/* <div className="text-xl mb-2">🏦</div> */}
 
                       <p className="text-xs font-black">UPI</p>
 
@@ -2853,7 +3077,7 @@ ${
                         setSplitMode(false);
                       }}
                       className={`
-                  p-4 rounded-2xl border-2 transition-all
+                  p-2 rounded-2xl border-2 transition-all
                   active:scale-[0.98]
                   ${
                     selectedPaymentMethod === "DUE"
@@ -2862,7 +3086,7 @@ ${
                   }
                 `}
                     >
-                      <div className="text-xl mb-2">⏳</div>
+                      {/* <div className="text-xl mb-2">⏳</div> */}
 
                       <p className="text-xs font-black">Due</p>
 
@@ -2885,7 +3109,7 @@ ${
                         );
                       }}
                       className={`
-                  p-4 rounded-2xl border-2 transition-all
+                  p-2 rounded-2xl border-2 transition-all
                   active:scale-[0.98]
                   ${
                     selectedPaymentMethod === "SPLIT"
@@ -2894,7 +3118,7 @@ ${
                   }
                 `}
                     >
-                      <div className="text-xl mb-2">🔀</div>
+                      {/* <div className="text-xl mb-2">🔀</div> */}
 
                       <p className="text-xs font-black">Split Bill</p>
 
@@ -2918,7 +3142,214 @@ ${
                       </div>
                     </div>
                   )}
+                  {/* =====================================================
+    MIXED PAYMENT PANEL
+====================================================== */}
 
+                  {selectedPaymentMethod === "MIXED" && (
+                    <div className="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-200">
+                      {/* HEADER */}
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <p className="text-sm font-black text-slate-900">
+                            Mixed Payment
+                          </p>
+
+                          <p className="text-[10px] text-slate-500 mt-0.5">
+                            Collect the bill using Cash + UPI
+                          </p>
+                        </div>
+
+                        <div className="w-8 h-8 rounded-xl bg-white border border-slate-200 flex items-center justify-center">
+                          💵
+                        </div>
+                      </div>
+
+                      {/* BILL TOTAL */}
+                      <div className="flex items-center justify-between p-3 rounded-xl bg-white border border-slate-200">
+                        <span className="text-xs font-bold text-slate-500">
+                          Bill Total
+                        </span>
+
+                        <span className="text-base font-black text-slate-900">
+                          ₹{Number(billOrder?.total || 0).toFixed(2)}
+                        </span>
+                      </div>
+
+                      {/* CASH */}
+                      <div className="mt-4">
+                        <label className="block text-[10px] font-black uppercase tracking-wider text-emerald-700 mb-2">
+                          Cash Amount
+                        </label>
+
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-500 pointer-events-none">
+                            ₹
+                          </span>
+
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            inputMode="decimal"
+                            value={mixedCashAmount}
+                            onChange={(e) => {
+                              const value = e.target.value;
+
+                              setMixedCashAmount(value);
+
+                              const total = Number(billOrder?.total || 0);
+                              const cash = Number(value);
+
+                              if (
+                                Number.isFinite(total) &&
+                                Number.isFinite(cash) &&
+                                cash >= 0 &&
+                                cash <= total
+                              ) {
+                                setMixedUpiAmount(
+                                  Math.max(0, total - cash).toFixed(2),
+                                );
+                              }
+                            }}
+                            className="
+            w-full
+            pl-8
+            pr-4
+            py-3
+            rounded-xl
+            border
+            border-slate-200
+            bg-white
+            text-sm
+            font-bold
+            text-slate-900
+            focus:outline-none
+            focus:border-emerald-500
+            focus:ring-4
+            focus:ring-emerald-500/10
+          "
+                          />
+                        </div>
+                      </div>
+
+                      {/* UPI */}
+                      <div className="mt-4">
+                        <label className="block text-[10px] font-black uppercase tracking-wider text-blue-700 mb-2">
+                          UPI Amount
+                        </label>
+
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-500 pointer-events-none">
+                            ₹
+                          </span>
+
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            inputMode="decimal"
+                            value={mixedUpiAmount}
+                            onChange={(e) => {
+                              const value = e.target.value;
+
+                              setMixedUpiAmount(value);
+
+                              const total = Number(billOrder?.total || 0);
+                              const upi = Number(value);
+
+                              if (
+                                Number.isFinite(total) &&
+                                Number.isFinite(upi) &&
+                                upi >= 0 &&
+                                upi <= total
+                              ) {
+                                setMixedCashAmount(
+                                  Math.max(0, total - upi).toFixed(2),
+                                );
+                              }
+                            }}
+                            className="
+            w-full
+            pl-8
+            pr-4
+            py-3
+            rounded-xl
+            border
+            border-slate-200
+            bg-white
+            text-sm
+            font-bold
+            text-slate-900
+            focus:outline-none
+            focus:border-blue-500
+            focus:ring-4
+            focus:ring-blue-500/10
+          "
+                          />
+                        </div>
+                      </div>
+
+                      {/* BREAKDOWN */}
+                      <div className="mt-4 pt-4 border-t border-slate-200 space-y-2">
+                        <div className="flex justify-between text-xs">
+                          <span className="font-bold text-slate-500">Cash</span>
+
+                          <span className="font-black text-emerald-600">
+                            ₹{Number(mixedCashAmount || 0).toFixed(2)}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between text-xs">
+                          <span className="font-bold text-slate-500">UPI</span>
+
+                          <span className="font-black text-blue-600">
+                            ₹{Number(mixedUpiAmount || 0).toFixed(2)}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between pt-2 border-t border-slate-200">
+                          <span className="text-xs font-black text-slate-700">
+                            Total Collected
+                          </span>
+
+                          <span className="text-sm font-black text-slate-900">
+                            ₹
+                            {(
+                              Number(mixedCashAmount || 0) +
+                              Number(mixedUpiAmount || 0)
+                            ).toFixed(2)}
+                          </span>
+                        </div>
+
+                        <div className="flex justify-between">
+                          <span className="text-xs font-bold text-slate-500">
+                            Remaining
+                          </span>
+
+                          <span
+                            className={`text-sm font-black ${
+                              Math.abs(
+                                Number(billOrder?.total || 0) -
+                                  Number(mixedCashAmount || 0) -
+                                  Number(mixedUpiAmount || 0),
+                              ) < 0.01
+                                ? "text-emerald-600"
+                                : "text-rose-600"
+                            }`}
+                          >
+                            ₹
+                            {Math.max(
+                              0,
+                              Number(billOrder?.total || 0) -
+                                Number(mixedCashAmount || 0) -
+                                Number(mixedUpiAmount || 0),
+                            ).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {/* =====================================================
                 SPLIT BILL PANEL
             ====================================================== */}
@@ -3094,7 +3525,12 @@ ${
                   onClick={() => {
                     setBillOrder(null);
                     setSelectedPaymentMethod(null);
+
                     setSplitMode(false);
+                    setSplitAmount("");
+
+                    setMixedCashAmount("");
+                    setMixedUpiAmount("");
                   }}
                   disabled={isGeneratingBill || isSplitSubmitting}
                   className="
@@ -3123,13 +3559,27 @@ ${
                       ? isSplitSubmitting ||
                         !splitAmount ||
                         Number(splitAmount) <= 0 ||
-                        Number(splitAmount) > Number(billOrder.total || 0)
-                      : !selectedPaymentMethod || isGeneratingBill
+                        Number(splitAmount) >= Number(billOrder.total || 0)
+                      : selectedPaymentMethod === "MIXED"
+                        ? isMixedSubmitting ||
+                          !mixedCashAmount ||
+                          !mixedUpiAmount ||
+                          Number(mixedCashAmount) <= 0 ||
+                          Number(mixedUpiAmount) <= 0 ||
+                          Number(
+                            (
+                              Number(mixedCashAmount || 0) +
+                              Number(mixedUpiAmount || 0)
+                            ).toFixed(2),
+                          ) !== Number(Number(billOrder.total || 0).toFixed(2))
+                        : !selectedPaymentMethod || isGeneratingBill
                   }
                   onClick={
                     selectedPaymentMethod === "SPLIT"
                       ? confirmSplitBill
-                      : confirmGenerateBill
+                      : selectedPaymentMethod === "MIXED"
+                        ? confirmMixedPayment
+                        : confirmGenerateBill
                   }
                   className="
               flex-1
@@ -3159,11 +3609,15 @@ ${
                     ? isSplitSubmitting
                       ? "Processing..."
                       : "Collect & Save Rest as Due"
-                    : isGeneratingBill
-                      ? "Processing..."
-                      : selectedPaymentMethod === "DUE"
-                        ? "Save as Due"
-                        : "Generate Bill"}
+                    : selectedPaymentMethod === "MIXED"
+                      ? isMixedSubmitting
+                        ? "Processing..."
+                        : "Confirm Cash + UPI"
+                      : isGeneratingBill
+                        ? "Processing..."
+                        : selectedPaymentMethod === "DUE"
+                          ? "Save as Due"
+                          : "Generate Bill"}
                 </button>
               </div>
             </div>
