@@ -1,11 +1,19 @@
 import { X } from 'lucide-react';
 
-export default function Modal({ isOpen, onClose, title, children }) {
+export default function Modal({
+  isOpen,
+  onClose,
+  title,
+  children,
+  panelClassName = "max-w-md",
+}) {
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-100 flex flex-col max-h-[90vh] animate-fade-in">
+      <div
+        className={`bg-white rounded-2xl w-full shadow-2xl border border-slate-100 flex flex-col max-h-[90vh] animate-fade-in ${panelClassName}`}
+      >
         {/* Header */}
         <div className="p-5 border-b border-slate-100 flex justify-between items-center">
           <h3 className="font-extrabold text-slate-900 text-base">{title}</h3>

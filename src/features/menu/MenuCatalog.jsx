@@ -37,8 +37,7 @@ export default function MenuCatalog() {
   const [isAiModalOpen, setIsAiModalOpen] = useState(false);
   // const [isAiLocked, setIsAiLocked] = useState(false);
   // const [aiNextAvailableDate, setAiNextAvailableDate] = useState(null);
-  const [aiImageFile, setAiImageFile] = useState(null);
-  const [aiImagePreview, setAiImagePreview] = useState("");
+  const [aiImageFiles, setAiImageFiles] = useState([]);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
@@ -55,6 +54,12 @@ export default function MenuCatalog() {
   const [errorMessage, setErrorMessage] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [itemToDelete, setItemToDelete] = useState(null);
+  const MIN_AI_MENU_IMAGES = 2;
+  const MAX_AI_MENU_IMAGES = 8;
+  const MAX_AI_IMAGE_BYTES = 5 * 1024 * 1024;
+  const MAX_AI_TOTAL_BYTES = 25 * 1024 * 1024;
+  const MULTIPLE_IMAGES_MESSAGE =
+    "Please upload multiple menu page images together. A single image is not accepted. Upload every page of your menu in one go so AI can add all items at once.";
 
   // MenuCatalog.jsx ke top pe — restaurant approval status fetch karo
   const { data: restaurantProfile } = useQuery({
@@ -244,8 +249,16 @@ export default function MenuCatalog() {
 
     setTimeout(() => {
       setShowErrorPopup(false);
-    }, 3000);
+    }, 5000);
   }, []);
+
+  const clearAiImages = useCallback(() => {
+    setAiImageFiles((current) => {
+      current.forEach((item) => URL.revokeObjectURL(item.preview));
+      return [];
+    });
+  }, []);
+
   const aiExtractMutation = useMutation({
     mutationFn: async (formData) => {
       return await axios.post(
@@ -253,17 +266,17 @@ export default function MenuCatalog() {
         formData,
         {
           withCredentials: true,
+          timeout: 240000,
         },
       );
     },
 
     onSuccess: (res) => {
       queryClient.invalidateQueries({ queryKey: ["menu-items"] });
-      queryClient.invalidateQueries({ queryKey: ["ai-menu-status"] }); // lock server se aayega
+      queryClient.invalidateQueries({ queryKey: ["ai-menu-status"] });
 
       setIsAiModalOpen(false);
-      setAiImageFile(null);
-      setAiImagePreview("");
+      clearAiImages();
       showSuccess(res.data?.message || "Menu items imported successfully!");
     },
 
@@ -271,6 +284,7 @@ export default function MenuCatalog() {
       if (err.response?.data?.code === "AI_MONTHLY_LIMIT_REACHED") {
         queryClient.invalidateQueries({ queryKey: ["ai-menu-status"] });
         setIsAiModalOpen(false);
+        clearAiImages();
       }
       showError(
         err.response?.data?.message || "Error processing AI menu extraction.",
@@ -809,8 +823,9 @@ export default function MenuCatalog() {
               </p>
 
               <p className="text-[11px] font-medium mt-1 leading-relaxed">
-                The AI menu upload feature can be used only once every 30 days.
-                Please review your menu image carefully before uploading.
+                This monthly upload accepts multiple menu page images together.
+                A single image is not accepted. Upload every page in one go so
+                AI can add the full menu at once.
               </p>
 
               {isAiLocked && aiNextAvailableDate && (
@@ -1202,62 +1217,173 @@ export default function MenuCatalog() {
         <Modal
           isOpen={isAiModalOpen}
           onClose={() => {
+            if (aiExtractMutation.isPending) return;
             setIsAiModalOpen(false);
-            setAiImageFile(null);
-            setAiImagePreview("");
+            clearAiImages();
           }}
           title="Auto-Fill Menu via AI Vision"
+          panelClassName="max-w-2xl"
         >
           <div className="space-y-6">
             <p className="text-xs text-slate-500 leading-relaxed">
-              Upload a clear photo of the restaurant's physical menu or printed
-              card. AI will automatically detect items, prices, and categories
-              and add them live to your catalog.
+              Upload every page of the printed menu together. AI reads all of
+              the pages in this one monthly upload and adds every detected item
+              to your catalog. A single image is not accepted.
             </p>
 
             <div className="space-y-1.5">
               <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Upload Menu Snapshot
+                Upload Menu Pages ({MIN_AI_MENU_IMAGES}–{MAX_AI_MENU_IMAGES})
               </label>
               <label className="flex flex-col items-center justify-center gap-2 w-full p-6 rounded-2xl border-2 border-dashed border-slate-200 bg-slate-50 hover:bg-slate-100/50 cursor-pointer transition-all">
                 <Upload size={24} className="text-purple-500" />
                 <span className="text-xs font-bold text-slate-700">
-                  {aiImageFile
-                    ? aiImageFile.name
-                    : "Click to browse menu image"}
+                  {aiImageFiles.length > 0
+                    ? `${aiImageFiles.length} menu page${aiImageFiles.length === 1 ? "" : "s"} selected`
+                    : "Click to browse menu page images"}
                 </span>
                 <span className="text-[10px] text-slate-400">
-                  Supports JPG, PNG, WEBP
+                  JPG, PNG, or WEBP. Select at least {MIN_AI_MENU_IMAGES}{" "}
+                  different pages.
                 </span>
                 <input
                   type="file"
-                  accept="image/*"
+                  accept="image/jpeg,image/png,image/webp"
+                  multiple
+                  disabled={aiExtractMutation.isPending}
                   onChange={(e) => {
-                    const file = e.target.files[0];
-                    if (file) {
-                      setAiImageFile(file);
-                      setAiImagePreview(URL.createObjectURL(file));
+                    const incoming = Array.from(e.target.files || []);
+                    e.target.value = "";
+
+                    if (incoming.length === 0) {
+                      return;
                     }
+
+                    if (
+                      aiImageFiles.length === 0 &&
+                      incoming.length < MIN_AI_MENU_IMAGES
+                    ) {
+                      showError(MULTIPLE_IMAGES_MESSAGE);
+                      return;
+                    }
+
+                    const accepted = [];
+
+                    for (const file of incoming) {
+                      const extension = file.name
+                        .slice(file.name.lastIndexOf("."))
+                        .toLowerCase();
+                      const allowed =
+                        ["image/jpeg", "image/png", "image/webp"].includes(
+                          file.type,
+                        ) && [".jpg", ".jpeg", ".png", ".webp"].includes(extension);
+
+                      if (!allowed) {
+                        showError(
+                          "Unsupported image format. Please upload JPG, PNG, or WEBP.",
+                        );
+                        return;
+                      }
+
+                      if (file.size > MAX_AI_IMAGE_BYTES) {
+                        showError(
+                          "Each menu image must be 5 MB or smaller.",
+                        );
+                        return;
+                      }
+
+                      accepted.push(file);
+                    }
+
+                    const merged = [...aiImageFiles.map((item) => item.file), ...accepted];
+
+                    if (merged.length > MAX_AI_MENU_IMAGES) {
+                      showError(
+                        `You can upload up to ${MAX_AI_MENU_IMAGES} menu page images in one go.`,
+                      );
+                      return;
+                    }
+
+                    const totalBytes = merged.reduce(
+                      (sum, file) => sum + file.size,
+                      0,
+                    );
+
+                    if (totalBytes > MAX_AI_TOTAL_BYTES) {
+                      showError(
+                        "These menu images are too large together. Keep the total under 25 MB.",
+                      );
+                      return;
+                    }
+
+                    setAiImageFiles((current) => [
+                      ...current,
+                      ...accepted.map((file) => ({
+                        id: `${file.name}-${file.size}-${file.lastModified}-${crypto.randomUUID()}`,
+                        file,
+                        preview: URL.createObjectURL(file),
+                      })),
+                    ]);
                   }}
                   className="hidden"
                 />
               </label>
             </div>
 
-            {aiImagePreview && (
-              <div className="relative w-full h-40 rounded-2xl overflow-hidden border border-slate-200">
-                <img
-                  src={aiImagePreview}
-                  alt="Menu Preview"
-                  className="w-full h-full object-cover"
-                />
+            {aiImageFiles.length === 1 && (
+              <p className="text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-100 rounded-xl p-3">
+                {MULTIPLE_IMAGES_MESSAGE}
+              </p>
+            )}
+
+            {aiImageFiles.length > 0 && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {aiImageFiles.map((item) => (
+                  <div
+                    key={item.id}
+                    className="relative rounded-2xl overflow-hidden border border-slate-200 bg-slate-50"
+                  >
+                    <img
+                      src={item.preview}
+                      alt={item.file.name}
+                      className="w-full h-28 object-cover"
+                    />
+                    <div className="flex items-center justify-between gap-2 px-2 py-1.5">
+                      <p className="text-[10px] font-semibold text-slate-600 truncate">
+                        {item.file.name}
+                      </p>
+                      <button
+                        type="button"
+                        disabled={aiExtractMutation.isPending}
+                        onClick={() => {
+                          const next = aiImageFiles.filter(
+                            (entry) => entry.id !== item.id,
+                          );
+                          URL.revokeObjectURL(item.preview);
+                          setAiImageFiles(next);
+                          if (next.length === 1) {
+                            showError(MULTIPLE_IMAGES_MESSAGE);
+                          }
+                        }}
+                        className="text-slate-400 hover:text-rose-600 text-sm leading-none disabled:opacity-40"
+                        aria-label={`Remove ${item.file.name}`}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
 
             <div className="flex justify-end gap-3 pt-4 border-t border-slate-100">
               <button
                 type="button"
-                onClick={() => setIsAiModalOpen(false)}
+                onClick={() => {
+                  if (aiExtractMutation.isPending) return;
+                  setIsAiModalOpen(false);
+                  clearAiImages();
+                }}
                 className="px-5 py-3 rounded-2xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition cursor-pointer"
               >
                 Cancel
@@ -1265,7 +1391,9 @@ export default function MenuCatalog() {
               <button
                 type="button"
                 disabled={
-                  !aiImageFile || aiExtractMutation.isPending || isAiLocked
+                  aiImageFiles.length < MIN_AI_MENU_IMAGES ||
+                  aiExtractMutation.isPending ||
+                  isAiLocked
                 }
                 onClick={() => {
                   if (isAiLocked) {
@@ -1275,8 +1403,15 @@ export default function MenuCatalog() {
                     return;
                   }
 
+                  if (aiImageFiles.length < MIN_AI_MENU_IMAGES) {
+                    showError(MULTIPLE_IMAGES_MESSAGE);
+                    return;
+                  }
+
                   const formData = new FormData();
-                  formData.append("image", aiImageFile);
+                  aiImageFiles.forEach((item) =>
+                    formData.append("images", item.file),
+                  );
                   aiExtractMutation.mutate(formData);
                 }}
                 className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-purple-600 text-white font-bold text-xs hover:bg-purple-700 transition cursor-pointer shadow-sm shadow-purple-500/20 disabled:opacity-50"
