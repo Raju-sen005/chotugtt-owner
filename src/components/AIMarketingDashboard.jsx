@@ -14,11 +14,7 @@ export default function AIMarketingDashboard() {
     setLoading(true);
     setError("");
     try {
-      // LocalStorage ya fallback valid MongoDB ID use ki gai hai
-      const restaurantId =
-        localStorage.getItem("restaurantId") || "6a62eeac1c1ecd9b010b8c13";
-
-      const API_BASE = "http://localhost:5000";
+      const API_BASE = import.meta.env.VITE_APP_API_BASE;
 
       const response = await fetch(`${API_BASE}/marketing/social/generate`, {
         method: "POST",
@@ -26,7 +22,7 @@ export default function AIMarketingDashboard() {
           "Content-Type": "application/json",
         },
         credentials: "include",
-        body: JSON.stringify({ restaurantId, contentType, details }),
+        body: JSON.stringify({ contentType, details }),
       });
 
       const data = await response.json();
@@ -48,7 +44,7 @@ export default function AIMarketingDashboard() {
     if (!generatedPost || !generatedPost._id) return;
 
     try {
-      const API_BASE = "http://localhost:5000";
+      const API_BASE = import.meta.env.VITE_APP_API_BASE;
 
       const response = await fetch(
         `${API_BASE}/marketing/social/publish/${generatedPost._id}`,

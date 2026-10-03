@@ -63,7 +63,7 @@ export default function MenuCatalog() {
 
   // MenuCatalog.jsx ke top pe — restaurant approval status fetch karo
   const { data: restaurantProfile } = useQuery({
-    queryKey: ["restaurant-profile"],
+    queryKey: ["restaurant-profile", restaurantId],
     queryFn: async () => {
       const res = await axios.get(
         `${import.meta.env.VITE_APP_API_BASE}/restaurant/profile`,
@@ -77,7 +77,7 @@ export default function MenuCatalog() {
   const isApproved = restaurantProfile?.isApproved === true;
 
   const { data: aiStatus } = useQuery({
-    queryKey: ["ai-menu-status"],
+    queryKey: ["ai-menu-status", restaurantId],
     queryFn: async () => {
       const res = await axios.get(
         `${import.meta.env.VITE_APP_API_BASE}/menu/admin/menu/ai-status`,
@@ -94,7 +94,7 @@ export default function MenuCatalog() {
     : null;
 
   const { data: menuItems = { items: [], combos: [] }, isLoading } = useQuery({
-    queryKey: ["menu-items"],
+    queryKey: ["menu-items", restaurantId],
     queryFn: async () => {
       const [itemsRes, combosRes] = await Promise.all([
         axios.get(`${import.meta.env.VITE_APP_API_BASE}/menu/admin/items`, {

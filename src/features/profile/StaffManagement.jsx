@@ -9,9 +9,7 @@ import {
   X,
 } from "lucide-react";
 
-const API_BASE =
-  import.meta.env.VITE_APP_API_BASE ||
-  "http://localhost:5000";
+const API_BASE = import.meta.env.VITE_APP_API_BASE;
 
 export default function StaffManagement() {
   const [staff, setStaff] = useState([]);

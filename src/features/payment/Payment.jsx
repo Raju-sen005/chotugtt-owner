@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useSocket } from "../../context/SocketContext";
+import { useAuth } from "../../context/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
 const PAYMENT_TABS = [
   { key: "CASH", label: "Cash", icon: Wallet, accent: "emerald" },
@@ -64,7 +65,9 @@ export default function Payment() {
   const [filter, setFilter] = React.useState("today");
   const [currentPage, setCurrentPage] = React.useState(1);
   const socket = useSocket();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
+  const restaurantId = user?.restaurantId?._id || user?.restaurantId || null;
   const ITEMS_PER_PAGE = 10;
   const API_BASE = import.meta.env.VITE_APP_API_BASE;
   const [showCustomerModal, setShowCustomerModal] = React.useState(false);
@@ -102,7 +105,7 @@ export default function Payment() {
     };
   }, [socket, queryClient]);
   const { data: billingData, isLoading } = useQuery({
-    queryKey: ["bills", filter, paymentMethod],
+    queryKey: ["bills", restaurantId, filter, paymentMethod],
     queryFn: () =>
       axios
         .get(
@@ -111,13 +114,14 @@ export default function Payment() {
         )
         .then((res) => res.data),
     staleTime: 10_000,
+    enabled: !!restaurantId,
   });
 
   const bills = billingData?.data || [];
   const summary = billingData?.summary || {};
 
   const { data: prevData } = useQuery({
-    queryKey: ["bills-prev", filter],
+    queryKey: ["bills-prev", restaurantId, filter],
     queryFn: () =>
       axios
         .get(`${API_BASE}/orders/billing/previous?filter=${filter}`, {
@@ -125,6 +129,7 @@ export default function Payment() {
         })
         .then((res) => res.data)
         .catch(() => ({ total: 0 })),
+    enabled: !!restaurantId,
   });
 
   const totalBills = bills?.length || 0;

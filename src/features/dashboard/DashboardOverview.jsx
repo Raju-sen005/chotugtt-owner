@@ -2,10 +2,14 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
 import { DollarSign, ShoppingBag, CheckCircle2, AlertTriangle, Activity, ShieldCheck, Radio } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 export default function DashboardOverview() {
+  const { user } = useAuth();
+  const restaurantId = user?.restaurantId?._id || user?.restaurantId || null;
+
   const { data: metrics, isLoading } = useQuery({
-    queryKey: ['dashboard-metrics'],
+    queryKey: ['dashboard-metrics', restaurantId],
     queryFn: async () => {
       const res = await axios.get(`${import.meta.env.VITE_APP_API_BASE}/orders/live`, { withCredentials: true });
       const todayOrders = res.data.data || [];
@@ -24,6 +28,7 @@ export default function DashboardOverview() {
     staleTime: 30_000,
     refetchOnWindowFocus: false,
     refetchInterval: 60_000,
+    enabled: !!restaurantId,
   });
 
   const stats = useMemo(() => [

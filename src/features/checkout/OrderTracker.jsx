@@ -8,16 +8,25 @@ export default function OrderTracker({ order }) {
   const [rejectReason, setRejectReason] = useState('');
 
   useEffect(() => {
-    // Pipeline client target runtime init
-    const socket = io(`${import.meta.env.VITE_APP_API_BASE}`, { transports: ['websocket'] });
+    const socket = io(import.meta.env.VITE_APP_API_BASE, {
+      withCredentials: true,
+      transports: ['websocket', 'polling'],
+      reconnection: true,
+    });
+
+    const matchesOrder = (data) => {
+      const incoming = String(data?._id || data?.id || '');
+      return incoming && incoming === String(order._id);
+    };
 
     socket.on('connect', () => {
       socket.emit('join_order_tracker', order._id);
     });
 
     socket.on('ORDER_STATUS_UPDATED', (data) => {
-      setLiveStatus(data.status);
-      if (data.rejectReason) setRejectReason(data.rejectReason);
+      if (!matchesOrder(data)) return;
+      if (data?.status) setLiveStatus(data.status);
+      if (data?.rejectReason) setRejectReason(data.rejectReason);
     });
 
     return () => {
@@ -44,10 +53,8 @@ export default function OrderTracker({ order }) {
 
         <div className={`p-8 rounded-2xl ${config.bg} ${config.color} flex flex-col items-center gap-3 transition-all duration-500`}>
           {config.icon}
-          <div className="space-y-0.5">
-            <h4 className="font-extrabold text-lg tracking-tight">{config.label}</h4>
-            <p className="text-xs opacity-80 font-medium max-w-[200px] mx-auto">{config.desc}</p>
-          </div>
+          <h4 className="font-extrabold text-lg tracking-tight">{config.label}</h4>
+          <p className="text-xs opacity-80 font-medium max-w-[200px] mx-auto">{config.desc}</p>
         </div>
 
         <div className="border-t border-slate-100 pt-4 space-y-2 text-left text-xs font-semibold text-slate-600">

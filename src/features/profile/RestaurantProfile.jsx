@@ -195,7 +195,7 @@ export default function RestaurantProfile() {
     isLoading,
     isError,
   } = useQuery({
-    queryKey: ["restaurant-profile"],
+    queryKey: ["restaurant-profile", restaurantId],
     queryFn: async () => {
       const res = await axios.get(
         `${import.meta.env.VITE_APP_API_BASE}/restaurant/profile`,

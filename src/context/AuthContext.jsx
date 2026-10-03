@@ -10,6 +10,7 @@ import {
   useRef,
 } from "react";
 import axios from "axios";
+import { useQueryClient } from "@tanstack/react-query";
 
 const AuthContext = createContext(null);
 
@@ -204,6 +205,7 @@ const requiresSubscriptionFromResponse = (data) => {
 */
 
 export const AuthProvider = ({ children }) => {
+  const queryClient = useQueryClient();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -938,13 +940,14 @@ const redirectToSubscription = useCallback(() => {
         );
       } finally {
         clearSubscriptionTimer();
+        queryClient.clear();
 
         if (mountedRef.current) {
           setUser(null);
         }
       }
     },
-    [clearSubscriptionTimer],
+    [clearSubscriptionTimer, queryClient],
   );
 
   /*

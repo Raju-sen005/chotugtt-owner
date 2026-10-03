@@ -1595,6 +1595,17 @@ export default function LiveOrderMonitor() {
     socket.on("RUNNING_ORDER_UPDATED", handleRunningOrderUpdated);
 
     socket.on("ORDER_ITEM_READY_STATUS_UPDATED", handleItemReadyStatusUpdated);
+
+    const handleReconnect = () => {
+      queryClient.invalidateQueries({
+        queryKey: ["live-orders", restaurantId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["table-status", restaurantId],
+      });
+    };
+
+    socket.io.on("reconnect", handleReconnect);
     // ==========================================
     // CLEANUP
     // ==========================================
@@ -1608,6 +1619,7 @@ export default function LiveOrderMonitor() {
         "ORDER_ITEM_READY_STATUS_UPDATED",
         handleItemReadyStatusUpdated,
       );
+      socket.io.off("reconnect", handleReconnect);
     };
   }, [socket, restaurantId, queryClient]);
 

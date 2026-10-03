@@ -878,7 +878,7 @@ export default function PublicMenu() {
 
           setConfirmedOrder({
             orderId: res.data.order.orderId,
-            total: finalPayableAmount,
+            total: Number(res.data.order?.total ?? finalPayableAmount),
           });
           setCart({});
           setCustomerName("");

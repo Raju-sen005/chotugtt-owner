@@ -30,6 +30,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { useSocket } from "../../context/SocketContext";
+import { useAuth } from "../../context/AuthContext";
 
 const api = axios.create({
   baseURL: import.meta.env.VITE_APP_API_BASE,
@@ -281,6 +282,8 @@ const OfferCard = memo(function OfferCard({
 
 export default function Offers() {
   const socket = useSocket();
+  const { user } = useAuth();
+  const restaurantId = user?.restaurantId?._id || user?.restaurantId || null;
   const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState(EMPTY_FORM);
@@ -322,10 +325,11 @@ export default function Offers() {
     refetch: refetchOffers,
     isFetching: offersFetching,
   } = useQuery({
-    queryKey: ["offers"],
+    queryKey: ["offers", restaurantId],
     queryFn: () =>
       api.get("/offers").then((response) => response.data.data),
     staleTime: 30_000,
+    enabled: !!restaurantId,
     refetchOnWindowFocus: true,
   });
 
@@ -334,12 +338,13 @@ export default function Offers() {
     isLoading: itemsLoading,
     isError: itemsError,
   } = useQuery({
-    queryKey: ["menu-items-list"],
+    queryKey: ["menu-items-list", restaurantId],
     queryFn: () =>
       api
         .get("/menu/admin/items")
         .then((response) => response.data.data),
     staleTime: 60_000,
+    enabled: !!restaurantId,
     refetchOnWindowFocus: false,
   });
 

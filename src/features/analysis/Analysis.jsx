@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useSocket } from "../../context/SocketContext";
+import { useAuth } from "../../context/AuthContext";
 import React from "react";
 import axios from "axios";
 import {
@@ -34,7 +35,9 @@ function getHourlyCategory(hour) {
 function Analysis() {
   const [showAllTables, setShowAllTables] = React.useState(false);
   const socket = useSocket();
+  const { user } = useAuth();
   const queryClient = useQueryClient();
+  const restaurantId = user?.restaurantId?._id || user?.restaurantId || null;
 
   React.useEffect(() => {
     if (!socket) return;
@@ -56,14 +59,16 @@ function Analysis() {
     isLoading,
     error,
   } = useQuery({
-    queryKey: ["analytics"],
+    queryKey: ["analytics", restaurantId],
     queryFn: async () => {
       const res = await axios.get(
         `${import.meta.env.VITE_APP_API_BASE}/analytics/summary`,
+        { withCredentials: true },
       );
       return res.data.data;
     },
     staleTime: 60_000,
+    enabled: !!restaurantId,
   });
 
   const chartData = React.useMemo(() => {
