@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 import { Menu, X } from "lucide-react";
 
@@ -23,6 +24,8 @@ import StaffManagement from "../features/profile/StaffManagement";
 
 export default function MerchantLayout() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === "SUPERADMIN";
 
   return (
     <div
@@ -217,33 +220,43 @@ export default function MerchantLayout() {
           "
         >
           <Routes>
-            <Route path="/" element={<DashboardOverview />} />
+            {isSuperAdmin ? (
+              <>
+                <Route path="/super-admin" element={<SuperAdminPanel />} />
+                <Route
+                  path="*"
+                  element={<Navigate to="/super-admin" replace />}
+                />
+              </>
+            ) : (
+              <>
+                <Route path="/" element={<DashboardOverview />} />
 
-            <Route path="/orders" element={<LiveOrderMonitor />} />
+                <Route path="/orders" element={<LiveOrderMonitor />} />
 
-            <Route path="/menu" element={<MenuCatalog />} />
+                <Route path="/menu" element={<MenuCatalog />} />
 
-            <Route path="/settings" element={<StoreSettings />} />
+                <Route path="/settings" element={<StoreSettings />} />
 
-            <Route path="/table-monitor" element={<TableMonitor />} />
+                <Route path="/table-monitor" element={<TableMonitor />} />
 
-            <Route path="/analysis" element={<Analysis />} />
+                <Route path="/analysis" element={<Analysis />} />
 
-            <Route path="/offer" element={<Offers />} />
+                <Route path="/offer" element={<Offers />} />
 
-            <Route path="/payment" element={<Payment />} />
+                <Route path="/payment" element={<Payment />} />
 
-            <Route path="/marketing" element={<AIMarketingDashboard />} />
+                <Route path="/marketing" element={<AIMarketingDashboard />} />
 
-            <Route path="/counter" element={<CounterPOS />} />
+                <Route path="/counter" element={<CounterPOS />} />
 
-            <Route path="/super-admin" element={<SuperAdminPanel />} />
+                <Route path="/profile" element={<Profile />} />
 
-            <Route path="/profile" element={<Profile />} />
+                <Route path="/staff" element={<StaffManagement />} />
 
-            <Route path="/staff" element={<StaffManagement />} />
-
-            <Route path="*" element={<Navigate to="/" replace />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
+              </>
+            )}
           </Routes>
         </main>
       </div>

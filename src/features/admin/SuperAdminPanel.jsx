@@ -178,6 +178,69 @@ const currency = (value) =>
     maximumFractionDigits: 2,
   })}`;
 
+const SELLABLE_PLANS = ["TRIAL", "BASIC", "PREMIUM"];
+
+const formatDayKey = (date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const buildDailySeries = (rows, period, valueKey) => {
+  const days =
+    period === "7d" ? 7 : period === "90d" ? 90 : period === "1y" ? 365 : 30;
+  const totals = new Map(
+    (rows || []).map((row) => [String(row._id), Number(row[valueKey]) || 0]),
+  );
+  const series = [];
+  const cursor = new Date();
+
+  for (let offset = days - 1; offset >= 0; offset -= 1) {
+    const day = new Date(cursor);
+    day.setDate(cursor.getDate() - offset);
+    const key = formatDayKey(day);
+    series.push({
+      _id: key,
+      label: key.slice(5),
+      value: totals.get(key) || 0,
+    });
+  }
+
+  return series;
+};
+
+const TrendChart = ({ title, series, color, formatValue }) => {
+  const peak = Math.max(1, ...series.map((point) => point.value));
+
+  return (
+    <div className="mt-5 rounded-xl border border-stone-200 p-4">
+      <h3 className="text-sm font-semibold text-stone-900">{title}</h3>
+      <div className="mt-4 flex h-44 items-end gap-px">
+        {series.map((point) => (
+          <div
+            key={point._id}
+            title={`${point._id}: ${formatValue(point.value)}`}
+            className="group flex h-full min-w-0 flex-1 items-end"
+          >
+            <div
+              className={`w-full rounded-t ${color}`}
+              style={{
+                height: `${Math.max(point.value > 0 ? 6 : 2, (point.value / peak) * 100)}%`,
+              }}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 flex justify-between text-[10px] text-stone-400">
+        <span>{series[0]?.label}</span>
+        <span>{series[Math.floor(series.length / 2)]?.label}</span>
+        <span>{series[series.length - 1]?.label}</span>
+      </div>
+    </div>
+  );
+};
+
 const getAuditActionLabel = (action) => {
   switch (action) {
     case "RESTAURANT_APPROVED":
@@ -204,6 +267,9 @@ const getAuditActionLabel = (action) => {
     case "STAFF_DEACTIVATED":
       return "Staff Deactivated";
 
+    case "RESTAURANT_DELETED":
+      return "Restaurant Deleted";
+
     default:
       return action || "Unknown";
   }
@@ -221,6 +287,7 @@ const getAuditActionTone = (action) => {
       return "amber";
     case "RESTAURANT_BLOCKED":
     case "STAFF_DEACTIVATED":
+    case "RESTAURANT_DELETED":
       return "rose";
     default:
       return "stone";
@@ -244,11 +311,20 @@ export default function SuperAdminPanel() {
   const [statsLoading, setStatsLoading] = useState(false);
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleteConfirmName, setDeleteConfirmName] = useState("");
+  const [deletingRestaurant, setDeletingRestaurant] = useState(false);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [approvalFilter, setApprovalFilter] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
+  const [activeTab, setActiveTab] = useState("graphs");
+  const [joinedFilter, setJoinedFilter] = useState("all");
+  const [planFilter, setPlanFilter] = useState("all");
+  const [subscriptionFilter, setSubscriptionFilter] = useState("all");
+  const [districtFilter, setDistrictFilter] = useState("");
+  const [pincodeFilter, setPincodeFilter] = useState("");
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [revenueStats, setRevenueStats] = useState(null);
@@ -294,6 +370,12 @@ export default function SuperAdminPanel() {
         status: statusFilter !== "all" ? statusFilter : undefined,
         approval: approvalFilter !== "all" ? approvalFilter : undefined,
         sort: sortBy,
+        joined: joinedFilter !== "all" ? joinedFilter : undefined,
+        plan: planFilter !== "all" ? planFilter : undefined,
+        subscription:
+          subscriptionFilter !== "all" ? subscriptionFilter : undefined,
+        district: districtFilter.trim() || undefined,
+        pincode: pincodeFilter.trim() || undefined,
       };
 
       const res = await axios.get("/admin/restaurants", {
@@ -329,11 +411,23 @@ export default function SuperAdminPanel() {
       () => {
         fetchRestaurants();
       },
-      search ? 400 : 0,
+      search || districtFilter || pincodeFilter ? 400 : 0,
     );
 
     return () => clearTimeout(timer);
-  }, [page, pageSize, search, statusFilter, approvalFilter, sortBy]);
+  }, [
+    page,
+    pageSize,
+    search,
+    statusFilter,
+    approvalFilter,
+    sortBy,
+    joinedFilter,
+    planFilter,
+    subscriptionFilter,
+    districtFilter,
+    pincodeFilter,
+  ]);
 
   const handleStatusUpdate = async (id, field, currentStatus) => {
     try {
@@ -459,7 +553,7 @@ export default function SuperAdminPanel() {
     const currentValue = selectedRestaurant[field];
 
     // Safety: no unnecessary API request
-    if (currentValue === value) {
+    if (field !== "subscriptionPlan" && currentValue === value) {
       setSubscriptionModal(null);
       return;
     }
@@ -496,6 +590,8 @@ export default function SuperAdminPanel() {
                 ...restaurant,
                 subscriptionPlan: updatedRestaurant.subscriptionPlan,
                 subscriptionStatus: updatedRestaurant.subscriptionStatus,
+                subscriptionStartedAt: updatedRestaurant.subscriptionStartedAt,
+                subscriptionExpiresAt: updatedRestaurant.subscriptionExpiresAt,
               }
             : restaurant,
         ),
@@ -671,29 +767,29 @@ export default function SuperAdminPanel() {
     fetchAuditLogs();
   }, [auditPage, auditPageSize, auditAction, auditSort]);
 
+  const openDeleteRestaurant = () => {
+    setDeleteConfirmName("");
+    setDeleteConfirmOpen(true);
+  };
+
   const handleDeleteRestaurant = async () => {
     if (!selectedRestaurant?._id) return;
 
-    const restaurantName = selectedRestaurant.name || "this restaurant";
+    const expectedName = String(selectedRestaurant.name || "").trim();
 
-    const firstConfirm = window.confirm(
-      `Are you sure you want to permanently delete "${restaurantName}"?`,
-    );
-
-    if (!firstConfirm) return;
-
-    const secondConfirm = window.confirm(
-      "This will permanently delete the restaurant and its tenant data. This action cannot be undone. Continue?",
-    );
-
-    if (!secondConfirm) return;
+    if (deleteConfirmName.trim() !== expectedName) {
+      return;
+    }
 
     try {
-      setDetailsLoading(true);
+      setDeletingRestaurant(true);
 
       const response = await axios.delete(
         `/admin/restaurants/${selectedRestaurant._id}`,
         {
+          data: {
+            confirmName: deleteConfirmName.trim(),
+          },
           withCredentials: true,
         },
       );
@@ -704,6 +800,8 @@ export default function SuperAdminPanel() {
         );
       }
 
+      setDeleteConfirmOpen(false);
+      setDeleteConfirmName("");
       setShowDetails(false);
       setSelectedRestaurant(null);
       setRestaurantOverview(null);
@@ -719,17 +817,9 @@ export default function SuperAdminPanel() {
 
       alert(error?.response?.data?.message || "Failed to delete restaurant.");
     } finally {
-      setDetailsLoading(false);
+      setDeletingRestaurant(false);
     }
   };
-  if (loading)
-    return (
-      <div className="flex h-screen flex-col items-center justify-center gap-3 bg-stone-50">
-        <Loader2 className="animate-spin text-red-600" size={32} />
-        <p className="text-sm font-medium text-stone-500">Loading dashboard…</p>
-      </div>
-    );
-
   // Quick statistics calculation
   const totalStores = platformStats?.restaurants?.total ?? 0;
   const approvedStores = platformStats?.restaurants?.approved ?? 0;
@@ -741,26 +831,26 @@ export default function SuperAdminPanel() {
   const activeOrders = platformStats?.orders?.active ?? 0;
 
   // Derived, presentation-only helpers (do not affect fetched data)
-  const growthMax = Math.max(
-    1,
-    ...(platformAnalytics?.restaurantGrowth || []).map((i) => i.count || 0),
-  );
-  const orderTrendMax = Math.max(
-    1,
-    ...(platformAnalytics?.orderTrend || []).map((i) => i.count || 0),
-  );
-  const revenueTrendMax = Math.max(
-    1,
-    ...(platformAnalytics?.revenueTrend || []).map((i) => i.revenue || 0),
-  );
   const subscriptionTotal = Math.max(
     1,
-      (platformAnalytics?.subscriptions?.starter || 0) +
-      (platformAnalytics?.subscriptions?.trial || 0) +
+    (platformAnalytics?.subscriptions?.trial || 0) +
       (platformAnalytics?.subscriptions?.basic || 0) +
-      (platformAnalytics?.subscriptions?.pro || 0) +
-      (platformAnalytics?.subscriptions?.premium || 0) +
-      (platformAnalytics?.subscriptions?.enterprise || 0),
+      (platformAnalytics?.subscriptions?.premium || 0),
+  );
+  const restaurantGrowthSeries = buildDailySeries(
+    platformAnalytics?.restaurantGrowth,
+    analyticsPeriod,
+    "count",
+  );
+  const orderTrendSeries = buildDailySeries(
+    platformAnalytics?.orderTrend,
+    analyticsPeriod,
+    "count",
+  );
+  const revenueTrendSeries = buildDailySeries(
+    platformAnalytics?.revenueTrend,
+    analyticsPeriod,
+    "revenue",
   );
 
   return (
@@ -818,11 +908,8 @@ export default function SuperAdminPanel() {
                 {subscriptionModal.field === "subscriptionPlan" ? (
                   <>
                     <option value="TRIAL">Trial</option>
-                    <option value="STARTER">Starter</option>
                     <option value="BASIC">Basic</option>
-                    <option value="PRO">Pro</option>
                     <option value="PREMIUM">Premium</option>
-                    <option value="ENTERPRISE">Enterprise</option>
                   </>
                 ) : (
                   <>
@@ -832,6 +919,12 @@ export default function SuperAdminPanel() {
                   </>
                 )}
               </SelectField>
+              {subscriptionModal.field === "subscriptionPlan" && (
+                <p className="mt-2 text-xs text-stone-500">
+                  Saving a plan sets it active from the server: Trial 7 days,
+                  Basic 1 year, Premium 1 year.
+                </p>
+              )}
             </div>
 
             <div className="mt-6 flex justify-end gap-2.5">
@@ -848,8 +941,9 @@ export default function SuperAdminPanel() {
                 type="button"
                 disabled={
                   subscriptionUpdating ||
-                  subscriptionModal.value ===
-                    selectedRestaurant?.[subscriptionModal.field]
+                  (subscriptionModal.field !== "subscriptionPlan" &&
+                    subscriptionModal.value ===
+                      selectedRestaurant?.[subscriptionModal.field])
                 }
                 onClick={handleSubscriptionUpdate}
                 className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -858,6 +952,53 @@ export default function SuperAdminPanel() {
                   <Loader2 size={14} className="animate-spin" />
                 )}
                 {subscriptionUpdating ? "Updating…" : "Update"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {deleteConfirmOpen && selectedRestaurant && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-stone-950/50 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+            <h3 className="text-base font-semibold text-stone-900">
+              Delete {selectedRestaurant.name}
+            </h3>
+            <p className="mt-2 text-sm text-stone-500">
+              This permanently removes the restaurant, its menu, orders, and
+              staff. Type the restaurant name to confirm.
+            </p>
+            <input
+              type="text"
+              value={deleteConfirmName}
+              onChange={(event) => setDeleteConfirmName(event.target.value)}
+              placeholder={selectedRestaurant.name}
+              autoComplete="off"
+              className="mt-4 h-10 w-full rounded-lg border border-stone-200 px-3 text-sm outline-none focus:border-stone-400"
+            />
+            <div className="mt-5 flex justify-end gap-2.5">
+              <button
+                type="button"
+                disabled={deletingRestaurant}
+                onClick={() => setDeleteConfirmOpen(false)}
+                className="rounded-lg border border-stone-200 px-4 py-2 text-sm font-medium text-stone-600"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={
+                  deletingRestaurant ||
+                  deleteConfirmName.trim() !==
+                    String(selectedRestaurant.name || "").trim()
+                }
+                onClick={handleDeleteRestaurant}
+                className="inline-flex items-center gap-2 rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {deletingRestaurant && (
+                  <Loader2 size={14} className="animate-spin" />
+                )}
+                Delete permanently
               </button>
             </div>
           </div>
@@ -1247,7 +1388,7 @@ export default function SuperAdminPanel() {
 
                       <div className="mt-2 flex items-center justify-between gap-3">
                         <span className="text-sm font-semibold text-stone-900">
-                          {selectedRestaurant.subscriptionPlan || "STARTER"}
+                          {selectedRestaurant.subscriptionPlan || "Not set"}
                         </span>
 
                         <button
@@ -1256,9 +1397,11 @@ export default function SuperAdminPanel() {
                           onClick={() =>
                             setSubscriptionModal({
                               field: "subscriptionPlan",
-                              value:
-                                selectedRestaurant.subscriptionPlan ||
-                                "STARTER",
+                              value: SELLABLE_PLANS.includes(
+                                selectedRestaurant.subscriptionPlan,
+                              )
+                                ? selectedRestaurant.subscriptionPlan
+                                : "BASIC",
                             })
                           }
                           className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1303,6 +1446,22 @@ export default function SuperAdminPanel() {
                         </button>
                       </div>
                     </div>
+                  </div>
+
+                  <div className="mt-3">
+                    <DetailItem
+                      label="Valid until"
+                      value={
+                        selectedRestaurant.subscriptionExpiresAt
+                          ? new Date(
+                              selectedRestaurant.subscriptionExpiresAt,
+                            ).toLocaleString("en-IN", {
+                              dateStyle: "medium",
+                              timeStyle: "short",
+                            })
+                          : "Not set"
+                      }
+                    />
                   </div>
                 </div>
 
@@ -1351,7 +1510,7 @@ export default function SuperAdminPanel() {
 
                     <button
                       type="button"
-                      onClick={handleDeleteRestaurant}
+                      onClick={openDeleteRestaurant}
                       className="inline-flex shrink-0 items-center gap-1.5 rounded-lg bg-rose-600 px-3.5 py-2 text-xs font-medium text-white transition hover:bg-rose-700"
                     >
                       <Trash2 size={13} />
@@ -1388,7 +1547,29 @@ export default function SuperAdminPanel() {
             </div>
           </div>
 
-          {/* Quick Metrics */}
+          <div className="flex gap-1 overflow-x-auto rounded-xl border border-stone-200 bg-white p-1">
+            {[
+              { id: "graphs", label: "Graphs" },
+              { id: "restaurants", label: "Restaurants" },
+              { id: "revenue", label: "Revenue" },
+              { id: "logs", label: "Logs" },
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveTab(tab.id)}
+                className={`rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap transition ${
+                  activeTab === tab.id
+                    ? "bg-red-600 text-white"
+                    : "text-stone-600 hover:bg-stone-50"
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          {activeTab === "graphs" && (
           <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-stone-200 bg-stone-200 sm:grid-cols-4 lg:grid-cols-7">
             <StatCell
               title="Total restaurants"
@@ -1424,11 +1605,10 @@ export default function SuperAdminPanel() {
               tone="brand"
             />
           </div>
+          )}
 
-          {/* =========================================================
-    REVENUE & PAYMENTS
-========================================================= */}
-
+          {activeTab === "revenue" && (
+          <>
           <div className="rounded-2xl border border-stone-200 bg-white">
             <div className="flex flex-col gap-4 border-b border-stone-100 p-5 sm:flex-row sm:items-center sm:justify-between">
               <SectionHeading
@@ -1631,7 +1811,7 @@ export default function SuperAdminPanel() {
                 </p>
 
                 <p className="mt-2 text-2xl font-black text-red-600">
-                  {currency(revenueStats.platformRevenue?.net || 0)}
+                  {currency(revenueStats?.platformRevenue?.net || 0)}
                 </p>
               </div>
 
@@ -1641,7 +1821,7 @@ export default function SuperAdminPanel() {
                 </p>
 
                 <p className="mt-2 text-xl font-black text-slate-900">
-                  {currency(revenueStats.platformRevenue?.subscription || 0)}
+                  {currency(revenueStats?.platformRevenue?.subscription || 0)}
                 </p>
               </div>
 
@@ -1651,7 +1831,7 @@ export default function SuperAdminPanel() {
                 </p>
 
                 <p className="mt-2 text-xl font-black text-slate-900">
-                  {currency(revenueStats.platformRevenue?.commission || 0)}
+                  {currency(revenueStats?.platformRevenue?.commission || 0)}
                 </p>
               </div>
 
@@ -1661,7 +1841,7 @@ export default function SuperAdminPanel() {
                 </p>
 
                 <p className="mt-2 text-xl font-black text-slate-900">
-                  {currency(revenueStats.platformRevenue?.platformFee || 0)}
+                  {currency(revenueStats?.platformRevenue?.platformFee || 0)}
                 </p>
               </div>
             </div>
@@ -1671,7 +1851,7 @@ export default function SuperAdminPanel() {
                 <p className="text-xs text-slate-500">Gross Platform Revenue</p>
 
                 <p className="mt-1 text-sm font-black text-slate-900">
-                  {currency(revenueStats.platformRevenue?.gross || 0)}
+                  {currency(revenueStats?.platformRevenue?.gross || 0)}
                 </p>
               </div>
 
@@ -1679,7 +1859,7 @@ export default function SuperAdminPanel() {
                 <p className="text-xs text-slate-500">Refunds</p>
 
                 <p className="mt-1 text-sm font-black text-rose-600">
-                  {currency(revenueStats.platformRevenue?.refunds || 0)}
+                  {currency(revenueStats?.platformRevenue?.refunds || 0)}
                 </p>
               </div>
 
@@ -1688,16 +1868,16 @@ export default function SuperAdminPanel() {
 
                 <p className="mt-1 text-sm font-black text-slate-900">
                   {Number(
-                    revenueStats.platformRevenue?.transactionCount || 0,
+                    revenueStats?.platformRevenue?.transactionCount || 0,
                   ).toLocaleString("en-IN")}
                 </p>
               </div>
             </div>
           </div>
-          {/* =========================================================
-    PLATFORM ANALYTICS
-========================================================= */}
+          </>
+          )}
 
+          {activeTab === "graphs" && (
           <div className="rounded-2xl border border-stone-200 bg-white">
             <div className="flex flex-col gap-4 border-b border-stone-100 p-5 sm:flex-row sm:items-center sm:justify-between">
               <SectionHeading
@@ -1762,11 +1942,6 @@ export default function SuperAdminPanel() {
                     <div className="mt-4 space-y-3">
                       {[
                         {
-                          label: "Starter",
-                          value: platformAnalytics.subscriptions?.starter || 0,
-                          tone: "bg-stone-400",
-                        },
-                        {
                           label: "Trial",
                           value: platformAnalytics.subscriptions?.trial || 0,
                           tone: "bg-amber-400",
@@ -1774,23 +1949,12 @@ export default function SuperAdminPanel() {
                         {
                           label: "Basic",
                           value: platformAnalytics.subscriptions?.basic || 0,
-                          tone: "bg-amber-500",
-                        },
-                        {
-                          label: "Pro",
-                          value: platformAnalytics.subscriptions?.pro || 0,
                           tone: "bg-red-500",
                         },
                         {
                           label: "Premium",
                           value: platformAnalytics.subscriptions?.premium || 0,
                           tone: "bg-violet-600",
-                        },
-                        {
-                          label: "Enterprise",
-                          value:
-                            platformAnalytics.subscriptions?.enterprise || 0,
-                          tone: "bg-stone-800",
                         },
                       ].map((row) => (
                         <div key={row.label}>
@@ -1815,117 +1979,24 @@ export default function SuperAdminPanel() {
                     </div>
                   </div>
 
-                  {/* Restaurant Growth */}
-                  <div className="mt-5 rounded-xl border border-stone-200 p-4">
-                    <h3 className="text-sm font-semibold text-stone-900">
-                      Restaurant growth
-                    </h3>
-
-                    <div className="mt-3.5 space-y-2">
-                      {(platformAnalytics.restaurantGrowth || []).length ===
-                      0 ? (
-                        <p className="text-xs text-stone-400">
-                          No restaurant registrations in this period.
-                        </p>
-                      ) : (
-                        platformAnalytics.restaurantGrowth.map((item) => (
-                          <div
-                            key={item._id}
-                            className="flex items-center gap-3"
-                          >
-                            <span className="w-24 shrink-0 text-xs text-stone-500">
-                              {item._id}
-                            </span>
-                            <div className="h-2 flex-1 overflow-hidden rounded-full bg-stone-100">
-                              <div
-                                className="h-full rounded-full bg-stone-800"
-                                style={{
-                                  width: `${(item.count / growthMax) * 100}%`,
-                                }}
-                              />
-                            </div>
-                            <span className="w-8 shrink-0 text-right text-sm font-semibold tabular-nums text-stone-900">
-                              {item.count}
-                            </span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Order Trend */}
-                  <div className="mt-5 rounded-xl border border-stone-200 p-4">
-                    <h3 className="text-sm font-semibold text-stone-900">
-                      Order trend
-                    </h3>
-
-                    <div className="mt-3.5 space-y-2">
-                      {(platformAnalytics.orderTrend || []).length === 0 ? (
-                        <p className="text-xs text-stone-400">
-                          No orders in this period.
-                        </p>
-                      ) : (
-                        platformAnalytics.orderTrend.map((item) => (
-                          <div
-                            key={item._id}
-                            className="flex items-center gap-3"
-                          >
-                            <span className="w-24 shrink-0 text-xs text-stone-500">
-                              {item._id}
-                            </span>
-                            <div className="h-2 flex-1 overflow-hidden rounded-full bg-stone-100">
-                              <div
-                                className="h-full rounded-full bg-red-500"
-                                style={{
-                                  width: `${(item.count / orderTrendMax) * 100}%`,
-                                }}
-                              />
-                            </div>
-                            <span className="w-8 shrink-0 text-right text-sm font-semibold tabular-nums text-stone-900">
-                              {item.count}
-                            </span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Revenue Trend */}
-                  <div className="mt-5 rounded-xl border border-stone-200 p-4">
-                    <h3 className="text-sm font-semibold text-stone-900">
-                      Revenue trend
-                    </h3>
-
-                    <div className="mt-3.5 space-y-2">
-                      {(platformAnalytics.revenueTrend || []).length === 0 ? (
-                        <p className="text-xs text-stone-400">
-                          No revenue data in this period.
-                        </p>
-                      ) : (
-                        platformAnalytics.revenueTrend.map((item) => (
-                          <div
-                            key={item._id}
-                            className="flex items-center gap-3"
-                          >
-                            <span className="w-24 shrink-0 text-xs text-stone-500">
-                              {item._id}
-                            </span>
-                            <div className="h-2 flex-1 overflow-hidden rounded-full bg-stone-100">
-                              <div
-                                className="h-full rounded-full bg-emerald-500"
-                                style={{
-                                  width: `${((item.revenue || 0) / revenueTrendMax) * 100}%`,
-                                }}
-                              />
-                            </div>
-                            <span className="w-24 shrink-0 text-right text-sm font-semibold tabular-nums text-stone-900">
-                              {currency(item.revenue)}
-                            </span>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
+                  <TrendChart
+                    title="Restaurant growth"
+                    series={restaurantGrowthSeries}
+                    color="bg-stone-800"
+                    formatValue={(value) => String(value)}
+                  />
+                  <TrendChart
+                    title="Order trend"
+                    series={orderTrendSeries}
+                    color="bg-red-500"
+                    formatValue={(value) => String(value)}
+                  />
+                  <TrendChart
+                    title="Revenue trend"
+                    series={revenueTrendSeries}
+                    color="bg-emerald-500"
+                    formatValue={currency}
+                  />
                 </>
               ) : (
                 <div className="rounded-xl bg-stone-50 p-6 text-center">
@@ -1936,11 +2007,12 @@ export default function SuperAdminPanel() {
               )}
             </div>
           </div>
+          )}
 
-          {/* Filters */}
+          {activeTab === "restaurants" && (
+          <>
           <div className="rounded-2xl border border-stone-200 bg-white p-4">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
-              {/* Search */}
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
               <div className="relative lg:col-span-2">
                 <Search
                   size={16}
@@ -1953,10 +2025,34 @@ export default function SuperAdminPanel() {
                     setSearch(e.target.value);
                     setPage(1);
                   }}
-                  placeholder="Search restaurant, owner, email, phone…"
+                  placeholder="Restaurant name, owner, email, phone"
                   className="h-10 w-full rounded-lg border border-stone-200 bg-stone-50 pl-10 pr-4 text-sm outline-none transition focus:border-stone-400 focus:bg-white"
                 />
               </div>
+
+              <SelectField
+                value={joinedFilter}
+                onChange={(e) => {
+                  setJoinedFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="all">All restaurants</option>
+                <option value="new">New (last 7 days)</option>
+              </SelectField>
+
+              <SelectField
+                value={sortBy}
+                onChange={(e) => {
+                  setSortBy(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+                <option value="name_asc">Name A–Z</option>
+                <option value="name_desc">Name Z–A</option>
+              </SelectField>
 
               {/* Status */}
               <SelectField
@@ -1971,7 +2067,6 @@ export default function SuperAdminPanel() {
                 <option value="blocked">Blocked</option>
               </SelectField>
 
-              {/* Approval */}
               <SelectField
                 value={approvalFilter}
                 onChange={(e) => {
@@ -1984,25 +2079,64 @@ export default function SuperAdminPanel() {
                 <option value="pending">Pending</option>
               </SelectField>
 
-              {/* Sort */}
               <SelectField
-                value={sortBy}
+                value={planFilter}
                 onChange={(e) => {
-                  setSortBy(e.target.value);
+                  setPlanFilter(e.target.value);
                   setPage(1);
                 }}
               >
-                <option value="newest">Newest first</option>
-                <option value="oldest">Oldest first</option>
-                <option value="name_asc">Name A–Z</option>
-                <option value="name_desc">Name Z–A</option>
+                <option value="all">All plans</option>
+                <option value="TRIAL">Trial</option>
+                <option value="BASIC">Basic</option>
+                <option value="PREMIUM">Premium</option>
               </SelectField>
+
+              <SelectField
+                value={subscriptionFilter}
+                onChange={(e) => {
+                  setSubscriptionFilter(e.target.value);
+                  setPage(1);
+                }}
+              >
+                <option value="all">Plan active and inactive</option>
+                <option value="active">Plan active</option>
+                <option value="inactive">Plan inactive</option>
+              </SelectField>
+
+              <input
+                type="text"
+                value={districtFilter}
+                onChange={(e) => {
+                  setDistrictFilter(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="District"
+                className="h-10 w-full rounded-lg border border-stone-200 bg-white px-3 text-sm outline-none focus:border-stone-400"
+              />
+
+              <input
+                type="text"
+                value={pincodeFilter}
+                onChange={(e) => {
+                  setPincodeFilter(e.target.value);
+                  setPage(1);
+                }}
+                placeholder="Pincode"
+                inputMode="numeric"
+                className="h-10 w-full rounded-lg border border-stone-200 bg-white px-3 text-sm outline-none focus:border-stone-400"
+              />
             </div>
           </div>
 
           {/* Restaurants table */}
           <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white">
-            {restaurants.length === 0 ? (
+            {loading ? (
+              <div className="flex items-center justify-center gap-2 py-16 text-sm text-stone-500">
+                <Loader2 size={18} className="animate-spin text-red-600" />
+                Loading restaurants…
+              </div>
+            ) : restaurants.length === 0 ? (
               <div className="space-y-3 py-16 text-center">
                 <Store className="mx-auto text-stone-300" size={40} />
                 <p className="text-sm font-medium text-stone-500">
@@ -2015,6 +2149,7 @@ export default function SuperAdminPanel() {
                   <thead className="border-b border-stone-100 bg-stone-50 text-[11px] font-medium uppercase tracking-wide text-stone-400">
                     <tr>
                       <th className="p-4 sm:p-5">Store details</th>
+                      <th className="p-4 sm:p-5">Area</th>
                       <th className="p-4 sm:p-5">Owner info</th>
                       <th className="p-4 sm:p-5">Status</th>
                       <th className="p-4 text-right sm:p-5">Access control</th>
@@ -2041,6 +2176,15 @@ export default function SuperAdminPanel() {
                               </p>
                             </div>
                           </div>
+                        </td>
+
+                        <td className="p-4 sm:p-5">
+                          <p className="text-sm text-stone-700">
+                            {store.address?.district || store.address?.city || "—"}
+                          </p>
+                          <p className="mt-0.5 text-xs text-stone-400">
+                            {store.address?.zip || "No pincode"}
+                          </p>
                         </td>
 
                         {/* Owner Info */}
@@ -2078,6 +2222,10 @@ export default function SuperAdminPanel() {
                               dot
                             >
                               {store.isActive !== false ? "Active" : "Blocked"}
+                            </StatusPill>
+
+                            <StatusPill tone="stone">
+                              {store.subscriptionPlan || "No plan"}
                             </StatusPill>
                           </div>
                         </td>
@@ -2183,8 +2331,10 @@ export default function SuperAdminPanel() {
               />
             )}
           </div>
+          </>
+          )}
 
-          {/* Audit logs */}
+          {activeTab === "logs" && (
           <div className="rounded-2xl border border-stone-200 bg-white">
             <div className="border-b border-stone-100 p-5">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -2212,6 +2362,17 @@ export default function SuperAdminPanel() {
                     </option>
                     <option value="RESTAURANT_BLOCKED">Blocked</option>
                     <option value="RESTAURANT_UNBLOCKED">Unblocked</option>
+                    <option value="RESTAURANT_DELETED">Deleted</option>
+                    <option value="SUBSCRIPTION_PLAN_CHANGED">
+                      Plan changed
+                    </option>
+                    <option value="SUBSCRIPTION_STATUS_CHANGED">
+                      Status changed
+                    </option>
+                    <option value="STAFF_ACTIVATED">Staff activated</option>
+                    <option value="STAFF_DEACTIVATED">
+                      Staff deactivated
+                    </option>
                   </SelectField>
 
                   <SelectField
@@ -2327,6 +2488,7 @@ export default function SuperAdminPanel() {
               onNext={() => setAuditPage((current) => current + 1)}
             />
           </div>
+          )}
         </div>
       </div>
     </>

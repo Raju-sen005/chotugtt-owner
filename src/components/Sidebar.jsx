@@ -11,7 +11,9 @@ import {
   ScanLine,
   UserRound,
   Users,
+  ShieldCheck,
 } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 // import logo from "../assets/cho.png";
 
 const NAV_ITEMS = [
@@ -69,10 +71,21 @@ const NAV_ITEMS = [
 ];
 
 export default function Sidebar({ closeMobileSidebar }) {
+  const { user } = useAuth();
   const handleNavClick = useMemo(
     () => (closeMobileSidebar ? closeMobileSidebar : () => {}),
     [closeMobileSidebar],
   );
+  const navItems =
+    user?.role === "SUPERADMIN"
+      ? [
+          {
+            to: "/super-admin",
+            icon: ShieldCheck,
+            label: "Admin",
+          },
+        ]
+      : NAV_ITEMS;
 
   return (
     <aside className="w-64 bg-slate-900 text-white h-full min-h-screen flex flex-col border-r border-slate-800 font-sans select-none">
@@ -110,7 +123,7 @@ export default function Sidebar({ closeMobileSidebar }) {
 
       {/* Navigation Links */}
       <nav className="flex-1 p-4 space-y-1.5 overflow-y-auto scrollbar-none">
-        {NAV_ITEMS.map(({ to, icon: Icon, label }) => (
+        {navItems.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}

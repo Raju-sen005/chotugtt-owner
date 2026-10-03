@@ -2,6 +2,7 @@ import { useState, useCallback, useMemo, memo, useEffect } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
+import { io } from "socket.io-client";
 import {
   ShoppingBag,
   Star,
@@ -688,6 +689,10 @@ export default function PublicMenu() {
           params.set("cursor", cursor);
         }
 
+        if (tableToken) {
+          params.set("t", tableToken);
+        }
+
         const query = params.toString();
 
         const res = await axios.get(
@@ -711,7 +716,7 @@ export default function PublicMenu() {
         return null;
       }
     },
-    [restaurantId, isCustomerSessionReady],
+    [restaurantId, isCustomerSessionReady, tableToken],
   );
 
   const handleLoadMoreCustomerOrders = useCallback(async () => {
@@ -760,6 +765,7 @@ export default function PublicMenu() {
           {
             params: {
               restaurantId,
+              ...(tableToken ? { t: tableToken } : {}),
             },
             withCredentials: true,
           },
@@ -773,7 +779,7 @@ export default function PublicMenu() {
         setCustomerOrderDetailLoading(false);
       }
     },
-    [restaurantId, isCustomerSessionReady],
+    [restaurantId, isCustomerSessionReady, tableToken],
   );
 
   useEffect(() => {
@@ -806,6 +812,99 @@ export default function PublicMenu() {
       cancelled = true;
     };
   }, [restaurantId, isCustomerSessionReady, fetchCustomerOrderHistory]);
+
+  useEffect(() => {
+    if (!restaurantId || !isCustomerSessionReady) return undefined;
+
+    let cancelled = false;
+    let refetchTimer = null;
+
+    const socket = io(import.meta.env.VITE_APP_API_BASE, {
+      withCredentials: true,
+      transports: ["websocket", "polling"],
+      reconnection: true,
+    });
+
+    const sameOrder = (row, payload) =>
+      String(row?.orderId || "") === String(payload.orderId || "") ||
+      String(row?._id || "") === String(payload._id || "") ||
+      String(row?.orderRef || "") === String(payload._id || "");
+
+    const applyLiveOrder = (payload) => {
+      if (!payload?.orderId) return;
+
+      if (
+        payload.restaurantId &&
+        String(payload.restaurantId) !== String(restaurantId)
+      ) {
+        return;
+      }
+
+      setCustomerOrderHistory((prev) => {
+        const index = prev.findIndex((row) => sameOrder(row, payload));
+
+        if (payload.status === "COMPLETED") {
+          return index === -1 ? prev : prev.filter((_, itemIndex) => itemIndex !== index);
+        }
+
+        if (index === -1) {
+          return [payload, ...prev];
+        }
+
+        const next = [...prev];
+        next[index] = {
+          ...next[index],
+          ...payload,
+          _id: next[index]._id,
+          orderRef: next[index].orderRef || payload.orderRef,
+        };
+        return next;
+      });
+
+      setSelectedCustomerOrder((current) => {
+        if (!current || !sameOrder(current, payload)) return current;
+        if (payload.status === "COMPLETED") return null;
+        return {
+          ...current,
+          ...payload,
+          _id: current._id,
+          orderRef: current.orderRef || payload.orderRef,
+        };
+      });
+    };
+
+    socket.on("connect", () => {
+      if (tableToken) {
+        socket.emit("join_table_orders", tableToken);
+      }
+    });
+
+    socket.on("CUSTOMER_TABLE_ORDER", (payload) => {
+      if (cancelled) return;
+
+      applyLiveOrder(payload);
+      window.clearTimeout(refetchTimer);
+      refetchTimer = window.setTimeout(async () => {
+        const data = await fetchCustomerOrderHistory();
+
+        if (cancelled || !data?.success) return;
+
+        setCustomerOrderHistory(data.data?.orders || []);
+        setCustomerOrderHistoryCursor(data.data?.nextCursor || null);
+      }, 400);
+    });
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(refetchTimer);
+      socket.disconnect();
+    };
+  }, [
+    restaurantId,
+    isCustomerSessionReady,
+    tableToken,
+    fetchCustomerOrderHistory,
+  ]);
 
   const handleApplyMergeTable = useCallback(() => {
     if (!mergeTableNumber.trim()) return;
@@ -1457,7 +1556,9 @@ export default function PublicMenu() {
                       </h3>
 
                       <p className="text-[10px] text-slate-400 font-semibold mt-0.5">
-                        Your previous orders
+                        {tableToken
+                          ? "Your orders and this table's captain or counter orders"
+                          : "Your previous orders"}
                       </p>
                     </div>
                   </div>
@@ -1509,9 +1610,13 @@ export default function PublicMenu() {
                             );
 
                             if (data?.success) {
-                              setSelectedCustomerOrder(
-                                data.data?.order || null,
-                              );
+                              const order = data.data?.orderId
+                                ? data.data
+                                : data.data?.order;
+
+                              if (order?.orderId) {
+                                setSelectedCustomerOrder(order);
+                              }
                             }
                           }}
                           className="w-full text-left bg-white border border-slate-200 rounded-2xl p-4 shadow-sm hover:border-rose-200 hover:shadow-md transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
@@ -1575,24 +1680,24 @@ export default function PublicMenu() {
                           </div>
                         </button>
                       ))}
+
+                      {customerOrderHistoryCursor && (
+                        <button
+                          type="button"
+                          onClick={handleLoadMoreCustomerOrders}
+                          disabled={customerOrderHistoryLoadingMore}
+                          className="w-full py-3 rounded-xl border border-slate-200 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {customerOrderHistoryLoadingMore
+                            ? "Loading..."
+                            : "Load More Orders"}
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
               </div>
             </div>
-
-            {customerOrderHistory.length > 0 && customerOrderHistoryCursor && (
-              <button
-                type="button"
-                onClick={handleLoadMoreCustomerOrders}
-                disabled={customerOrderHistoryLoadingMore}
-                className="w-full mt-4 py-3 rounded-xl border border-slate-200 text-xs font-black text-slate-600 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {customerOrderHistoryLoadingMore
-                  ? "Loading..."
-                  : "Load More Orders"}
-              </button>
-            )}
           </>
         )}
 
