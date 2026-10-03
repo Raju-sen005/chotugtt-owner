@@ -1136,8 +1136,8 @@ export const getBillReceiptCSS = () => `
     }
 
     .receipt .powered-by {
-      margin-top: 8px !important;
-      padding-top: 6px !important;
+      margin-top: 4px !important;
+      padding-top: 3px !important;
       border-top: 1px dashed #000 !important;
       font-size: 11px !important;
       font-weight: 700 !important;
@@ -1176,7 +1176,7 @@ export const getBillReceiptCSS = () => `
       min-width: 0 !important;
       max-width: 72mm !important;
       margin: 0 !important;
-      padding: 0 1mm 10mm 1mm !important;
+      padding: 0 1mm 2mm !important;
       border: 0 !important;
     }
 

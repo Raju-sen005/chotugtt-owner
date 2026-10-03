@@ -180,6 +180,8 @@ const DEFAULT_TEMPLATE = "classic";
 const TEMPLATE_STORAGE_PREFIX = "food-saas-bill-template:";
 
 const PRO_PLANS = new Set([
+  "trial",
+  "basic",
   "pro",
   "premium",
   "enterprise",

@@ -755,8 +755,11 @@ export default function SuperAdminPanel() {
   );
   const subscriptionTotal = Math.max(
     1,
-    (platformAnalytics?.subscriptions?.starter || 0) +
+      (platformAnalytics?.subscriptions?.starter || 0) +
+      (platformAnalytics?.subscriptions?.trial || 0) +
+      (platformAnalytics?.subscriptions?.basic || 0) +
       (platformAnalytics?.subscriptions?.pro || 0) +
+      (platformAnalytics?.subscriptions?.premium || 0) +
       (platformAnalytics?.subscriptions?.enterprise || 0),
   );
 
@@ -814,8 +817,11 @@ export default function SuperAdminPanel() {
               >
                 {subscriptionModal.field === "subscriptionPlan" ? (
                   <>
+                    <option value="TRIAL">Trial</option>
                     <option value="STARTER">Starter</option>
+                    <option value="BASIC">Basic</option>
                     <option value="PRO">Pro</option>
+                    <option value="PREMIUM">Premium</option>
                     <option value="ENTERPRISE">Enterprise</option>
                   </>
                 ) : (
@@ -1761,9 +1767,24 @@ export default function SuperAdminPanel() {
                           tone: "bg-stone-400",
                         },
                         {
+                          label: "Trial",
+                          value: platformAnalytics.subscriptions?.trial || 0,
+                          tone: "bg-amber-400",
+                        },
+                        {
+                          label: "Basic",
+                          value: platformAnalytics.subscriptions?.basic || 0,
+                          tone: "bg-amber-500",
+                        },
+                        {
                           label: "Pro",
                           value: platformAnalytics.subscriptions?.pro || 0,
                           tone: "bg-red-500",
+                        },
+                        {
+                          label: "Premium",
+                          value: platformAnalytics.subscriptions?.premium || 0,
+                          tone: "bg-violet-600",
                         },
                         {
                           label: "Enterprise",

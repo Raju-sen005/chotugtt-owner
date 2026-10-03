@@ -1,7 +1,6 @@
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
 } from "react";
@@ -11,8 +10,10 @@ import {
   ArrowRight,
   Check,
   CircleCheck,
+  Clock3,
   Loader2,
   LockKeyhole,
+  Printer,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
@@ -30,48 +31,59 @@ const RAZORPAY_SCRIPT_URL =
 
 /*
 |--------------------------------------------------------------------------
-| Subscription Plan
+| Display copy
 |--------------------------------------------------------------------------
 |
-| IMPORTANT:
-| These values are display values only.
+| Amount, currency, and duration are loaded from the backend.
+| These entries only describe what each plan includes.
 |
-| Backend remains the source of truth for:
-| - plan validity
-| - amount
-| - currency
-| - subscription activation
-|
-| STARTER code is intentionally retained because the backend/database
-| already uses STARTER as the stable subscription plan code.
 |--------------------------------------------------------------------------
 */
 
-const PLANS = Object.freeze({
-  STARTER: {
-    code: "STARTER",
-    name: "ChotuGTT",
-    amount: 3000,
-    currency: "INR",
-    durationMonths: 15,
-    durationLabel: "15 Months",
+const PLAN_COPY = Object.freeze({
+  TRIAL: {
     description:
-      "Complete restaurant management platform for your business.",
+      "Try the full restaurant workspace free for 7 days. The account is blocked when the trial ends.",
     features: [
-      "QR menu & table ordering",
-      "POS & billing management",
-      "Captain App & live orders",
-      "Kitchen KOT management",
-      "Restaurant menu management",
-      "Offers & discount management",
-      "Live order monitoring",
-      "Analytics & business reports",
-      "Customer & table management",
-      "Secure multi-tenant platform",
+      "7 days only, once per restaurant",
+      "Full workspace during the trial",
+      "Account is blocked when the 7 days end",
+      "Choose Basic or Premium to continue",
+    ],
+    icon: Clock3,
+    popular: false,
+    buttonText: "Start 7-day free trial",
+  },
+  BASIC: {
+    description:
+      "One year of restaurant operations, ordering, billing, and AI menu tools.",
+    features: [
+      "Counter POS",
+      "Table QR ordering",
+      "Captain app",
+      "AI menu upload",
+      "Analysis and business reports",
+      "Live orders and KOT",
+      "Offers and menu management",
+      "Valid for 1 year only",
     ],
     icon: Sparkles,
     popular: true,
-    buttonText: "Activate ChotuGTT",
+    buttonText: "Choose Basic",
+  },
+  PREMIUM: {
+    description:
+      "Basic for 1 year, plus one thermal printer. Nothing beyond that year and printer.",
+    features: [
+      "Everything in Basic",
+      "Counter POS, table QR, and captain app",
+      "AI menu upload and analysis",
+      "1 thermal printer included",
+      "Valid for 1 year only",
+    ],
+    icon: Printer,
+    popular: false,
+    buttonText: "Choose Premium",
   },
 });
 
@@ -214,6 +226,22 @@ const formatPrice = (amount) => {
   }).format(amount);
 };
 
+const formatDuration = (plan) => {
+  if (plan.durationDays) {
+    return `${plan.durationDays} days`;
+  }
+
+  if (plan.durationMonths === 12) {
+    return "1 year";
+  }
+
+  if (plan.durationMonths) {
+    return `${plan.durationMonths} months`;
+  }
+
+  return "";
+};
+
 /*
 |--------------------------------------------------------------------------
 | Component
@@ -221,7 +249,10 @@ const formatPrice = (amount) => {
 */
 
 export default function SubscriptionCheckout() {
-  const { refreshSession } = useAuth();
+  const { refreshSession, user } = useAuth();
+
+  const [plans, setPlans] = useState([]);
+  const [plansLoading, setPlansLoading] = useState(true);
 
   const [loadingPlan, setLoadingPlan] =
     useState(null);
@@ -253,10 +284,7 @@ export default function SubscriptionCheckout() {
   |--------------------------------------------------------------------------
   */
 
-  const planList = useMemo(
-    () => Object.values(PLANS),
-    [],
-  );
+  const planList = plans;
 
   /*
   |--------------------------------------------------------------------------
@@ -306,13 +334,7 @@ export default function SubscriptionCheckout() {
           !window.Razorpay
         ) {
           setRazorpayReady(false);
-
-          setError(
-            "Secure payment gateway could not be loaded. Please refresh the page and try again.",
-          );
-
           setIsInitializing(false);
-
           return;
         }
 
@@ -342,6 +364,63 @@ export default function SubscriptionCheckout() {
     };
   }, [clearPaymentTimeout]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadPlans = async () => {
+      try {
+        const response = await axios.get(
+          `${import.meta.env.VITE_APP_API_BASE}/payments/plans`,
+          { withCredentials: true },
+        );
+
+        if (cancelled || !mountedRef.current) {
+          return;
+        }
+
+        const serverPlans = Array.isArray(response.data?.data)
+          ? response.data.data
+          : [];
+
+        const nextPlans = serverPlans
+          .filter((plan) => PLAN_COPY[plan.code])
+          .map((plan) => ({
+            ...plan,
+            ...PLAN_COPY[plan.code],
+            code: plan.code,
+            name: plan.name,
+            amount: plan.amount,
+            trial: plan.trial === true,
+          }));
+
+        setPlans(nextPlans);
+
+        if (nextPlans.length === 0) {
+          setError("Subscription plans are unavailable right now.");
+        }
+      } catch (loadError) {
+        if (cancelled || !mountedRef.current) {
+          return;
+        }
+
+        setError(
+          loadError?.response?.data?.message ||
+            "Unable to load subscription plans.",
+        );
+      } finally {
+        if (!cancelled && mountedRef.current) {
+          setPlansLoading(false);
+        }
+      }
+    };
+
+    loadPlans();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   /*
   |--------------------------------------------------------------------------
   | Redirect After Successful Payment
@@ -360,6 +439,37 @@ export default function SubscriptionCheckout() {
         "/dashboard",
       );
     }, [clearPaymentTimeout]);
+
+  const handleStartTrial = useCallback(async () => {
+    if (loadingPlan) {
+      return;
+    }
+
+    setLoadingPlan("TRIAL");
+    setError("");
+    setPaymentStage("Starting your 7-day trial...");
+
+    try {
+      await axios.post(
+        `${import.meta.env.VITE_APP_API_BASE}/payments/start-trial`,
+        {},
+        { withCredentials: true },
+      );
+
+      redirectToDashboard();
+    } catch (trialError) {
+      if (!mountedRef.current) {
+        return;
+      }
+
+      setError(
+        trialError?.response?.data?.message ||
+          "Unable to start the free trial.",
+      );
+      setPaymentStage("");
+      setLoadingPlan(null);
+    }
+  }, [loadingPlan, redirectToDashboard]);
 
   /*
   |--------------------------------------------------------------------------
@@ -380,10 +490,11 @@ export default function SubscriptionCheckout() {
           return;
         }
 
-        const selectedPlan =
-          PLANS[planCode];
+        const selectedPlan = plans.find(
+          (plan) => plan.code === planCode,
+        );
 
-        if (!selectedPlan) {
+        if (!selectedPlan || selectedPlan.trial) {
           setError(
             "Invalid subscription plan selected.",
           );
@@ -870,6 +981,7 @@ export default function SubscriptionCheckout() {
         razorpayReady,
         redirectToDashboard,
         refreshSession,
+        plans,
       ],
     );
 
@@ -881,6 +993,18 @@ export default function SubscriptionCheckout() {
 
   const isBusy =
     loadingPlan !== null;
+
+  const activeExpiry = user?.subscriptionExpiresAt
+    ? new Date(user.subscriptionExpiresAt)
+    : null;
+
+  const hasActiveSubscription =
+    String(user?.subscriptionStatus || "").toUpperCase() === "ACTIVE" &&
+    activeExpiry instanceof Date &&
+    !Number.isNaN(activeExpiry.getTime()) &&
+    activeExpiry.getTime() > Date.now();
+
+  const activePlanLabel = user?.subscriptionPlan || "current";
 
   /*
   |--------------------------------------------------------------------------
@@ -942,21 +1066,20 @@ export default function SubscriptionCheckout() {
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-rose-100 bg-white px-3.5 py-1.5 text-[11px] font-bold text-rose-600 shadow-sm">
             <ShieldCheck size={14} />
 
-            One simple subscription
+            Choose a plan
           </div>
 
           <h1 className="text-3xl font-black tracking-[-0.03em] text-slate-950 sm:text-4xl lg:text-5xl">
-            Everything your restaurant
+            Start free, or run
             <span className="block text-rose-600">
-              needs in ChotuGTT
+              the full restaurant
             </span>
           </h1>
 
           <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
-            Activate your ChotuGTT workspace with
-            one simple subscription and get access
-            to restaurant operations, ordering,
-            billing, analytics and automation.
+            Trial lasts 7 days, then the restaurant account is blocked.
+            Basic is ₹4,000 for 1 year. Premium is ₹8,000 for that same
+            year plus one thermal printer.
           </p>
 
           {/* Secure indicators */}
@@ -967,7 +1090,7 @@ export default function SubscriptionCheckout() {
                 size={14}
                 className="text-emerald-500"
               />
-              Secure checkout
+              7-day trial
             </span>
 
             <span className="hidden h-3 w-px bg-slate-200 sm:block" />
@@ -977,7 +1100,7 @@ export default function SubscriptionCheckout() {
                 size={14}
                 className="text-emerald-500"
               />
-              15 months validity
+              Basic ₹4,000 / year
             </span>
 
             <span className="hidden h-3 w-px bg-slate-200 sm:block" />
@@ -987,7 +1110,7 @@ export default function SubscriptionCheckout() {
                 size={14}
                 className="text-emerald-500"
               />
-              Razorpay secured
+              Premium includes a printer
             </span>
           </div>
         </section>
@@ -1018,7 +1141,30 @@ export default function SubscriptionCheckout() {
           </div>
         )}
 
-        {error && (
+        {hasActiveSubscription && (
+          <div className="mx-auto mt-8 max-w-2xl rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-4 text-left">
+            <p className="text-sm font-black text-emerald-800">
+              {activePlanLabel} is already active until{" "}
+              {activeExpiry.toLocaleDateString("en-IN", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              })}
+            </p>
+            <p className="mt-1 text-xs leading-5 text-emerald-700">
+              The free trial cannot replace this subscription. Continue to the
+              dashboard, or choose Basic or Premium below to extend it.
+            </p>
+            <button
+              type="button"
+              onClick={() => window.location.assign("/dashboard")}
+              className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-xs font-black text-white"
+            >
+              Open dashboard
+              <ArrowRight size={14} />
+            </button>
+          </div>
+        )}
           <div
             role="alert"
             className="mx-auto mt-8 flex max-w-2xl items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-left text-sm text-rose-700"
@@ -1030,7 +1176,7 @@ export default function SubscriptionCheckout() {
 
             <div>
               <p className="font-bold">
-                Payment could not be started
+                Unable to continue
               </p>
 
               <p className="mt-1 text-xs leading-5 text-rose-600">
@@ -1038,203 +1184,136 @@ export default function SubscriptionCheckout() {
               </p>
             </div>
           </div>
-        )}
+        
 
         {/* ============================================================
-            SINGLE PLAN
+            PLANS
             ============================================================ */}
 
-        <section className="mx-auto mt-10 max-w-3xl">
+        <section className="mx-auto mt-10 grid max-w-6xl gap-5 lg:grid-cols-3">
+          {plansLoading && (
+            <div className="col-span-full flex items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-8 text-sm font-semibold text-slate-600">
+              <Loader2 size={18} className="animate-spin text-rose-600" />
+              Loading plans...
+            </div>
+          )}
+
           {planList.map((plan) => {
             const Icon = plan.icon;
-
-            const isLoading =
-              loadingPlan ===
-              plan.code;
-
+            const isLoading = loadingPlan === plan.code;
             const isDisabled =
               isBusy ||
-              !razorpayReady ||
-              isInitializing;
+              plansLoading ||
+              (plan.trial && hasActiveSubscription) ||
+              (!plan.trial && (!razorpayReady || isInitializing));
+            const durationLabel = formatDuration(plan);
 
             return (
               <article
                 key={plan.code}
-                className="relative overflow-visible rounded-[2rem] border border-slate-900 bg-white shadow-2xl shadow-slate-300/50"
+                className={`relative flex flex-col rounded-[1.75rem] border bg-white p-6 shadow-sm ${
+                  plan.popular
+                    ? "border-slate-900 shadow-xl shadow-slate-200"
+                    : "border-slate-200"
+                }`}
               >
-                {/* Premium badge */}
-
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-950 px-5 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-white shadow-lg">
-                    <Sparkles
-                      size={12}
-                      className="text-rose-400"
-                    />
-
-                    ChotuGTT
-                  </div>
-                </div>
-
-                <div className="p-6 sm:p-8 lg:p-10">
-                  {/* Header */}
-
-                  <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
-                          <Icon size={23} />
-                        </div>
-
-                        <div>
-                          <h2 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                            {plan.name}
-                          </h2>
-
-                          <p className="mt-1 text-xs font-semibold text-slate-400">
-                            Complete restaurant management
-                          </p>
-                        </div>
-                      </div>
-
-                      <p className="mt-5 max-w-xl text-sm leading-6 text-slate-500">
-                        {plan.description}
-                      </p>
-                    </div>
-
-                    {/* Price */}
-
-                    <div className="shrink-0 rounded-2xl bg-slate-50 px-5 py-4 sm:text-right">
-                      <div className="text-4xl font-black tracking-[-0.04em] text-slate-950">
-                        {formatPrice(
-                          plan.amount,
-                        )}
-                      </div>
-
-                      <div className="mt-1 text-xs font-bold text-rose-600">
-                        Valid for 15 months
-                      </div>
+                {plan.popular && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-950 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-white">
+                      <Sparkles size={12} className="text-rose-400" />
+                      Most used
                     </div>
                   </div>
+                )}
 
-                  <div className="my-7 h-px bg-slate-100" />
-
-                  {/* Validity highlight */}
-
-                  <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-4">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-rose-600 shadow-sm">
-                          <CircleCheck
-                            size={19}
-                          />
-                        </div>
-
-                        <div>
-                          <p className="text-sm font-black text-slate-900">
-                            15 Months Access
-                          </p>
-
-                          <p className="mt-0.5 text-[11px] font-medium text-slate-500">
-                            One-time subscription payment
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="text-left sm:text-right">
-                        <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-                          Total
-                        </p>
-
-                        <p className="text-lg font-black text-slate-950">
-                          {formatPrice(
-                            plan.amount,
-                          )}
-                        </p>
-                      </div>
-                    </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
+                    <Icon size={20} />
                   </div>
-
-                  {/* Features */}
-
-                  <div className="mt-8">
-                    <p className="mb-5 text-[11px] font-black uppercase tracking-[0.14em] text-slate-400">
-                      Everything included
+                  <div>
+                    <h2 className="text-xl font-black text-slate-950">
+                      {plan.name}
+                    </h2>
+                    <p className="text-[11px] font-semibold text-slate-400">
+                      {durationLabel}
                     </p>
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {plan.features.map(
-                        (feature) => (
-                          <div
-                            key={feature}
-                            className="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-3"
-                          >
-                            <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
-                              <Check
-                                size={13}
-                              />
-                            </div>
-
-                            <span className="text-xs font-semibold leading-5 text-slate-600">
-                              {feature}
-                            </span>
-                          </div>
-                        ),
-                      )}
-                    </div>
-                  </div>
-
-                  {/* CTA */}
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handlePayment(
-                        plan.code,
-                      )
-                    }
-                    disabled={
-                      isDisabled
-                    }
-                    className="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-4 text-sm font-black text-white shadow-xl shadow-slate-300/50 transition-all hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                  >
-                    {isLoading ? (
-                      <>
-                        <Loader2
-                          size={18}
-                          className="animate-spin"
-                        />
-
-                        Processing secure payment...
-                      </>
-                    ) : (
-                      <>
-                        {plan.buttonText}
-
-                        <ArrowRight
-                          size={17}
-                        />
-                      </>
-                    )}
-                  </button>
-
-                  <div className="mt-4 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-[10px] font-semibold text-slate-400">
-                    <span className="inline-flex items-center gap-1.5">
-                      <LockKeyhole
-                        size={12}
-                      />
-                      Secure Razorpay checkout
-                    </span>
-
-                    <span className="hidden h-3 w-px bg-slate-200 sm:block" />
-
-                    <span className="inline-flex items-center gap-1.5">
-                      <ShieldCheck
-                        size={12}
-                      />
-                      Backend verified payment
-                    </span>
                   </div>
                 </div>
+
+                <div className="mt-5">
+                  <p className="text-4xl font-black tracking-tight text-slate-950">
+                    {plan.trial ? "Free" : formatPrice(plan.amount)}
+                  </p>
+                  <p className="mt-1 text-xs font-bold text-rose-600">
+                    {plan.trial
+                      ? "Then the account is blocked"
+                      : `Valid for ${durationLabel}`}
+                  </p>
+                </div>
+
+                {Array.isArray(plan.components) && plan.components.length > 0 && (
+                  <div className="mt-4 space-y-1 rounded-xl bg-slate-50 px-3 py-3">
+                    {plan.components.map((component) => (
+                      <div
+                        key={component.label}
+                        className="flex items-center justify-between text-[11px] font-semibold text-slate-600"
+                      >
+                        <span>{component.label}</span>
+                        <span>{formatPrice(component.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <p className="mt-4 text-xs leading-5 text-slate-500">
+                  {plan.description}
+                </p>
+
+                <div className="mt-5 space-y-2">
+                  {plan.features.map((feature) => (
+                    <div key={feature} className="flex items-start gap-2">
+                      <Check size={14} className="mt-0.5 shrink-0 text-emerald-600" />
+                      <span className="text-xs font-semibold leading-5 text-slate-600">
+                        {feature}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    plan.trial
+                      ? handleStartTrial()
+                      : handlePayment(plan.code)
+                  }
+                  disabled={isDisabled}
+                  className={`mt-6 flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-black text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                    plan.popular
+                      ? "bg-slate-950 hover:bg-slate-800"
+                      : "bg-rose-600 hover:bg-rose-700"
+                  }`}
+                >
+                  {isLoading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      {plan.trial ? "Starting trial..." : "Opening checkout..."}
+                    </>
+                  ) : (
+                    <>
+                      {plan.buttonText}
+                      <ArrowRight size={16} />
+                    </>
+                  )}
+                </button>
+
+                <p className="mt-3 text-center text-[10px] font-semibold text-slate-400">
+                  {plan.trial
+                    ? hasActiveSubscription
+                      ? "Trial is only for a restaurant with no active plan."
+                      : "No payment required. One trial per restaurant."
+                    : "Razorpay checkout. Amount is confirmed by the server."}
+                </p>
               </article>
             );
           })}
@@ -1299,8 +1378,9 @@ export default function SubscriptionCheckout() {
 
                 <p className="mt-1 text-[11px] leading-5 text-slate-500">
                   After successful verification,
-                  your 15-month subscription is
-                  activated automatically.
+                  the selected 1-year plan is
+                  activated automatically. The
+                  Basic trial needs no payment.
                 </p>
               </div>
             </div>

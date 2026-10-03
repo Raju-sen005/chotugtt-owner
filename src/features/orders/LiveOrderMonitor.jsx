@@ -28,6 +28,7 @@ import {
   prepareImageForThermal,
   generateThermalQr,
 } from "../../utils/thermalImage";
+import { printThermalHtml } from "../../utils/thermalPrint";
 
 // Shared status → badge style map (used by both the desktop row and mobile card
 // so ACCEPTED / COMPLETED / REJECTED are visually distinct at a glance)
@@ -757,11 +758,11 @@ export default function LiveOrderMonitor() {
     }
 
     .kot {
-  width: 72mm;
-  max-width: 72mm;
-  margin: 0;
-  padding: 0 1mm 10mm 1mm;
-}
+      width: 72mm;
+      max-width: 72mm;
+      margin: 0;
+      padding: 0 1mm 2mm;
+    }
 
     /* ================================
        HEADER
@@ -769,9 +770,8 @@ export default function LiveOrderMonitor() {
 
    .header {
   text-align: center;
-  margin-top: 0;
-  padding-top: 0;
-  margin-bottom: 8px;
+  margin: 0 0 4px;
+  padding: 0;
 }
 
     .brand {
@@ -826,12 +826,12 @@ export default function LiveOrderMonitor() {
 
     .divider {
       border-top: 1.5px dashed #111;
-      margin: 9px 0;
+      margin: 4px 0;
     }
 
     .solid-divider {
       border-top: 2px solid #111;
-      margin: 8px 0;
+      margin: 4px 0;
     }
 
     /* ================================
@@ -921,10 +921,10 @@ export default function LiveOrderMonitor() {
     }
 
     td {
-  vertical-align: top;
-  padding: 7px 0;
-  border-bottom: 1px solid #000;
-}
+      vertical-align: top;
+      padding: 3px 0;
+      border-bottom: 1px solid #000;
+    }
 
     .sr-col {
       width: 8%;
@@ -946,22 +946,19 @@ export default function LiveOrderMonitor() {
 .qty-col {
   width: 22%;
   text-align: right;
-  font-size: 20px;
-  font-weight: 900;
+  font-size: 18px;
+  font-weight: 700;
   color: #000;
-  -webkit-text-stroke: 0.4px #000;
 }
 
     .item-name {
-  font-size: 16px;
-  line-height: 1.25;
-  font-weight: 900;
-  color: #000;
-  letter-spacing: 0.3px;
-  text-transform: uppercase;
-  -webkit-text-stroke: 0.4px #000;
-  word-break: break-word;
-}
+      font-size: 15px;
+      line-height: 1.2;
+      font-weight: 700;
+      color: #000;
+      text-transform: uppercase;
+      word-break: break-word;
+    }
 
     .item-meta {
   margin-top: 2px;
@@ -1053,8 +1050,7 @@ export default function LiveOrderMonitor() {
 
     .footer {
       text-align: center;
-
-      margin-top: 12px;
+      margin-top: 4px;
     }
 
     .kitchen-copy {
@@ -1066,18 +1062,12 @@ export default function LiveOrderMonitor() {
     }
 
     .powered-by {
-      margin-top: 8px;
-
-      padding-top: 6px;
-
+      margin-top: 4px;
+      padding-top: 3px;
       border-top: 1px dashed #999;
-
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 700;
-
       color: #000;
-
-      letter-spacing: 0.5px;
     }
 
     .powered-by b {
@@ -1093,6 +1083,10 @@ export default function LiveOrderMonitor() {
     ================================= */
 
    @media print {
+  @page {
+    margin: 0;
+    size: 80mm auto;
+  }
   html,
   body {
     width: 72mm !important;
@@ -1104,6 +1098,7 @@ export default function LiveOrderMonitor() {
   .kot {
     width: 72mm;
     margin: 0;
+    padding: 0 1mm 2mm;
   }
 }
 
@@ -1286,29 +1281,6 @@ export default function LiveOrderMonitor() {
     </div>
 
   </div>
-
- <script>
-  window.focus();
-
-  const fitPageToContent = () => {
-    const el = document.querySelector(".kot");
-    if (!el) return;
-    const px = Math.ceil(el.getBoundingClientRect().height);
-    const mm = Math.ceil((px * 25.4) / 96) + 1;
-    const s = document.createElement("style");
-    s.textContent = "@page { size: 80mm " + mm + "mm; margin: 0; }";
-    document.head.appendChild(s);
-  };
-
-  window.addEventListener("load", () => {
-    setTimeout(() => {
-      fitPageToContent();
-      window.print();
-    }, 150);
-  });
-
-  window.onafterprint = () => window.close();
-</script>
 </body>
 </html>
 `;
@@ -1316,22 +1288,14 @@ export default function LiveOrderMonitor() {
       // -----------------------------------------
       // OPEN PRINT WINDOW
       // -----------------------------------------
-      const printWindow = window.open("", "_blank", "width=380,height=680");
-
-      if (!printWindow) {
-        showError(
-          "Print window was blocked. Please allow popups for this site.",
-        );
+      try {
+        await printThermalHtml(windowContent);
+      } catch (error) {
+        console.error("KOT print failed:", error);
+        showError("KOT could not be printed. Check the printer and try again.");
         return;
       }
 
-      printWindow.document.open();
-      printWindow.document.write(windowContent);
-      printWindow.document.close();
-
-      // -----------------------------------------
-      // MARK ONLY PRINTED ITEMS
-      // -----------------------------------------
       try {
         await axios.patch(
           `${apiBase}/orders/${order._id}/kot/printed`,
@@ -2292,45 +2256,15 @@ ${
 
         <div class="powered-by">Powered by <b>ChotuGTT</b></div>
       </div>
-<script>
-  window.focus();
-
-  const fitPageToContent = () => {
-    const el = document.querySelector(".receipt");
-    if (!el) return;
-    const px = Math.ceil(el.getBoundingClientRect().height);
-    const mm = Math.ceil((px * 25.4) / 96) + 1;
-    const s = document.createElement("style");
-    s.textContent = "@page { size: 80mm " + mm + "mm; margin: 0; }";
-    document.head.appendChild(s);
-  };
-
-  const printWhenReady = async () => {
-    const imgs = Array.from(document.images);
-    await Promise.race([
-      Promise.all(imgs.map((img) => img.decode ? img.decode().catch(() => {}) : Promise.resolve())),
-      new Promise((r) => setTimeout(r, 3000)),
-    ]);
-    fitPageToContent();
-    window.print();
-  };
-
-  window.addEventListener("load", printWhenReady);
-  window.onafterprint = () => window.close();
-</script>
     </body>
   </html>`;
 
-      const printWindow = window.open("", "_blank", "width=380,height=680");
-      if (!printWindow) {
-        showError?.(
-          "Print window was blocked. Please allow popups for this site.",
-        );
-        return;
+      try {
+        await printThermalHtml(windowContent);
+      } catch (error) {
+        console.error("Bill print failed:", error);
+        showError?.("Bill could not be printed. Check the printer and try again.");
       }
-      printWindow.document.open();
-      printWindow.document.write(windowContent);
-      printWindow.document.close();
     },
     [storeDetails, user, apiBase, showError, selectedBillTemplate],
   );
@@ -2464,11 +2398,17 @@ ${
       );
 
       const completedOrder = res.data?.data;
+      const billedId = billOrder._id;
+
+      setBillOrder(null);
+      setSelectedPaymentMethod(null);
+      setSplitMode(false);
+      setSplitAmount("");
 
       await printBillReceipt(completedOrder || billOrder);
 
       queryClient.setQueryData(["live-orders", restaurantId], (prev) =>
-        (prev || []).filter((o) => o._id !== billOrder._id),
+        (prev || []).filter((o) => o._id !== billedId),
       );
 
       queryClient.invalidateQueries({
@@ -2477,11 +2417,6 @@ ${
       queryClient.invalidateQueries({ queryKey: ["table-monitor-orders"] });
       queryClient.invalidateQueries({ queryKey: ["bills"] });
       queryClient.invalidateQueries({ queryKey: ["bills-prev"] });
-
-      setBillOrder(null);
-      setSelectedPaymentMethod(null);
-      setSplitMode(false);
-      setSplitAmount("");
 
       showSuccess(
         `₹${amount.toFixed(2)} collected via ${splitCollectMethod}. Remaining ₹${(total - amount).toFixed(2)} saved as Due.`,
@@ -2564,12 +2499,21 @@ ${
         throw new Error("Payment completed but bill data was not returned.");
       }
 
+      const billedId = billOrder._id;
+
+      setBillOrder(null);
+      setSelectedPaymentMethod(null);
+      setSplitMode(false);
+      setSplitAmount("");
+      setMixedCashAmount("");
+      setMixedUpiAmount("");
+
       // Print ONLY after server confirms payment.
       await printBillReceipt(completedOrder);
 
       // Remove from local live orders immediately.
       queryClient.setQueryData(["live-orders", restaurantId], (prev) =>
-        (prev || []).filter((o) => o._id !== billOrder._id),
+        (prev || []).filter((o) => o._id !== billedId),
       );
 
       // Refresh related data.
@@ -2588,16 +2532,6 @@ ${
       queryClient.invalidateQueries({
         queryKey: ["bills-prev"],
       });
-
-      // Reset modal state.
-      setBillOrder(null);
-      setSelectedPaymentMethod(null);
-
-      setSplitMode(false);
-      setSplitAmount("");
-
-      setMixedCashAmount("");
-      setMixedUpiAmount("");
 
       showSuccess(
         `₹${cash.toFixed(2)} Cash + ₹${upi.toFixed(
@@ -2660,13 +2594,18 @@ ${
       );
 
       const completedOrder = res.data?.data;
+      const billedId = billOrder._id;
+      const paymentLabel = selectedPaymentMethod;
+
+      setBillOrder(null);
+      setSelectedPaymentMethod(null);
 
       // Print bill with payment information
       await printBillReceipt(completedOrder || billOrder);
 
       // Remove completed order from live monitor
       queryClient.setQueryData(["live-orders", restaurantId], (prev) =>
-        (prev || []).filter((o) => o._id !== billOrder._id),
+        (prev || []).filter((o) => o._id !== billedId),
       );
 
       // Refresh table status
@@ -2687,13 +2626,10 @@ ${
         queryKey: ["bills-prev"],
       });
 
-      setBillOrder(null);
-      setSelectedPaymentMethod(null);
-
       showSuccess(
-        selectedPaymentMethod === "DUE"
+        paymentLabel === "DUE"
           ? "Bill generated and marked as Due"
-          : `Bill generated via ${selectedPaymentMethod}`,
+          : `Bill generated via ${paymentLabel}`,
       );
     } catch (err) {
       console.error("Failed to complete order:", err);
