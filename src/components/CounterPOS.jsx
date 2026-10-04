@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import axios from "axios";
 import {
   ShoppingBag,
@@ -16,10 +16,41 @@ import {
   X,
   ChevronUp,
   ChevronDown,
+  GripVertical,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useSocket } from "../context/SocketContext";
 import { getSelectedBillTemplate } from "../constants/billTemplates";
+import { orderCategoryNames, sortMenuEntries } from "../utils/menuOrder";
+
+function indexUnderPointer(attribute, clientX, clientY) {
+  const nodes = document.querySelectorAll(`[${attribute}]`);
+  let match = -1;
+  let best = Infinity;
+
+  nodes.forEach((node) => {
+    const rect = node.getBoundingClientRect();
+    const inside =
+      clientX >= rect.left &&
+      clientX <= rect.right &&
+      clientY >= rect.top &&
+      clientY <= rect.bottom;
+
+    if (!inside) return;
+
+    const dx = clientX - (rect.left + rect.width / 2);
+    const dy = clientY - (rect.top + rect.height / 2);
+    const distance = dx * dx + dy * dy;
+
+    if (distance < best) {
+      best = distance;
+      match = Number(node.getAttribute(attribute));
+    }
+  });
+
+  return Number.isInteger(match) ? match : -1;
+}
+
 export default function CounterPOS() {
   const { user } = useAuth();
   const socket = useSocket();
@@ -45,6 +76,11 @@ export default function CounterPOS() {
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
   const [mobileCartOpen, setMobileCartOpen] = useState(false);
+  const [categoryOrder, setCategoryOrder] = useState([]);
+  const [arrangeMode, setArrangeMode] = useState(false);
+  const [savingOrder, setSavingOrder] = useState(false);
+  const [dragKey, setDragKey] = useState("");
+  const dragState = useRef(null);
   const [storeDetails, setStoreDetails] = useState({
     name: "",
     address: "",
@@ -56,8 +92,7 @@ export default function CounterPOS() {
   const [showNewTableModal, setShowNewTableModal] = useState(false);
   const [newTableNumber, setNewTableNumber] = useState("");
   const [tableStatusList, setTableStatusList] = useState([]);
-  const apiBase =
-    import.meta.env.VITE_APP_API_BASE || "http://localhost:5000/api/v1";
+  const apiBase = import.meta.env.VITE_APP_API_BASE || "http://localhost:5000";
 
   useEffect(() => {
     const fetchStoreDetails = async () => {
@@ -132,6 +167,11 @@ export default function CounterPOS() {
             itemsResult.value?.data?.data ?? itemsResult.value?.data ?? [];
 
           setItems(Array.isArray(data) ? data : []);
+          setCategoryOrder(
+            Array.isArray(itemsResult.value?.data?.categoryOrder)
+              ? itemsResult.value.data.categoryOrder
+              : [],
+          );
         } else {
           console.warn("Menu items fetch failed:", itemsResult.reason?.message);
         }
@@ -452,14 +492,19 @@ export default function CounterPOS() {
       catalogType: "COMBO",
       category: "COMBO",
     }));
-    return [...formattedItems, ...formattedCombos];
-  }, [items, combos]);
+    return sortMenuEntries(
+      [...formattedItems, ...formattedCombos],
+      categoryOrder,
+    );
+  }, [items, combos, categoryOrder]);
 
   const categories = useMemo(() => {
-    const cats = new Set(items.map((i) => i.category).filter(Boolean));
-    if (combos.length > 0) cats.add("COMBO");
-    return ["ALL", ...Array.from(cats)];
-  }, [items, combos]);
+    const names = items.map((item) => item.category).filter(Boolean);
+    return [
+      "ALL",
+      ...orderCategoryNames(names, categoryOrder, combos.length > 0),
+    ];
+  }, [items, combos.length, categoryOrder]);
 
   const filteredCatalog = useMemo(() => {
     return catalog.filter((item) => {
@@ -470,6 +515,198 @@ export default function CounterPOS() {
       return matchesSearch && item.category === activeTab;
     });
   }, [catalog, searchQuery, activeTab]);
+
+  const canArrangeItems =
+    arrangeMode && activeTab !== "ALL" && !searchQuery.trim() && !savingOrder;
+
+  const persistLayout = async (payload, rollback) => {
+    setSavingOrder(true);
+
+    try {
+      await axios.patch(`${apiBase}/menu/admin/layout`, payload, {
+        withCredentials: true,
+      });
+    } catch (error) {
+      rollback();
+      const code = error.response?.data?.code;
+      alert(
+        code === "ROUTE_NOT_FOUND"
+          ? "Menu order could not be saved because this API server does not have the layout route. Use the local backend on port 5000."
+          : error.response?.data?.message || "Could not save menu order",
+      );
+    } finally {
+      setSavingOrder(false);
+    }
+  };
+
+  const stopDrag = () => {
+    const drag = dragState.current;
+    if (drag?.stop) drag.stop();
+    dragState.current = null;
+    setDragKey("");
+  };
+
+  const beginDrag = (event, state) => {
+    event.preventDefault();
+    stopDrag();
+    const drag = { ...state, pointerId: event.pointerId };
+    dragState.current = drag;
+
+    const onMove = (moveEvent) => {
+      if (moveEvent.pointerId !== drag.pointerId) return;
+      moveEvent.preventDefault();
+
+      if (Math.hypot(moveEvent.clientX - drag.startX, moveEvent.clientY - drag.startY) > 8) {
+        drag.moved = true;
+      }
+
+      if (!drag.moved) return;
+
+      if (drag.kind === "category") {
+        const nextIndex = indexUnderPointer(
+          "data-category-index",
+          moveEvent.clientX,
+          moveEvent.clientY,
+        );
+
+        if (nextIndex <= 0 || nextIndex === drag.index) return;
+
+        const names = [...drag.order];
+        const [moved] = names.splice(drag.index - 1, 1);
+        names.splice(nextIndex - 1, 0, moved);
+        drag.index = nextIndex;
+        drag.order = names;
+        setCategoryOrder(names);
+        return;
+      }
+
+      const nextIndex = indexUnderPointer(
+        "data-item-index",
+        moveEvent.clientX,
+        moveEvent.clientY,
+      );
+
+      if (nextIndex < 0 || nextIndex === drag.index) return;
+
+      const ids = [...drag.ids];
+      const [moved] = ids.splice(drag.index, 1);
+      ids.splice(nextIndex, 0, moved);
+      drag.index = nextIndex;
+      drag.ids = ids;
+      applyItemIds(ids);
+    };
+
+    const onUp = (upEvent) => {
+      if (upEvent.pointerId !== drag.pointerId) return;
+      finishDrag();
+    };
+
+    drag.stop = () => {
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+
+    window.addEventListener("pointermove", onMove, { passive: false });
+    window.addEventListener("pointerup", onUp);
+    window.addEventListener("pointercancel", onUp);
+  };
+
+  useEffect(() => {
+    return () => {
+      dragState.current?.stop?.();
+    };
+  }, []);
+
+  const finishDrag = () => {
+    const drag = dragState.current;
+    if (!drag) return;
+    if (drag.stop) drag.stop();
+    dragState.current = null;
+    setDragKey("");
+
+    if (drag.kind === "category") {
+      if (!drag.moved) {
+        setActiveTab(drag.origin[drag.index - 1] || "ALL");
+        return;
+      }
+
+      if (drag.order.join("\u0000") === drag.origin.join("\u0000")) return;
+
+      const next = drag.order;
+      const previous = drag.origin;
+      setCategoryOrder(next);
+      persistLayout({ categoryOrder: next }, () => setCategoryOrder(previous));
+      return;
+    }
+
+    if (!drag.moved) return;
+
+    const rows = drag.ids.map((id, sortOrder) => ({ id, sortOrder }));
+    const payload =
+      drag.category === "COMBO" ? { combos: rows } : { items: rows };
+
+    persistLayout(payload, () => {
+      setItems(drag.originItems);
+      setCombos(drag.originCombos);
+    });
+  };
+
+  const onCategoryPointerDown = (event, index) => {
+    if (!arrangeMode || savingOrder || index === 0) return;
+
+    beginDrag(event, {
+      kind: "category",
+      index,
+      origin: categories.slice(1),
+      order: categories.slice(1),
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
+    });
+    setDragKey(`category:${categories[index]}`);
+  };
+
+  const onItemPointerDown = (event, product, index) => {
+    if (!canArrangeItems) return;
+
+    event.stopPropagation();
+    beginDrag(event, {
+      kind: "item",
+      index,
+      ids: filteredCatalog.map((entry) => String(entry._id)),
+      originItems: items,
+      originCombos: combos,
+      startX: event.clientX,
+      startY: event.clientY,
+      moved: false,
+      category: activeTab,
+    });
+    setDragKey(`item:${product._id}`);
+  };
+
+  const applyItemIds = (ids) => {
+    const rank = new Map(ids.map((id, index) => [id, index]));
+
+    if (activeTab === "COMBO") {
+      setCombos((prev) =>
+        prev.map((combo) =>
+          rank.has(String(combo._id))
+            ? { ...combo, sortOrder: rank.get(String(combo._id)) }
+            : combo,
+        ),
+      );
+      return;
+    }
+
+    setItems((prev) =>
+      prev.map((item) =>
+        rank.has(String(item._id))
+          ? { ...item, sortOrder: rank.get(String(item._id)) }
+          : item,
+      ),
+    );
+  };
 
   // Quick lookup so product cards can show "already in cart" quantity badges
   const cartQtyMap = useMemo(() => {
@@ -1429,12 +1666,26 @@ export default function CounterPOS() {
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 font-medium mt-0.5">
-                  {activeTables.length > 0
-                    ? `${activeTables.length} table${activeTables.length > 1 ? "s" : ""} running · billing counter`
-                    : "Streamlined counter billing, parcels & table order mapping"}
+                  {arrangeMode
+                    ? "Drag categories, then open a category and drag its dishes. This order is used everywhere."
+                    : activeTables.length > 0
+                      ? `${activeTables.length} table${activeTables.length > 1 ? "s" : ""} running · billing counter`
+                      : "Streamlined counter billing, parcels & table order mapping"}
                 </p>
               </div>
             </div>
+            <button
+              type="button"
+              onClick={() => setArrangeMode((current) => !current)}
+              disabled={savingOrder}
+              className={`px-3 py-2 rounded-xl text-xs font-black border transition-colors ${
+                arrangeMode
+                  ? "bg-slate-900 text-white border-slate-900"
+                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+              }`}
+            >
+              {savingOrder ? "Saving..." : arrangeMode ? "Done arranging" : "Arrange menu"}
+            </button>
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
               <input
@@ -1448,23 +1699,40 @@ export default function CounterPOS() {
           </div>
 
           {/* Category Filters Horizontal Scroll */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-            {categories.map((cat) => (
+          <div
+            className={`flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar ${
+              arrangeMode ? "touch-none" : ""
+            }`}
+          >
+            {categories.map((cat, index) => (
               <button
                 key={cat}
-                onClick={() => setActiveTab(cat)}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 ${
+                type="button"
+                data-category-index={index}
+                onClick={() => {
+                  if (!arrangeMode || cat === "ALL") setActiveTab(cat);
+                }}
+                onPointerDown={(event) => onCategoryPointerDown(event, index)}
+                className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 touch-none ${
                   activeTab === cat
                     ? "bg-rose-600 text-white shadow-sm shadow-rose-200"
                     : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-300"
+                } ${dragKey === `category:${cat}` ? "opacity-60" : ""} ${
+                  arrangeMode && cat !== "ALL" ? "cursor-grab active:cursor-grabbing" : ""
                 }`}
               >
                 {cat === "COMBO" ? (
                   <span className="flex items-center gap-1.5">
+                    {arrangeMode && <GripVertical className="w-3.5 h-3.5" />}
                     <Sparkles className="w-3.5 h-3.5" /> Combos & Deals
                   </span>
                 ) : (
-                  cat
+                  <span className="flex items-center gap-1.5">
+                    {arrangeMode && cat !== "ALL" && (
+                      <GripVertical className="w-3.5 h-3.5" />
+                    )}
+                    {cat}
+                  </span>
                 )}
               </button>
             ))}
@@ -1500,28 +1768,48 @@ export default function CounterPOS() {
                 </p>
               </div>
             ) : (
+              <>
+              {arrangeMode && activeTab === "ALL" && (
+                <p className="mb-3 text-xs font-semibold text-slate-500">
+                  Category order is ready. Open one category to drag its dishes.
+                </p>
+              )}
+              {arrangeMode && activeTab !== "ALL" && searchQuery.trim() && (
+                <p className="mb-3 text-xs font-semibold text-slate-500">
+                  Clear search before dragging dishes.
+                </p>
+              )}
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {filteredCatalog.map((product) => {
+                {filteredCatalog.map((product, index) => {
                   const isCombo = product.catalogType === "COMBO";
                   const qtyInCart = cartQtyMap[product._id];
 
                   return (
                     <div
                       key={product._id}
-                      onClick={() => addToCart(product)}
+                      data-item-index={index}
+                      onClick={() => {
+                        if (!arrangeMode) addToCart(product);
+                      }}
+                      onPointerDown={(event) =>
+                        onItemPointerDown(event, product, index)
+                      }
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) => {
+                        if (arrangeMode) return;
                         if (e.key === "Enter" || e.key === " ") {
                           e.preventDefault();
                           addToCart(product);
                         }
                       }}
                       className={`group bg-white p-4 rounded-2xl border hover:shadow-lg hover:shadow-slate-200/60 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer flex flex-col justify-between relative overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 ${
+                        canArrangeItems ? "touch-none cursor-grab active:cursor-grabbing" : ""
+                      } ${
                         qtyInCart
                           ? "border-rose-300 ring-1 ring-rose-100"
                           : "border-slate-200 hover:border-rose-200"
-                      }`}
+                      } ${dragKey === `item:${product._id}` ? "opacity-60" : ""}`}
                     >
                       {isCombo && (
                         <span className="absolute top-3 right-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider z-10">
@@ -1574,6 +1862,7 @@ export default function CounterPOS() {
                   );
                 })}
               </div>
+              </>
             )}
           </div>
         </div>

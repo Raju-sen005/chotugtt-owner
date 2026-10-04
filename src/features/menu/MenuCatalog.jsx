@@ -18,6 +18,7 @@ import Input from "../../components/ui/Input";
 import Modal from "../../components/ui/Modal";
 import { useSocket } from "../../context/SocketContext";
 import { useAuth } from "../../context/AuthContext";
+import { orderCategoryNames, sortMenuEntries } from "../../utils/menuOrder";
 
 export default function MenuCatalog() {
   const queryClient = useQueryClient();
@@ -93,7 +94,7 @@ export default function MenuCatalog() {
     ? new Date(aiStatus.nextAvailableAt)
     : null;
 
-  const { data: menuItems = { items: [], combos: [] }, isLoading } = useQuery({
+  const { data: menuItems = { items: [], combos: [], categoryOrder: [] }, isLoading } = useQuery({
     queryKey: ["menu-items", restaurantId],
     queryFn: async () => {
       const [itemsRes, combosRes] = await Promise.all([
@@ -107,6 +108,7 @@ export default function MenuCatalog() {
       return {
         items: itemsRes.data.data || [],
         combos: combosRes.data.data || [],
+        categoryOrder: itemsRes.data.categoryOrder || [],
       };
     },
     staleTime: 60_000,
@@ -295,34 +297,38 @@ export default function MenuCatalog() {
   const categoriesList = useMemo(
     () => [
       "ALL",
-      "COMBO",
-      ...new Set(
-        (menuItems.items || [])
-          .map((item) => item.category?.toUpperCase())
-          .filter(Boolean),
+      ...orderCategoryNames(
+        (menuItems.items || []).map((item) => item.category).filter(Boolean),
+        menuItems.categoryOrder,
+        (menuItems.combos || []).length > 0,
       ),
     ],
-    [menuItems.items],
+    [menuItems.items, menuItems.combos, menuItems.categoryOrder],
   );
 
   const allCatalogItems = useMemo(
-    () => [
-      ...(menuItems.items || []),
-      ...(menuItems.combos || []).map((c) => ({
-        ...c,
-        isCombo: true,
-        category: "COMBO",
-      })),
-    ],
-    [menuItems.items, menuItems.combos],
+    () =>
+      sortMenuEntries(
+        [
+          ...(menuItems.items || []),
+          ...(menuItems.combos || []).map((c) => ({
+            ...c,
+            isCombo: true,
+            category: "COMBO",
+          })),
+        ],
+        menuItems.categoryOrder,
+      ),
+    [menuItems.items, menuItems.combos, menuItems.categoryOrder],
   );
 
   const filteredMenuItems = useMemo(() => {
     if (activeCategoryFilter === "ALL") return allCatalogItems;
+    if (activeCategoryFilter === "COMBO") {
+      return allCatalogItems.filter((item) => item.isCombo);
+    }
     return allCatalogItems.filter(
-      (item) =>
-        item.category?.toUpperCase() === activeCategoryFilter ||
-        (!item.category && activeCategoryFilter === "COMBO"),
+      (item) => item.category === activeCategoryFilter,
     );
   }, [allCatalogItems, activeCategoryFilter]);
 

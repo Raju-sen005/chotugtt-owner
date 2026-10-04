@@ -3,6 +3,7 @@ import { useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import { io } from "socket.io-client";
+import { orderCategoryNames, sortMenuEntries } from "../../utils/menuOrder";
 import {
   ShoppingBag,
   Star,
@@ -399,10 +400,19 @@ export default function PublicMenu() {
     enabled: !!restaurantId,
   });
 
-  const { categories, combos, restaurant } = catalog || {};
+  const { categories, combos, restaurant, categoryOrder } = catalog || {};
   const categoryNames = useMemo(
     () => (categories ? Object.keys(categories) : []),
     [categories],
+  );
+  const menuOrder = useMemo(
+    () =>
+      orderCategoryNames(
+        categoryNames,
+        categoryOrder,
+        (combos || []).length > 0,
+      ),
+    [categoryNames, categoryOrder, combos],
   );
 
   // 🔑 tableToken mein table number encoded hai (StoreSettings jaisa btoa
@@ -611,8 +621,8 @@ export default function PublicMenu() {
     return Object.values(categories).flat();
   }, [categories]);
 
-  const filteredCombos = useMemo(
-    () =>
+  const filteredCombos = useMemo(() => {
+    const rows =
       combos?.filter((c) => {
         const matchesSearch = c.name
           ?.toLowerCase()
@@ -621,24 +631,29 @@ export default function PublicMenu() {
         const matchesVeg = !vegOnly || c.isVeg !== false;
 
         return matchesSearch && matchesVeg;
-      }) || [],
-    [combos, searchQuery, vegOnly],
-  );
+      }) || [];
+
+    return sortMenuEntries(
+      rows.map((combo) => ({ ...combo, isCombo: true })),
+      categoryOrder,
+    );
+  }, [combos, searchQuery, vegOnly, categoryOrder]);
 
   const filteredCategoryItems = useMemo(() => {
     if (!categories) return {};
     const result = {};
     for (const catName of Object.keys(categories)) {
-      result[catName] = categories[catName].filter((i) => {
+      const rows = categories[catName].filter((i) => {
         const matchesSearch = i.name
           .toLowerCase()
           .includes(searchQuery.toLowerCase());
         const matchesVeg = !vegOnly || i.isVeg !== false;
         return matchesSearch && matchesVeg;
       });
+      result[catName] = sortMenuEntries(rows, categoryOrder);
     }
     return result;
-  }, [categories, searchQuery, vegOnly]);
+  }, [categories, searchQuery, vegOnly, categoryOrder]);
 
   const hasVisibleResults = useMemo(() => {
     const comboVisible =
@@ -1192,31 +1207,33 @@ export default function PublicMenu() {
               >
                 {t("allMenu")}
               </button>
-              {combos?.length > 0 && (
-                <button
-                  onClick={() => setActiveCategory("COMBOS")}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black tracking-tight whitespace-nowrap transition-all cursor-pointer border shrink-0 ${
-                    activeCategory === "COMBOS"
-                      ? "bg-rose-500 text-white border-rose-500 shadow-sm"
-                      : "bg-rose-50 text-rose-600 border-rose-100 hover:bg-rose-100"
-                  }`}
-                >
-                  🔥 Combos
-                </button>
+              {menuOrder.map((catName) =>
+                catName === "COMBO" ? (
+                  <button
+                    key="COMBO"
+                    onClick={() => setActiveCategory("COMBOS")}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-black tracking-tight whitespace-nowrap transition-all cursor-pointer border shrink-0 ${
+                      activeCategory === "COMBOS"
+                        ? "bg-rose-500 text-white border-rose-500 shadow-sm"
+                        : "bg-rose-50 text-rose-600 border-rose-100 hover:bg-rose-100"
+                    }`}
+                  >
+                    🔥 Combos
+                  </button>
+                ) : (
+                  <button
+                    key={catName}
+                    onClick={() => setActiveCategory(catName)}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold tracking-tight whitespace-nowrap transition-all cursor-pointer border shrink-0 ${
+                      activeCategory === catName
+                        ? "bg-slate-900 text-white border-slate-900 shadow-sm"
+                        : "bg-slate-50 text-slate-600 border-slate-200/60 hover:bg-slate-100"
+                    }`}
+                  >
+                    {catName}
+                  </button>
+                ),
               )}
-              {categoryNames.map((catName) => (
-                <button
-                  key={catName}
-                  onClick={() => setActiveCategory(catName)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold tracking-tight whitespace-nowrap transition-all cursor-pointer border shrink-0 ${
-                    activeCategory === catName
-                      ? "bg-slate-900 text-white border-slate-900 shadow-sm"
-                      : "bg-slate-50 text-slate-600 border-slate-200/60 hover:bg-slate-100"
-                  }`}
-                >
-                  {catName}
-                </button>
-              ))}
               <button
                 onClick={() => setVegOnly((v) => !v)}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-black tracking-tight whitespace-nowrap transition-all cursor-pointer border shrink-0 flex items-center gap-1 ${
@@ -1290,11 +1307,14 @@ export default function PublicMenu() {
         )}
 
         {/* ---------------- Menu ---------------- */}
-        <div className="p-4 sm:p-6 space-y-6">
+        <div className="p-4 sm:p-6 flex flex-col gap-6">
           {combos?.length > 0 &&
             (activeCategory === "ALL" || activeCategory === "COMBOS") &&
             filteredCombos.length > 0 && (
-              <div className="space-y-3">
+              <div
+                className="space-y-3"
+                style={{ order: Math.max(0, menuOrder.indexOf("COMBO")) }}
+              >
                 <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1 flex items-center gap-1">
                   ✨ {t("combos")}
                 </h2>
@@ -1351,7 +1371,13 @@ export default function PublicMenu() {
                 const items = filteredCategoryItems[categoryName];
                 if (!items || items.length === 0) return null;
                 return (
-                  <div key={categoryName} className="space-y-3">
+                  <div
+                    key={categoryName}
+                    className="space-y-3"
+                    style={{
+                      order: Math.max(0, menuOrder.indexOf(categoryName)),
+                    }}
+                  >
                     {activeCategory === "ALL" && (
                       <h2 className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">
                         {categoryName}
