@@ -1,4 +1,4 @@
-import { ChefHat } from "lucide-react";
+// import { ChefHat } from "lucide-react";
 
 export const authInputClass =
   "w-full rounded-xl border border-[var(--border)] bg-white px-3.5 py-3 text-sm font-medium text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-disabled)] focus:border-[var(--primary)] focus:ring-4 focus:ring-[rgba(244,63,94,0.12)]";
@@ -36,7 +36,12 @@ export default function AuthShell({
         <div className="relative px-5 py-4 sm:px-8 lg:px-10 lg:pt-12">
           <div className="flex items-center gap-3">
             <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[var(--primary)] shadow-sm">
-              <ChefHat size={22} strokeWidth={2.25} />
+              {/* <ChefHat size={22} strokeWidth={2.25} /> */}
+              <img
+                src="/ChotuGTT__1_-removebg-preview.png"
+                alt="ChotuGTT Logo"
+                className="h-6 w-6"
+              />
             </span>
             <div className="leading-tight">
               <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/70">

@@ -79,7 +79,12 @@ export default function Sidebar({ closeMobileSidebar }) {
 
   return (
     <aside className="flex h-full w-full flex-col overflow-hidden border-r border-[var(--border)] bg-white font-sans text-[var(--text-secondary)] select-none">
-      <div className="px-6 pb-4 pt-6">
+      <div className="flex items-center gap-3 px-6 pb-4 pt-6">
+       <img
+          src="/ChotuGTT__1_-removebg-preview.png"
+          alt="ChotuGTT Logo"
+          className="h-7 w-7"
+        />
         <p className="text-[26px] font-black tracking-tight leading-none">
           <span className="text-[var(--text-primary)]">Chotu</span>
           <span className="text-[var(--secondary)]">GTT</span>
@@ -109,7 +114,11 @@ export default function Sidebar({ closeMobileSidebar }) {
                 <Icon
                   size={18}
                   strokeWidth={1.8}
-                  className={isActive ? "text-[var(--primary)]" : "text-[var(--text-muted)]"}
+                  className={
+                    isActive
+                      ? "text-[var(--primary)]"
+                      : "text-[var(--text-muted)]"
+                  }
                 />
                 <span className="flex-1">{label}</span>
                 {badge && liveOrders.length > 0 && (
@@ -132,7 +141,7 @@ export default function Sidebar({ closeMobileSidebar }) {
       {!isSuperAdmin && (
         <div className="px-3 pb-3">
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-3.5">
-            <div className="flex items-center gap-2.5">
+            {/* <div className="flex items-center gap-2.5">
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--secondary-light)] text-[var(--secondary)]">
                 <Crown size={15} />
               </span>
@@ -145,9 +154,12 @@ export default function Sidebar({ closeMobileSidebar }) {
                   Restaurant Management
                 </p>
               </div>
-            </div>
+            </div> */}
 
             <div className="mt-3 flex items-start gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--secondary-light)] text-[var(--secondary)]">
+                <Crown size={15} />
+              </span>
               <CheckCircle2
                 size={16}
                 className={
@@ -164,7 +176,9 @@ export default function Sidebar({ closeMobileSidebar }) {
                       : "text-[var(--warning)]"
                   }`}
                 >
-                  {subscriptionActive ? "Subscription Active" : "Subscription Inactive"}
+                  {subscriptionActive
+                    ? "Subscription Active"
+                    : "Subscription Inactive"}
                 </p>
                 {expiryLabel && (
                   <p className="mt-0.5 text-[10px] text-[var(--text-muted)]">
