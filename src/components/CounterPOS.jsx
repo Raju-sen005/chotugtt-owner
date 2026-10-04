@@ -90,6 +90,9 @@ export default function CounterPOS() {
     upiQrCode: "",
   });
   const [showNewTableModal, setShowNewTableModal] = useState(false);
+  const [showParcelModal, setShowParcelModal] = useState(false);
+  const [customerNameInput, setCustomerNameInput] = useState("");
+  const [openParcels, setOpenParcels] = useState([]);
   const [newTableNumber, setNewTableNumber] = useState("");
   const [tableStatusList, setTableStatusList] = useState([]);
   const apiBase = import.meta.env.VITE_APP_API_BASE || "http://localhost:5000";
@@ -220,6 +223,13 @@ export default function CounterPOS() {
           ];
 
           setActiveTables(tables);
+          setOpenParcels(
+            safeOrders.filter(
+              (order) =>
+                order?.tableNumber === "PARCEL" &&
+                (order.status === "PENDING" || order.status === "ACCEPTED"),
+            ),
+          );
         } else {
           console.warn(
             "Live orders fetch failed:",
@@ -351,6 +361,13 @@ export default function CounterPOS() {
         ];
 
         setActiveTables(tables);
+        setOpenParcels(
+          orders.filter(
+            (order) =>
+              order?.tableNumber === "PARCEL" &&
+              (order.status === "PENDING" || order.status === "ACCEPTED"),
+          ),
+        );
       } catch (error) {
         console.error(
           "Live table sync failed:",
@@ -1285,7 +1302,10 @@ export default function CounterPOS() {
           <p class="row">
             <span>Name:</span>
             <span>
-              ${billOrder.customerName || "Walk-in Customer"}
+              ${String(billOrder.customerName || "Walk-in Customer")
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")}
             </span>
           </p>
 
@@ -1431,16 +1451,19 @@ export default function CounterPOS() {
     printWindow.document.close();
   };
 
-  const handleParcelOrder = async () => {
+  const handleParcelOrder = async (targetOrderId) => {
     if (cart.length === 0) {
       return alert("Cart is empty!");
     }
 
+    const customerName = customerNameInput.trim();
     setLoading(true);
 
     try {
       const orderPayload = {
         orderType: "PARCEL",
+        ...(targetOrderId ? { targetOrderId } : {}),
+        ...(!targetOrderId && customerName ? { customerName } : {}),
 
         items: cart.map((i) => ({
           menuItem: i.catalogType === "ITEM" ? i._id : undefined,
@@ -1474,8 +1497,14 @@ export default function CounterPOS() {
       const createdOrder = res.data?.data || res.data?.order;
 
       setCart([]);
+      if (!targetOrderId) setCustomerNameInput("");
+      setShowParcelModal(false);
 
-      showSuccess("Parcel order sent to Live Orders!");
+      showSuccess(
+        targetOrderId
+          ? "Items added to the same parcel"
+          : "Parcel order sent to Live Orders!",
+      );
     } catch (err) {
       console.error("Parcel order error:", err);
 
@@ -1548,6 +1577,9 @@ export default function CounterPOS() {
     try {
       const payload = {
         tableNumber: newTableNumber,
+        ...(customerNameInput.trim()
+          ? { customerName: customerNameInput.trim() }
+          : {}),
 
         // 🔒 Backend price/name/discount verify karega.
         // Client totals sirf UI ke liye hain.
@@ -1589,6 +1621,7 @@ export default function CounterPOS() {
       setCart([]);
 
       setNewTableNumber("");
+      setCustomerNameInput("");
 
       setShowNewTableModal(false);
 
@@ -2016,9 +2049,24 @@ export default function CounterPOS() {
               </div>
             </div>
 
+            <input
+              type="text"
+              value={customerNameInput}
+              maxLength={60}
+              onChange={(event) => setCustomerNameInput(event.target.value)}
+              placeholder="Customer name (optional)"
+              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100 focus:bg-white"
+            />
             <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
               <button
-                onClick={handleParcelOrder}
+                onClick={() => {
+                  if (cart.length === 0) return alert("Cart is empty!");
+                  if (openParcels.length > 0) {
+                    setShowParcelModal(true);
+                    return;
+                  }
+                  handleParcelOrder();
+                }}
                 disabled={loading || cart.length === 0}
                 className="py-3 lg:py-3.5 bg-rose-600 text-white rounded-xl font-bold text-xs hover:bg-rose-700 transition-all cursor-pointer shadow-sm shadow-rose-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
               >
@@ -2059,6 +2107,81 @@ export default function CounterPOS() {
           </div>
         </div>
 
+        {showParcelModal && (
+          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-[2px] flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-2xl border border-slate-100">
+              <div className="flex items-start justify-between">
+                <div>
+                  <h3 className="font-black text-slate-900 text-base tracking-tight">
+                    Parcel
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Start a new parcel, or add these items to an open one.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!loading) setShowParcelModal(false);
+                  }}
+                  className="text-slate-400 hover:text-slate-700 transition-colors p-1"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <input
+                type="text"
+                value={customerNameInput}
+                maxLength={60}
+                onChange={(event) => setCustomerNameInput(event.target.value)}
+                placeholder="Customer name for a new parcel (optional)"
+                className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-rose-400"
+              />
+              <div className="space-y-2 max-h-52 overflow-y-auto">
+                {openParcels.map((parcel) => {
+                  const activeCount = (parcel.items || []).filter(
+                    (item) => item?.status !== "REJECTED",
+                  ).length;
+                  return (
+                    <button
+                      key={parcel._id}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => handleParcelOrder(parcel._id)}
+                      className="w-full text-left px-3 py-2.5 rounded-xl border border-slate-200 hover:border-rose-300 hover:bg-rose-50 disabled:opacity-50"
+                    >
+                      <span className="block text-xs font-black text-slate-900">
+                        {parcel.orderId} · {parcel.customerName || "Counter Parcel"}
+                      </span>
+                      <span className="block text-[11px] text-slate-500 mt-0.5">
+                        Add to this parcel · {activeCount} item
+                        {activeCount === 1 ? "" : "s"}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="flex gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => setShowParcelModal(false)}
+                  disabled={loading}
+                  className="flex-1 py-3 border border-slate-200 rounded-xl font-bold text-xs text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleParcelOrder()}
+                  disabled={loading || cart.length === 0}
+                  className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold text-xs hover:bg-rose-700 disabled:opacity-50"
+                >
+                  {loading ? "Sending..." : "New parcel"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Table Selection Modal */}
         {showTableModal && (
           <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-[2px] flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
@@ -2147,6 +2270,14 @@ export default function CounterPOS() {
                   <p className="text-xs text-slate-500 mt-2">
                     Select a free table to create a completely new order.
                   </p>
+                  <input
+                    type="text"
+                    value={customerNameInput}
+                    maxLength={60}
+                    onChange={(event) => setCustomerNameInput(event.target.value)}
+                    placeholder="Customer name (optional)"
+                    className="mt-3 w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-emerald-400"
+                  />
                 </div>
 
                 <button
