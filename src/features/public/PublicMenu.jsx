@@ -229,74 +229,80 @@ const MenuSkeleton = memo(function MenuSkeleton() {
   );
 });
 
+const menuImageSrc = (src) => {
+  if (!src) return "";
+  const value = String(src);
+  if (value.startsWith("http") || value.startsWith("blob:")) return value;
+  return `${String(import.meta.env.VITE_APP_API_BASE || "").replace(/\/api(?:\/v1)?\/?$/, "")}${value}`;
+};
+
+const offerBadge = (offer) => {
+  if (!offer) return "";
+  if (offer.discountType === "FLAT") return `₹${Number(offer.discountValue || 0)} OFF`;
+  return `${Number(offer.discountValue || 0)}% OFF`;
+};
+
 const ItemCard = memo(function ItemCard({
   item,
   quantity,
   onAdd,
   onRemove,
   onOpenDetail,
+  offerLabel,
 }) {
+  const image = menuImageSrc(item.image);
   return (
-    <div
+    <article
       onClick={() => onOpenDetail(item)}
-      className="bg-white p-4 rounded-2xl border border-slate-200/70 shadow-sm hover:shadow-md transition-shadow flex gap-4 items-center justify-between cursor-pointer relative"
+      className="flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm"
     >
-      {item.isBestseller && (
-        <span className="absolute -top-2 left-3 bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full flex items-center gap-0.5 shadow-sm">
-          <Flame size={9} /> Bestseller
-        </span>
-      )}
-      <div className="flex gap-3 items-center flex-1 min-w-0">
-        {item.image ? (
+      <div className="relative h-28 bg-slate-50 sm:h-36">
+        {image ? (
           <img
-            src={
-              item.image
-                ? item.image.startsWith("http")
-                  ? item.image
-                  : `${import.meta.env.VITE_APP_API_BASE.replace("/api", "")}${item.image}`
-                : null
-            }
-            alt={item.name}
-            className="w-16 h-16 object-cover rounded-xl border border-slate-100 bg-slate-50 shrink-0"
+            src={image}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
           />
         ) : (
-          <div className="w-16 h-16 rounded-xl border border-slate-100 bg-slate-50 shrink-0 flex items-center justify-center text-slate-300">
-            <Utensils size={20} />
+          <div className="flex h-full items-center justify-center text-slate-300">
+            <Utensils size={22} />
           </div>
         )}
-        <div className="space-y-0.5 min-w-0">
-          <span
-            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-black border ${
-              item.isVeg === false
-                ? "bg-red-50 text-red-600 border-red-200"
-                : "bg-emerald-50 text-emerald-600 border-emerald-200"
-            }`}
-          >
-            {item.isVeg === false ? "Non-Veg" : "Veg"}
+        <span className={`absolute left-2 top-2 h-3 w-3 rounded-full border-2 border-white ${item.isVeg === false ? "bg-red-500" : "bg-emerald-500"}`} />
+        {offerLabel ? (
+          <span className="absolute right-2 top-2 rounded-lg bg-rose-500 px-1.5 py-0.5 text-[10px] font-black text-white">
+            {offerLabel}
           </span>
-          <h3 className="font-black text-sm text-slate-900 tracking-tight truncate">
-            {item.name}
-          </h3>
-          <p className="text-xs text-slate-400 font-medium line-clamp-2 leading-relaxed pr-2">
-            {item.description}
-          </p>
-          <p className="text-sm font-black text-slate-900 pt-0.5">
-            ₹{item.price}
-          </p>
+        ) : item.isBestseller ? (
+          <span className="absolute right-2 top-2 inline-flex items-center gap-0.5 rounded-lg bg-amber-500 px-1.5 py-0.5 text-[10px] font-black text-white">
+            <Flame size={9} /> Hot
+          </span>
+        ) : null}
+      </div>
+      <div className="flex flex-1 flex-col p-2.5">
+        <h3 className="line-clamp-2 text-[13px] font-black leading-4 text-slate-900">{item.name}</h3>
+        {item.description ? (
+          <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-400">{item.description}</p>
+        ) : null}
+        <div className="mt-auto flex items-center justify-between gap-2 pt-2">
+          <p className="text-sm font-black text-slate-900">₹{item.price}</p>
+          <div onClick={(e) => e.stopPropagation()}>
+            <QuantityController
+              id={item._id}
+              name={item.name}
+              price={item.price}
+              type="item"
+              quantity={quantity}
+              onAdd={onAdd}
+              onRemove={onRemove}
+              size="sm"
+            />
+          </div>
         </div>
       </div>
-      <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
-        <QuantityController
-          id={item._id}
-          name={item.name}
-          price={item.price}
-          type="item"
-          quantity={quantity}
-          onAdd={onAdd}
-          onRemove={onRemove}
-        />
-      </div>
-    </div>
+    </article>
   );
 });
 
@@ -620,6 +626,33 @@ export default function PublicMenu() {
     if (!categories) return [];
     return Object.values(categories).flat();
   }, [categories]);
+
+  const offerLabelByItem = useMemo(() => {
+    const offers = catalog?.offers || [];
+    const labels = {};
+    if (!offers.length) return labels;
+    allItemsFlat.forEach((item) => {
+      const applicable = offers.filter((offer) => {
+        const targets = offer.targetItems || [];
+        if (targets.length > 0) return targets.includes(item._id);
+        return true;
+      });
+      if (!applicable.length) return;
+      const best = applicable.reduce((winner, offer) =>
+        Number(offer.discountValue) > Number(winner.discountValue) ? offer : winner,
+      );
+      labels[item._id] = offerBadge(best);
+    });
+    return labels;
+  }, [catalog, allItemsFlat]);
+
+  const restaurantAddress = [
+    restaurant?.address?.street,
+    restaurant?.address?.city,
+    restaurant?.address?.state,
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   const filteredCombos = useMemo(() => {
     const rows =
@@ -1104,37 +1137,33 @@ export default function PublicMenu() {
   const phoneHasError =
     touched.phone && customerPhone.trim() !== "" && !isValidPhone;
   return (
-    <div className="min-h-screen bg-slate-200/60">
-      <div className="min-h-screen bg-slate-50 text-slate-900 pb-28 antialiased font-sans max-w-md sm:max-w-2xl lg:max-w-5xl mx-auto shadow-sm relative sm:border-x border-slate-200/60">
-        {/* ---------------- Header ---------------- */}
-        <div className="bg-white sticky top-0 z-40 border-b border-slate-100">
-          <div className="p-4 sm:p-6 flex gap-4 items-center">
+    <div className="min-h-screen bg-[var(--background)] pb-28 font-sans text-slate-900">
+      <div className="relative mx-auto min-h-screen w-full max-w-md lg:max-w-6xl">
+        <div className="sticky top-0 z-40 border-b border-slate-100 bg-white">
+          <div className="flex items-center gap-3 bg-slate-950 px-4 py-3 text-white">
             {restaurant?.logo ? (
               <img
                 src={
                   restaurant.logo.startsWith("http")
                     ? restaurant.logo
-                    : `${import.meta.env.VITE_APP_API_BASE.replace("/api", "")}${restaurant.logo}`
+                    : menuImageSrc(restaurant.logo)
                 }
                 alt={restaurant.name}
-                className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl object-cover bg-slate-50 border border-slate-100 shrink-0"
+                className="h-11 w-11 shrink-0 rounded-2xl border border-white/10 bg-white object-cover"
               />
             ) : (
-              <div className="w-14 h-14 sm:w-16 sm:h-16 bg-rose-50 text-rose-500 rounded-2xl flex items-center justify-center font-black text-xl border border-rose-100 shrink-0">
-                {restaurant?.name?.charAt(0) || "🍴"}
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-rose-500 text-sm font-black">
+                {restaurant?.name?.charAt(0) || "M"}
               </div>
             )}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-black tracking-tight text-slate-900 truncate">
-                  {restaurant?.name || "Our Restaurant"}
-                </h1>
-                {/* <span className="flex items-center text-[10px] bg-amber-50 text-amber-700 font-extrabold px-1.5 py-0.5 rounded-md border border-amber-200/50 shrink-0">
-                  <Star size={10} className="fill-amber-600 mr-0.5" /> 4.2
-                </span> */}
-              </div>
-              <p className="text-[11px] sm:text-xs text-slate-400 font-semibold mt-0.5">
-                Digital Menu · Scan &amp; Order
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-black tracking-wide text-rose-300">ChotuGTT</p>
+              <h1 className="truncate text-base font-black">
+                {restaurant?.name || "Our Restaurant"}
+              </h1>
+              <p className="truncate text-[11px] font-semibold text-white/70">
+                {currentTableNumber ? `Table ${currentTableNumber}` : "Scan & order"}
+                {restaurantAddress ? ` · ${restaurantAddress}` : ""}
               </p>
             </div>
             <div className="flex items-center gap-1 shrink-0">
@@ -1148,13 +1177,14 @@ export default function PublicMenu() {
               >
                 <ShoppingBag size={15} />
               </button>
-              {/* <button
-                onClick={() => setLanguage((l) => (l === "EN" ? "HI" : "EN"))}
+              <button
+                type="button"
+                onClick={() => setLanguage((current) => (current === "EN" ? "HI" : "EN"))}
                 aria-label="Toggle language"
-                className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+                className="rounded-xl border border-white/15 px-2.5 py-1.5 text-[11px] font-black text-white"
               >
-                <Globe size={15} />
-              </button> */}
+                {language}
+              </button>
               {/* <button
                 onClick={() => refetch()}
                 aria-label="Refresh menu"
@@ -1201,8 +1231,8 @@ export default function PublicMenu() {
                 onClick={() => setActiveCategory("ALL")}
                 className={`px-3.5 py-1.5 rounded-xl text-xs font-black tracking-tight whitespace-nowrap transition-all cursor-pointer border shrink-0 ${
                   activeCategory === "ALL"
-                    ? "bg-slate-900 text-white border-slate-900 shadow-sm"
-                    : "bg-slate-50 text-slate-600 border-slate-200/60 hover:bg-slate-100"
+                    ? "bg-rose-500 text-white border-rose-500 shadow-sm"
+                    : "bg-slate-50 text-slate-600 border-slate-200/60"
                 }`}
               >
                 {t("allMenu")}
@@ -1226,8 +1256,8 @@ export default function PublicMenu() {
                     onClick={() => setActiveCategory(catName)}
                     className={`px-3.5 py-1.5 rounded-xl text-xs font-bold tracking-tight whitespace-nowrap transition-all cursor-pointer border shrink-0 ${
                       activeCategory === catName
-                        ? "bg-slate-900 text-white border-slate-900 shadow-sm"
-                        : "bg-slate-50 text-slate-600 border-slate-200/60 hover:bg-slate-100"
+                        ? "bg-rose-500 text-white border-rose-500 shadow-sm"
+                        : "bg-slate-50 text-slate-600 border-slate-200/60"
                     }`}
                   >
                     {catName}
@@ -1383,11 +1413,12 @@ export default function PublicMenu() {
                         {categoryName}
                       </h2>
                     )}
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-4">
                       {items.map((item) => (
                         <ItemCard
                           key={item._id}
                           item={item}
+                          offerLabel={offerLabelByItem[item._id]}
                           quantity={cart[item._id]?.quantity || 0}
                           onAdd={addToCart}
                           onRemove={removeFromCart}
@@ -1441,12 +1472,12 @@ export default function PublicMenu() {
                   <ShoppingBag size={16} strokeWidth={2.5} />
                 </div>
                 <div>
-                  <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     {totalItemsInCart} Item{totalItemsInCart > 1 ? "s" : ""}
                   </p>
-                  {/* <p className="text-base font-black text-white tracking-tight">
-                    ₹{totalCartAmount.toLocaleString("en-IN")}
-                  </p> */}
+                  <p className="text-base font-black tracking-tight text-white">
+                    ₹{finalPayableAmount.toLocaleString("en-IN")}
+                  </p>
                 </div>
               </div>
               <button
@@ -1474,7 +1505,7 @@ export default function PublicMenu() {
                       detailItem.image
                         ? detailItem.image.startsWith("http")
                           ? detailItem.image
-                          : `${import.meta.env.VITE_APP_API_BASE.replace("/api", "")}${detailItem.image}`
+                          : menuImageSrc(detailItem.image)
                         : null
                     }
                     alt={detailItem.name}

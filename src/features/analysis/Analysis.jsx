@@ -10,12 +10,24 @@ import {
   Moon,
   CloudSun,
   TrendingUp,
-  DollarSign,
+  IndianRupee,
   ShoppingBag,
   Award,
   BarChart3,
+  CalendarDays,
+  Clock,
 } from "lucide-react";
-import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from "recharts";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
 
 // Module-level — har render pe new object not create
 const HOURLY_ICONS = {
@@ -134,273 +146,281 @@ function Analysis() {
 
   const rev = stats.revenueStats || {};
   const topItems = stats.topItems || [];
+  const money = (value) =>
+    `₹${Number(value || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  const todayLabel = new Date().toLocaleDateString("en-IN", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+  const parcelCount = sortedTableStats
+    .filter((table) => String(table._id || "").toUpperCase() === "PARCEL")
+    .reduce((sum, table) => sum + Number(table.orderCount || 0), 0);
+  const dineCount = sortedTableStats
+    .filter((table) => {
+      const id = String(table._id || "").toUpperCase();
+      return id && id !== "PARCEL" && id !== "N/A";
+    })
+    .reduce((sum, table) => sum + Number(table.orderCount || 0), 0);
+  const typeTotal = parcelCount + dineCount;
+  const typeSlices = [
+    { name: "Dine In", value: dineCount, color: "#22C55E" },
+    { name: "Parcel", value: parcelCount, color: "#FB923C" },
+  ].filter((slice) => slice.value > 0);
+  const hourlyChart = [
+    { label: "6–12", name: "Morning", count: hourlyData.Morning },
+    { label: "12–5", name: "Afternoon", count: hourlyData.Afternoon },
+    { label: "5–9", name: "Evening", count: hourlyData.Evening },
+    { label: "9–6", name: "Night", count: hourlyData.Night },
+  ];
+  const hourlyColors = ["#F59E0B", "#F97316", "#F43F5E", "#3B82F6"];
 
   const summaryCards = [
     {
       label: "Today Revenue",
-      val: `₹${Number(rev.today || 0).toFixed(2)}`,
-      icon: DollarSign,
+      val: money(rev.today),
+      icon: IndianRupee,
       color: "text-emerald-600 bg-emerald-50",
     },
     {
       label: "Total Revenue",
-      val: `₹${Number(rev.totalRevenue || 0).toFixed(2)}`,
+      val: money(rev.totalRevenue),
       icon: TrendingUp,
       color: "text-blue-600 bg-blue-50",
     },
     {
       label: "Total Orders",
-      val: rev.totalOrders || 0,
+      val: Number(rev.totalOrders || 0).toLocaleString("en-IN"),
       icon: ShoppingBag,
-      color: "text-purple-600 bg-purple-50",
+      color: "text-rose-600 bg-rose-50",
     },
     {
       label: "Top Items",
       val: topItems.length,
       icon: Award,
-      color: "text-rose-600 bg-rose-50",
+      color: "text-violet-600 bg-violet-50",
     },
   ];
 
   return (
-    <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-10 space-y-8 font-sans bg-[#F8F9FA] min-h-screen">
-      {/* Header Section */}
-      <div className="flex items-center gap-4 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs">
-        <div className="p-3 bg-red-50 text-red-600 rounded-2xl border border-red-100">
-          <BarChart3 size={28} />
-        </div>
-        <div>
-          <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-            Business Analytics
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-            Track revenue metrics, sales trends, and table performance.
-          </p>
+    <div className="-m-4 bg-[var(--background)] p-4 font-sans md:-m-6 md:p-5 lg:-m-8 lg:p-5">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[var(--primary)] via-[var(--primary)] to-[var(--secondary)] p-5 text-white">
+        <div className="relative z-10 flex flex-wrap items-start justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
+              <BarChart3 className="h-6 w-6" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-white/80">Business Analytics</p>
+              <h2 className="text-2xl font-black tracking-tight">Restaurant Performance</h2>
+              <p className="mt-1 max-w-xl text-sm text-white/85">
+                Get insights about your sales, orders, popular items and table performance.
+              </p>
+            </div>
+          </div>
+          <div className="rounded-2xl bg-white/15 px-4 py-3 text-right">
+            <p className="flex items-center justify-end gap-2 text-sm font-bold">
+              <CalendarDays size={14} /> {todayLabel}
+            </p>
+            <p className="mt-1 text-[11px] font-semibold text-emerald-100">Today</p>
+          </div>
         </div>
       </div>
 
-      {/* Summary Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {summaryCards.map((item, i) => {
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {summaryCards.map((item) => {
           const Icon = item.icon;
           return (
-            <div
-              key={i}
-              className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs space-y-3"
-            >
-              <div className="flex justify-between items-center">
-                <p className="text-[10px] uppercase font-bold tracking-wider text-slate-400">
-                  {item.label}
-                </p>
-                <div className={`p-2 rounded-xl ${item.color}`}>
-                  <Icon size={18} />
-                </div>
+            <div key={item.label} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${item.color}`}>
+                  <Icon size={16} />
+                </span>
+                <p className="text-[11px] font-bold text-slate-400">{item.label}</p>
               </div>
-              <h3 className="text-2xl font-black text-slate-900 tracking-tight">
-                {item.val}
-              </h3>
+              <p className="mt-3 text-2xl font-black text-slate-900">{item.val}</p>
             </div>
           );
         })}
       </div>
 
-      {/* Charts & Hourly Breakdown Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Weekly Sales Trend */}
-        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
-          <div className="flex items-center justify-between">
-            <h3 className="font-black text-slate-900 text-base">
-              Weekly Sales Trend
+      <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-3">
+        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="flex items-center gap-2 text-sm font-black text-slate-900">
+              <BarChart3 size={16} className="text-rose-500" /> Sales Trend
             </h3>
-            <span className="text-[10px] font-bold uppercase tracking-wider bg-slate-100 text-slate-600 px-3 py-1 rounded-full">
-              Last 7 Days
-            </span>
+            <span className="rounded-full bg-rose-500 px-2.5 py-1 text-[10px] font-black text-white">Last 7 days</span>
           </div>
-          <div className="pt-4">
-            <ResponsiveContainer
-              width="100%"
-              height={240}
-              className="w-full !max-w-full"
-            >
-              <BarChart data={chartData}>
-                <XAxis
-                  dataKey="day"
-                  axisLine={false}
-                  tickLine={false}
-                  tick={{ fontSize: 12, fill: "#64748b" }}
-                />
-                <Tooltip
-                  cursor={{ fill: "#f8fafc" }}
-                  formatter={(value) => [
-                    `₹${Number(value || 0).toFixed(2)}`,
-                    "Sales",
-                  ]}
-                  contentStyle={{
-                    borderRadius: "12px",
-                    border: "1px solid #e2e8f0",
-                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.05)",
-                  }}
-                />
-                <Bar
-                  dataKey="sales"
-                  fill="#f43f5e"
-                  radius={[6, 6, 0, 0]}
-                  barSize={36}
-                />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={chartData}>
+              <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94A3B8" }} />
+              <YAxis hide />
+              <Tooltip
+                cursor={{ fill: "#fff1f2" }}
+                formatter={(value) => [money(value), "Revenue"]}
+                contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0" }}
+              />
+              <Bar dataKey="sales" fill="#FB7185" radius={[6, 6, 0, 0]} barSize={22} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
 
-        {/* Hourly Activity Breakdown */}
-        <div className="grid grid-cols-2 gap-4">
-          {Object.entries(hourlyData).map(([label, val]) => (
-            <div
-              key={label}
-              className="bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs hover:border-red-200 transition-all duration-300 group flex flex-col justify-between"
-            >
-              <div className="flex justify-between items-start">
-                <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-                  {label}
-                </p>
-                <div className="p-2.5 bg-slate-50 rounded-2xl group-hover:bg-red-50 transition-colors">
-                  {HOURLY_ICONS[label]}
+        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+          <h3 className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900">
+            <Clock size={16} className="text-orange-500" /> Hourly Order Distribution
+          </h3>
+          <ResponsiveContainer width="100%" height={220}>
+            <BarChart data={hourlyChart}>
+              <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94A3B8" }} />
+              <Tooltip
+                cursor={{ fill: "#fff7ed" }}
+                formatter={(value, _name, item) => [value, item?.payload?.name || "Orders"]}
+                contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0" }}
+              />
+              <Bar dataKey="count" radius={[8, 8, 0, 0]} barSize={36}>
+                {hourlyChart.map((entry, index) => (
+                  <Cell key={entry.name} fill={hourlyColors[index]} />
+                ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+          <h3 className="mb-3 text-sm font-black text-slate-900">Order Type Distribution</h3>
+          {typeTotal === 0 ? (
+            <p className="py-16 text-center text-xs font-semibold text-slate-400">No completed orders yet</p>
+          ) : (
+            <div className="flex items-center gap-4">
+              <div className="relative h-40 w-40 shrink-0">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie data={typeSlices} dataKey="value" innerRadius={48} outerRadius={68} paddingAngle={3} stroke="none">
+                      {typeSlices.map((slice) => (
+                        <Cell key={slice.name} fill={slice.color} />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                  <p className="text-lg font-black text-slate-900">{typeTotal}</p>
+                  <p className="text-[10px] font-bold text-slate-400">Orders</p>
                 </div>
               </div>
-              <div>
-                <h3 className="text-2xl font-black text-slate-900">{val}</h3>
-                <p className="text-xs font-medium text-slate-400 mt-0.5">
-                  orders placed
-                </p>
+              <div className="space-y-3 text-sm">
+                {typeSlices.map((slice) => (
+                  <div key={slice.name}>
+                    <p className="font-bold text-slate-800">{slice.name}</p>
+                    <p className="text-xs text-slate-500">
+                      {slice.value} · {Math.round((slice.value / typeTotal) * 100)}%
+                    </p>
+                  </div>
+                ))}
               </div>
             </div>
-          ))}
+          )}
         </div>
       </div>
 
-      {/* Tables & Top Items Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Table Performance */}
-        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-            <h3 className="font-black text-slate-900 text-base">
-              Table Performance
-            </h3>
-            <span className="text-xs font-bold text-slate-500">
-              {sortedTableStats.length} Tables Active
-            </span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-slate-400 text-[10px] uppercase tracking-wider border-b border-slate-100">
-                <tr>
-                  <th className="pb-3 text-left font-bold">Table No.</th>
-                  <th className="pb-3 text-right font-bold">Orders Volume</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {displayTables.length > 0 ? (
-                  displayTables.map((t) => {
-                    const percentage = (t.orderCount / maxOrders) * 100;
-                    return (
-                      <tr
-                        key={t._id}
-                        className="group hover:bg-slate-50/80 transition-colors"
-                      >
-                        <td className="py-4 font-bold text-slate-800">
-                          Table {t._id || "N/A"}
-                        </td>
-                        <td className="py-4 text-right">
-                          <div className="flex items-center justify-end gap-4">
-                            <span className="font-black text-red-500">
-                              {t.orderCount}
-                            </span>
-                            <div className="w-20 h-2 bg-slate-100 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-gradient-to-r from-red-400 to-rose-500 rounded-full"
-                                style={{ width: `${percentage}%` }}
-                              />
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })
-                ) : (
-                  <tr>
-                    <td
-                      colSpan="2"
-                      className="py-12 text-center text-slate-400 italic text-xs"
-                    >
-                      No active orders found
-                    </td>
+      <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-3">
+        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+          <h3 className="mb-3 text-sm font-black text-slate-900">Top Selling Items</h3>
+          <table className="w-full text-left text-xs">
+            <thead className="text-[10px] font-bold uppercase text-slate-400">
+              <tr>
+                <th className="pb-2">#</th>
+                <th className="pb-2">Item Name</th>
+                <th className="pb-2 text-right">Orders</th>
+              </tr>
+            </thead>
+            <tbody>
+              {topItems.length > 0 ? (
+                topItems.map((item, index) => (
+                  <tr key={`${item._id}-${index}`} className="border-t border-slate-50">
+                    <td className="py-2 font-black text-rose-500">{index + 1}</td>
+                    <td className="py-2 font-bold text-slate-800">{item._id}</td>
+                    <td className="py-2 text-right font-black text-slate-700">{item.count}</td>
                   </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {sortedTableStats.length > 5 && (
-            <button
-              onClick={() => setShowAllTables(!showAllTables)}
-              className="w-full mt-2 py-3 text-xs text-red-600 font-bold bg-red-50/50 hover:bg-red-50 rounded-2xl transition cursor-pointer"
-            >
-              {showAllTables
-                ? "Show Less Tables"
-                : `View All (${sortedTableStats.length}) Tables`}
-            </button>
-          )}
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="3" className="py-8 text-center text-slate-400">No top items yet</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
         </div>
 
-        {/* Top Selling Items */}
-        <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-4">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-            <h3 className="font-black text-slate-900 text-base">
-              Top Selling Items
-            </h3>
-            <span className="text-xs font-bold text-slate-500">
-              {topItems.length} Featured Items
-            </span>
+        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-black text-slate-900">Table Performance</h3>
+            {sortedTableStats.length > 5 && (
+              <button type="button" onClick={() => setShowAllTables((open) => !open)} className="text-[11px] font-bold text-rose-500">
+                {showAllTables ? "Show less" : "View all"}
+              </button>
+            )}
           </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="text-slate-400 text-[10px] uppercase tracking-wider border-b border-slate-100">
-                <tr>
-                  <th className="pb-3 text-left font-bold">Item Name</th>
-                  <th className="pb-3 text-right font-bold">Units Sold</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {topItems.length > 0 ? (
-                  topItems.map((item, i) => (
-                    <tr
-                      key={i}
-                      className="group hover:bg-slate-50/80 transition-colors"
-                    >
-                      <td className="py-4 font-bold text-slate-800">
-                        {item._id}
-                      </td>
-                      <td className="py-4 text-right">
-                        <span className="px-3 py-1 bg-emerald-50 text-emerald-600 font-black rounded-full text-xs border border-emerald-100">
-                          {item.count} sold
-                        </span>
+          <table className="w-full text-left text-xs">
+            <thead className="text-[10px] font-bold uppercase text-slate-400">
+              <tr>
+                <th className="pb-2">#</th>
+                <th className="pb-2">Table</th>
+                <th className="pb-2 text-right">Orders</th>
+                <th className="pb-2 text-right">Share</th>
+              </tr>
+            </thead>
+            <tbody>
+              {displayTables.length > 0 ? (
+                displayTables.map((table, index) => {
+                  const share = Math.round((table.orderCount / maxOrders) * 100);
+                  const label = String(table._id || "").toUpperCase() === "PARCEL" ? "Parcel" : table._id || "N/A";
+                  return (
+                    <tr key={table._id || index} className="border-t border-slate-50">
+                      <td className="py-2 font-black text-rose-500">{index + 1}</td>
+                      <td className="py-2 font-bold text-slate-800">{label}</td>
+                      <td className="py-2 text-right font-bold text-slate-700">{table.orderCount}</td>
+                      <td className="py-2">
+                        <div className="ml-auto flex w-24 items-center gap-2">
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                            <div className="h-full rounded-full bg-emerald-400" style={{ width: `${share}%` }} />
+                          </div>
+                          <span className="w-8 text-right text-[10px] font-bold text-slate-500">{share}%</span>
+                        </div>
                       </td>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      colSpan="2"
-                      className="py-12 text-center text-slate-400 italic text-xs"
-                    >
-                      No top items data available
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan="4" className="py-8 text-center text-slate-400">No completed orders yet</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+          <h3 className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900">
+            <Clock size={16} className="text-rose-500" /> Busiest Hours
+          </h3>
+          <div className="space-y-3">
+            {hourlyChart.map((slot, index) => (
+              <div key={slot.name} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+                <div className="flex items-center gap-2">
+                  {HOURLY_ICONS[slot.name]}
+                  <div>
+                    <p className="text-xs font-black text-slate-800">{slot.name}</p>
+                    <p className="text-[10px] text-slate-400">{slot.label}</p>
+                  </div>
+                </div>
+                <p className="text-sm font-black" style={{ color: hourlyColors[index] }}>{slot.count}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>

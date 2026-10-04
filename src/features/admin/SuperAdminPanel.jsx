@@ -29,6 +29,8 @@ import {
   X,
   Building2,
   Users,
+  Eye,
+  Phone,
 } from "lucide-react";
 
 /* ----------------------------------------------------------------------
@@ -180,6 +182,23 @@ const currency = (value) =>
 
 const SELLABLE_PLANS = ["TRIAL", "BASIC", "PREMIUM"];
 
+const formatPlan = (plan) => {
+  const value = String(plan || "").trim();
+  if (!value) return "No plan";
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+};
+
+const formatJoined = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
 const formatDayKey = (date) => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -319,7 +338,7 @@ export default function SuperAdminPanel() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [approvalFilter, setApprovalFilter] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
-  const [activeTab, setActiveTab] = useState("graphs");
+  const [activeTab, setActiveTab] = useState("restaurants");
   const [joinedFilter, setJoinedFilter] = useState("all");
   const [planFilter, setPlanFilter] = useState("all");
   const [subscriptionFilter, setSubscriptionFilter] = useState("all");
@@ -1007,14 +1026,14 @@ export default function SuperAdminPanel() {
 
       {showDetails && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/40 p-4 backdrop-blur-sm"
+          className="fixed inset-0 z-50 flex justify-end bg-slate-950/30"
           onMouseDown={(e) => {
             if (e.target === e.currentTarget) {
               setShowDetails(false);
             }
           }}
         >
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-stone-200 bg-white shadow-xl">
+          <div className="h-full w-full max-w-md overflow-y-auto border-l border-slate-100 bg-white shadow-2xl">
             {/* Header */}
             <div className="sticky top-0 z-10 flex items-center justify-between border-b border-stone-100 bg-white/95 px-6 py-4 backdrop-blur">
               <div className="flex items-center gap-3">
@@ -1045,6 +1064,35 @@ export default function SuperAdminPanel() {
               </div>
             ) : selectedRestaurant ? (
               <div className="space-y-7 p-6">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleStatusUpdate(
+                        selectedRestaurant._id,
+                        "isActive",
+                        selectedRestaurant.isActive === true,
+                      )
+                    }
+                    className="inline-flex items-center justify-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700"
+                  >
+                    <Power size={13} />
+                    {selectedRestaurant.isActive !== false ? "Block" : "Unblock"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleStatusUpdate(
+                        selectedRestaurant._id,
+                        "isApproved",
+                        selectedRestaurant.isApproved === true,
+                      )
+                    }
+                    className="inline-flex items-center justify-center gap-1 rounded-xl bg-rose-500 px-3 py-2 text-xs font-black text-white"
+                  >
+                    {selectedRestaurant.isApproved ? "Revoke" : "Approve"}
+                  </button>
+                </div>
                 {/* Status */}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div className="rounded-xl border border-stone-200 bg-stone-50 p-4">
@@ -1528,26 +1576,39 @@ export default function SuperAdminPanel() {
         </div>
       )}
 
-      <div className="min-h-screen bg-stone-50 p-4 sm:p-6 lg:p-10">
-        <div className="mx-auto max-w-7xl space-y-6">
-          {/* Header */}
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-3.5">
-              <div className="rounded-xl border border-red-100 bg-red-50 p-2.5 text-red-600">
-                <ShieldCheck size={24} />
+      <div className="-m-4 min-h-screen bg-[var(--background)] p-4 font-sans sm:-m-6 sm:p-5 lg:-m-8 lg:p-5">
+        <div className="mx-auto max-w-[1400px] space-y-4">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[var(--primary)] via-[var(--primary)] to-[var(--secondary)] p-5 text-white">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
+                  <Building2 className="h-6 w-6" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-black tracking-tight">
+                    {activeTab === "restaurants"
+                      ? "All Restaurants"
+                      : activeTab === "graphs"
+                        ? "Platform Graphs"
+                        : activeTab === "revenue"
+                          ? "Platform Revenue"
+                          : "Audit Logs"}
+                  </h1>
+                  <p className="mt-1 text-sm text-white/85">
+                    Manage, monitor and support all restaurant partners
+                  </p>
+                </div>
               </div>
-              <div>
-                <h1 className="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
-                  Super admin console
-                </h1>
-                <p className="mt-0.5 text-sm text-stone-500">
-                  Manage every registered restaurant and tenant on the platform.
-                </p>
-              </div>
+              {activeTab === "restaurants" && (
+                <div className="rounded-2xl bg-white/15 px-4 py-3 text-right">
+                  <p className="text-[11px] font-bold text-white/80">Total Restaurants</p>
+                  <p className="text-2xl font-black">{statsLoading ? "…" : totalStores}</p>
+                </div>
+              )}
             </div>
           </div>
 
-          <div className="flex gap-1 overflow-x-auto rounded-xl border border-stone-200 bg-white p-1">
+          <div className="flex gap-1 overflow-x-auto rounded-2xl border border-slate-100 bg-white p-1 shadow-sm">
             {[
               { id: "graphs", label: "Graphs" },
               { id: "restaurants", label: "Restaurants" },
@@ -1558,10 +1619,10 @@ export default function SuperAdminPanel() {
                 key={tab.id}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
-                className={`rounded-lg px-4 py-2 text-sm font-medium whitespace-nowrap transition ${
+                className={`rounded-xl px-4 py-2 text-sm font-black whitespace-nowrap transition ${
                   activeTab === tab.id
-                    ? "bg-red-600 text-white"
-                    : "text-stone-600 hover:bg-stone-50"
+                    ? "bg-rose-500 text-white"
+                    : "text-slate-600 hover:bg-slate-50"
                 }`}
               >
                 {tab.label}
@@ -2011,7 +2072,24 @@ export default function SuperAdminPanel() {
 
           {activeTab === "restaurants" && (
           <>
-          <div className="rounded-2xl border border-stone-200 bg-white p-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {[
+              ["Total Restaurants", statsLoading ? "…" : totalStores, Building2, "text-violet-600 bg-violet-50", "All partners"],
+              ["Active Restaurants", statsLoading ? "…" : activeStores, CheckCircle2, "text-emerald-600 bg-emerald-50", statsLoading || !totalStores ? "" : `${((activeStores / totalStores) * 100).toFixed(1)}% active`],
+              ["Pending Approval", statsLoading ? "…" : pendingStores, AlertCircle, "text-amber-600 bg-amber-50", statsLoading || !totalStores ? "" : `${((pendingStores / totalStores) * 100).toFixed(1)}% pending`],
+              ["Blocked Restaurants", statsLoading ? "…" : blockedStores, XCircle, "text-rose-600 bg-rose-50", statsLoading || !totalStores ? "" : `${((blockedStores / totalStores) * 100).toFixed(1)}% blocked`],
+            ].map(([label, value, Icon, tint, note]) => (
+              <div key={label} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+                <div className="flex items-center justify-between">
+                  <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${tint}`}><Icon size={16} /></span>
+                  <p className="text-[11px] font-bold text-slate-400">{label}</p>
+                </div>
+                <p className="mt-3 text-2xl font-black text-slate-900">{value}</p>
+                {note ? <p className="mt-1 text-[11px] font-bold text-slate-400">{note}</p> : null}
+              </div>
+            ))}
+          </div>
+          <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
               <div className="relative lg:col-span-2">
                 <Search
@@ -2126,6 +2204,24 @@ export default function SuperAdminPanel() {
                 inputMode="numeric"
                 className="h-10 w-full rounded-lg border border-stone-200 bg-white px-3 text-sm outline-none focus:border-stone-400"
               />
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch("");
+                  setStatusFilter("all");
+                  setApprovalFilter("all");
+                  setSortBy("newest");
+                  setJoinedFilter("all");
+                  setPlanFilter("all");
+                  setSubscriptionFilter("all");
+                  setDistrictFilter("");
+                  setPincodeFilter("");
+                  setPage(1);
+                }}
+                className="h-10 rounded-xl border border-slate-200 px-3 text-xs font-black text-slate-600"
+              >
+                Reset
+              </button>
             </div>
           </div>
 
@@ -2145,152 +2241,79 @@ export default function SuperAdminPanel() {
               </div>
             ) : (
               <div className="overflow-x-auto">
-                <table className="w-full border-collapse text-left">
-                  <thead className="border-b border-stone-100 bg-stone-50 text-[11px] font-medium uppercase tracking-wide text-stone-400">
+                <table className="w-full min-w-[980px] border-collapse text-left">
+                  <thead className="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wide text-slate-400">
                     <tr>
-                      <th className="p-4 sm:p-5">Store details</th>
-                      <th className="p-4 sm:p-5">Area</th>
-                      <th className="p-4 sm:p-5">Owner info</th>
-                      <th className="p-4 sm:p-5">Status</th>
-                      <th className="p-4 text-right sm:p-5">Access control</th>
+                      <th className="px-4 py-3">#</th>
+                      <th className="px-4 py-3">Restaurant</th>
+                      <th className="px-4 py-3">Owner</th>
+                      <th className="px-4 py-3">Contact</th>
+                      <th className="px-4 py-3">Location</th>
+                      <th className="px-4 py-3">Plan</th>
+                      <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Joined On</th>
+                      <th className="px-4 py-3 text-right">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-stone-100 text-xs sm:text-sm">
-                    {restaurants.map((store) => (
-                      <tr
-                        key={store._id}
-                        className="group transition-colors hover:bg-stone-50/80"
-                      >
-                        {/* Store Details */}
-                        <td className="p-4 sm:p-5">
-                          <div className="flex items-center gap-3">
-                            <div className="rounded-lg bg-stone-100 p-2.5 text-stone-500 transition-colors group-hover:bg-red-50 group-hover:text-red-600">
-                              <Store size={18} />
-                            </div>
-                            <div>
-                              <p className="text-sm font-semibold text-stone-900">
-                                {store.name}
-                              </p>
-                              <p className="mt-0.5 font-mono text-xs text-stone-400">
-                                /{store.slug}
-                              </p>
-                            </div>
-                          </div>
+                  <tbody className="divide-y divide-slate-50 text-xs sm:text-sm">
+                    {restaurants.map((store, index) => {
+                      const rowStatus = !store.isApproved
+                        ? "Pending"
+                        : store.isActive === false
+                          ? "Blocked"
+                          : "Active";
+                      const rowTone = rowStatus === "Pending" ? "amber" : rowStatus === "Blocked" ? "rose" : "emerald";
+                      return (
+                      <tr key={store._id} className="hover:bg-slate-50/80">
+                        <td className="px-4 py-3 text-xs font-bold text-slate-400">
+                          {(pagination.page - 1) * pagination.limit + index + 1}
                         </td>
-
-                        <td className="p-4 sm:p-5">
-                          <p className="text-sm text-stone-700">
-                            {store.address?.district || store.address?.city || "—"}
-                          </p>
-                          <p className="mt-0.5 text-xs text-stone-400">
-                            {store.address?.zip || "No pincode"}
-                          </p>
+                        <td className="px-4 py-3">
+                          <p className="text-sm font-black text-slate-900">{store.name}</p>
+                          <p className="text-[11px] font-semibold text-slate-400">{store.slug || "—"}</p>
                         </td>
-
-                        {/* Owner Info */}
-                        <td className="p-4 sm:p-5">
-                          <div className="flex flex-col gap-1">
-                            <span className="flex items-center gap-1.5 font-medium text-stone-700">
-                              <User size={13} className="text-stone-400" />
-                              {store.ownerName || store.name}
-                            </span>
-                            <span className="flex items-center gap-1.5 text-xs text-stone-400">
-                              <Mail size={13} className="text-stone-400" />
-                              {store.email}
-                            </span>
-                          </div>
+                        <td className="px-4 py-3 font-semibold text-slate-700">{store.ownerName || "—"}</td>
+                        <td className="px-4 py-3">
+                          <p className="flex items-center gap-1 font-semibold text-slate-700"><Phone size={12} className="text-slate-400" />{store.phone || "—"}</p>
+                          <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-400"><Mail size={12} />{store.email || "—"}</p>
                         </td>
-
-                        {/* Status Badge */}
-                        <td className="p-4 sm:p-5">
-                          <div className="flex flex-col items-start gap-1.5">
-                            <StatusPill
-                              tone={store.isApproved ? "emerald" : "amber"}
-                            >
-                              {store.isApproved ? (
-                                <CheckCircle2 size={12} />
-                              ) : (
-                                <AlertCircle size={12} />
-                              )}
-                              {store.isApproved ? "Approved" : "Pending"}
-                            </StatusPill>
-
-                            <StatusPill
-                              tone={
-                                store.isActive !== false ? "emerald" : "rose"
-                              }
-                              dot
-                            >
-                              {store.isActive !== false ? "Active" : "Blocked"}
-                            </StatusPill>
-
-                            <StatusPill tone="stone">
-                              {store.subscriptionPlan || "No plan"}
-                            </StatusPill>
-                          </div>
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-slate-700">{store.address?.city || store.address?.district || "—"}</p>
+                          <p className="text-[11px] text-slate-400">{store.address?.state || store.address?.zip || ""}</p>
                         </td>
-
-                        {/* Access Control Action Buttons */}
-                        <td className="p-4 text-right sm:p-5">
-                          <div className="flex items-center justify-end gap-2">
+                        <td className="px-4 py-3">
+                          <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-600">{formatPlan(store.subscriptionPlan)}</span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <StatusPill tone={rowTone} dot>{rowStatus}</StatusPill>
+                        </td>
+                        <td className="px-4 py-3 text-xs font-semibold text-slate-500">{formatJoined(store.createdAt)}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            <button type="button" onClick={() => handleViewDetails(store._id)} title="View" className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50">
+                              <Eye size={14} />
+                            </button>
                             <button
                               type="button"
-                              onClick={() => handleViewDetails(store._id)}
-                              className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 transition hover:bg-stone-50"
+                              onClick={() => handleStatusUpdate(store._id, "isActive", store.isActive === true)}
+                              title={store.isActive !== false ? "Block" : "Unblock"}
+                              className={`rounded-lg border p-2 ${store.isActive !== false ? "border-rose-200 text-rose-500 hover:bg-rose-50" : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"}`}
                             >
-                              View
+                              <Power size={14} />
                             </button>
-
-                            {/* Block/Unblock Button */}
                             <button
-                              onClick={() =>
-                                handleStatusUpdate(
-                                  store._id,
-                                  "isActive",
-                                  store.isActive === true,
-                                )
-                              }
-                              className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-medium transition ${
-                                store.isActive !== false
-                                  ? "border-rose-200 bg-white text-rose-600 hover:bg-rose-50"
-                                  : "border-emerald-200 bg-white text-emerald-600 hover:bg-emerald-50"
-                              }`}
-                              title={
-                                store.isActive !== false
-                                  ? "Block restaurant access"
-                                  : "Unblock restaurant"
-                              }
+                              type="button"
+                              onClick={() => handleStatusUpdate(store._id, "isApproved", store.isApproved === true)}
+                              title={store.isApproved ? "Revoke approval" : "Approve"}
+                              className={`rounded-lg border p-2 ${store.isApproved ? "border-amber-200 text-amber-600 hover:bg-amber-50" : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"}`}
                             >
-                              <Power size={13} />
-                              {store.isActive !== false ? "Block" : "Unblock"}
-                            </button>
-
-                            {/* Approve/Reject Button */}
-                            <button
-                              onClick={() =>
-                                handleStatusUpdate(
-                                  store._id,
-                                  "isApproved",
-                                  store.isApproved === true,
-                                )
-                              }
-                              className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition ${
-                                store.isApproved
-                                  ? "border border-amber-200 bg-white text-amber-600 hover:bg-amber-50"
-                                  : "bg-red-600 text-white hover:bg-red-700"
-                              }`}
-                            >
-                              {store.isApproved ? (
-                                <XCircle size={13} />
-                              ) : (
-                                <Check size={13} />
-                              )}
-                              {store.isApproved ? "Revoke" : "Approve"}
+                              {store.isApproved ? <XCircle size={14} /> : <Check size={14} />}
                             </button>
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

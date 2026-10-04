@@ -1,10 +1,13 @@
-export default function Button({ children, variant = 'primary', className = '', ...props }) {
-  const baseStyle = "px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
+export default function Button({ children, variant = "primary", className = "", ...props }) {
+  const baseStyle =
+    "px-4 py-2.5 rounded-xl text-sm font-semibold transition-all shadow-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed";
   const variants = {
-    primary: "bg-red-500 text-white hover:bg-red-600 shadow-red-500/10",
-    secondary: "bg-slate-100 text-slate-700 hover:bg-slate-200",
-    danger: "bg-rose-600 text-white hover:bg-rose-700",
-    outline: "border border-slate-200 text-slate-600 hover:bg-slate-50"
+    primary:
+      "bg-[var(--primary)] text-white hover:bg-[var(--primary-dark)] shadow-[0_4px_14px_rgba(244,63,94,0.18)]",
+    secondary: "bg-[var(--surface-muted)] text-[var(--text-secondary)] hover:bg-[var(--border)]",
+    danger: "bg-[var(--danger)] text-white hover:brightness-95",
+    outline:
+      "border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--surface-muted)]",
   };
 
   return (

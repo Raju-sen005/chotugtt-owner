@@ -44,7 +44,7 @@ export default function BillTemplatePaymentModal({ template, onClose, onSuccess 
         description: `${template.name} bill template license`,
         order_id: order.orderId,
         prefill: { name: order.restaurantName },
-        theme: { color: "#e75822" },
+        theme: { color: "#F97316" },
         modal: { ondismiss: () => setIsPaying(false) },
         handler: async (response) => {
           try {

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from "react";
+import { Link } from "react-router-dom";
 import axios from "axios";
 import {
   ShoppingBag,
@@ -8,20 +9,78 @@ import {
   Search,
   Package,
   UtensilsCrossed,
+  Utensils,
   Loader2,
   Sparkles,
-  ReceiptText,
   CheckCircle2,
-  Circle,
   X,
   ChevronUp,
   ChevronDown,
   GripVertical,
+  ReceiptText,
+  ChefHat,
+  LayoutGrid,
+  Flame,
+  Coffee,
+  Soup,
+  Cake,
+  UserRound,
+  ArrowRight,
+  Salad,
+  GlassWater,
+  CupSoda,
+  Milk,
+  Wheat,
+  Pizza,
+  Sandwich,
+  Popcorn,
+  Leaf,
+  IceCreamCone,
+  Drumstick,
+  EggFried,
+  Candy,
+  Martini,
+  Croissant,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { useSocket } from "../context/SocketContext";
 import { getSelectedBillTemplate } from "../constants/billTemplates";
 import { orderCategoryNames, sortMenuEntries } from "../utils/menuOrder";
+import { requireApiBase, resolveMediaUrl } from "../utils/mediaUrl";
+
+function categoryIcon(name) {
+  const value = String(name || "").toLowerCase();
+  if (name === "ALL") return LayoutGrid;
+  if (name === "COMBO") return Sparkles;
+  if (value.includes("soup") || value.includes("start") || value.includes("appet")) return Soup;
+  if (value.includes("shake") || value.includes("smoothie")) return IceCreamCone;
+  if (value.includes("mocktail") || value.includes("cocktail") || value.includes("mojito")) return Martini;
+  if (value.includes("lassi") || value.includes("raita") || value.includes("curd") || value.includes("buttermilk")) return Milk;
+  if (value.includes("coffee") || value.includes("tea") || value.includes("hot beverage") || value.includes("beverage")) return Coffee;
+  if (value.includes("drink") || value.includes("juice") || value.includes("cold")) return CupSoda;
+  if (value.includes("salad")) return Salad;
+  if (value.includes("papad")) return Croissant;
+  if (value.includes("roti") || value.includes("paratha") || value.includes("naan") || value.includes("bread")) return Wheat;
+  if (value.includes("rice") || value.includes("biryani") || value.includes("pulao")) return Package;
+  if (value.includes("paneer")) return EggFried;
+  if (value.includes("veg") || value.includes("vegetable") || value.includes("dal")) return Leaf;
+  if (value.includes("chinese") || value.includes("noodle") || value.includes("manchurian")) return Flame;
+  if (value.includes("pizza")) return Pizza;
+  if (value.includes("sandwich") || value.includes("burger") || value.includes("maggie")) return Sandwich;
+  if (value.includes("fries") || value.includes("snack") || value.includes("chaat") || value.includes("pakoda")) return Popcorn;
+  if (value.includes("sizzler") || value.includes("tikka") || value.includes("grill")) return Drumstick;
+  if (value.includes("dessert") || value.includes("sweet") || value.includes("ice") || value.includes("cake")) return Cake;
+  if (value.includes("special") || value.includes("signature") || value.includes("chef") || value.includes("treat")) return Sparkles;
+  if (value.includes("water") || value.includes("lassi")) return GlassWater;
+  if (value.includes("candy") || value.includes("chocolate")) return Candy;
+  return Utensils;
+}
+
+function categoryLabel(name) {
+  if (name === "ALL") return "All Items";
+  if (name === "COMBO") return "Combos";
+  return name;
+}
 
 function indexUnderPointer(attribute, clientX, clientY) {
   const nodes = document.querySelectorAll(`[${attribute}]`);
@@ -93,9 +152,13 @@ export default function CounterPOS() {
   const [showParcelModal, setShowParcelModal] = useState(false);
   const [customerNameInput, setCustomerNameInput] = useState("");
   const [openParcels, setOpenParcels] = useState([]);
+  const [orderMode, setOrderMode] = useState("DINE_IN");
+  const [sortMode, setSortMode] = useState("default");
+  const [offersOnly, setOffersOnly] = useState(false);
+  const searchRef = useRef(null);
   const [newTableNumber, setNewTableNumber] = useState("");
   const [tableStatusList, setTableStatusList] = useState([]);
-  const apiBase = import.meta.env.VITE_APP_API_BASE || "http://localhost:5000";
+  const apiBase = requireApiBase();
 
   useEffect(() => {
     const fetchStoreDetails = async () => {
@@ -130,6 +193,41 @@ export default function CounterPOS() {
 
     fetchStoreDetails();
   }, [apiBase]);
+
+  useEffect(() => {
+    const onKey = (event) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Escape closes POS dialogs; lock body scroll while any modal is open
+  useEffect(() => {
+    const anyModalOpen = showTableModal || showNewTableModal || showParcelModal;
+    if (!anyModalOpen) return undefined;
+
+    const onKey = (event) => {
+      if (event.key !== "Escape" || loading) return;
+      if (showTableModal) setShowTableModal(false);
+      if (showNewTableModal) {
+        setShowNewTableModal(false);
+        setNewTableNumber("");
+      }
+      if (showParcelModal) setShowParcelModal(false);
+    };
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [showTableModal, showNewTableModal, showParcelModal, loading]);
 
   // 1. Fetch Menu Items, Combos, and Active Tables
   useEffect(() => {
@@ -532,6 +630,52 @@ export default function CounterPOS() {
       return matchesSearch && item.category === activeTab;
     });
   }, [catalog, searchQuery, activeTab]);
+
+  const activeOfferCoverage = useMemo(() => {
+    const now = Date.now();
+    const ids = new Set();
+    let allItems = false;
+
+    offers.forEach((offer) => {
+      if (offer?.isActive === false) return;
+      const startsAt = offer?.startsAt ? new Date(offer.startsAt).getTime() : null;
+      const expiresAt = offer?.expiresAt ? new Date(offer.expiresAt).getTime() : null;
+      if (startsAt && Number.isFinite(startsAt) && startsAt > now) return;
+      if (expiresAt && Number.isFinite(expiresAt) && expiresAt <= now) return;
+      if (offer?.targetScope === "ALL_ITEMS") {
+        allItems = true;
+        return;
+      }
+      (Array.isArray(offer?.targetItems) ? offer.targetItems : []).forEach((target) => {
+        const id = target?._id || target;
+        if (id) ids.add(String(id));
+      });
+    });
+
+    return { ids, allItems };
+  }, [offers]);
+
+  const visibleCatalog = useMemo(() => {
+    let rows = filteredCatalog;
+
+    if (offersOnly && !arrangeMode) {
+      rows = rows.filter((item) => {
+        if (item.catalogType === "COMBO") return false;
+        if (activeOfferCoverage.allItems) return true;
+        return activeOfferCoverage.ids.has(String(item._id));
+      });
+    }
+
+    if (arrangeMode || sortMode === "default") return rows;
+
+    const copy = [...rows];
+    if (sortMode === "name") {
+      copy.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    } else if (sortMode === "price") {
+      copy.sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
+    }
+    return copy;
+  }, [filteredCatalog, offersOnly, arrangeMode, sortMode, activeOfferCoverage]);
 
   const canArrangeItems =
     arrangeMode && activeTab !== "ALL" && !searchQuery.trim() && !savingOrder;
@@ -990,7 +1134,7 @@ export default function CounterPOS() {
       }
 
       // Relative backend path
-      return `${apiBase.replace("/api", "")}${path}`;
+      return resolveMediaUrl(path, apiBase);
     };
 
     const upiQrUrl = resolveUrl(storeDetails.upiQrCode);
@@ -1650,12 +1794,42 @@ export default function CounterPOS() {
 
   const cartItemCount = cart.reduce((acc, i) => acc + i.quantity, 0);
 
+  const submitCurrentOrder = () => {
+    if (cart.length === 0) return alert("Cart is empty!");
+
+    if (orderMode === "PARCEL") {
+      if (openParcels.length > 0) {
+        setShowParcelModal(true);
+        return;
+      }
+      handleParcelOrder();
+      return;
+    }
+
+    if (orderMode === "NEW_TABLE") {
+      if (!newTableNumber) {
+        setShowNewTableModal(true);
+        return;
+      }
+      handleNewTableOrderSubmit();
+      return;
+    }
+
+    if (!selectedTable) {
+      setShowTableModal(true);
+      return;
+    }
+    handleAddToTableSubmit();
+  };
+
+  const menuImage = (image) => resolveMediaUrl(image, apiBase);
+
   return (
     <>
       {/* Toast — kept minimal, docket-tinted */}
       {showSuccessPopup && (
         <div className="fixed top-6 right-6 z-[9999] animate-in slide-in-from-right-5 fade-in duration-300">
-          <div className="flex items-start gap-3 bg-white border border-slate-200 border-l-4 border-l-emerald-500 shadow-2xl rounded-2xl px-5 py-4 min-w-[320px] max-w-[400px]">
+          <div className="flex items-start gap-3 bg-white border border-slate-200 border-l-4 border-l-emerald-500 shadow-2xl rounded-2xl px-5 py-4 w-[calc(100%-2rem)] max-w-sm">
             <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
               <CheckCircle2 size={22} strokeWidth={2.5} />
             </div>
@@ -1679,144 +1853,194 @@ export default function CounterPOS() {
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 pb-24 lg:pb-6 grid grid-cols-1 lg:grid-cols-12 gap-6 font-sans min-h-[92vh] bg-[#FAF7F2]">
-        {/* Left 8 Cols: Catalog & Menu Grid */}
-        <div className="lg:col-span-8 flex flex-col space-y-5 min-w-0">
-          {/* Header & Search Bar */}
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 sm:p-6 rounded-2xl border border-slate-200 shadow-sm shadow-slate-200/40">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-rose-600 to-rose-700 text-white flex items-center justify-center shadow-sm shadow-rose-200 shrink-0">
-                <ReceiptText className="w-6 h-6" />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h1 className="text-xl font-black text-slate-900 tracking-tight">
-                    Counter POS
-                  </h1>
-                  <span className="hidden sm:flex items-center gap-1 text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
-                    <Circle className="w-1.5 h-1.5 fill-emerald-500 text-emerald-500 animate-pulse" />
-                    LIVE
-                  </span>
+      <div className="-mx-4 -mt-4 mb-24 bg-[var(--background)] px-4 pb-6 pt-4 font-sans md:-mx-6 lg:-mx-8 lg:mb-0 lg:px-5">
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="min-w-0 space-y-4">
+            <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.9fr)]">
+              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[var(--primary)] via-[var(--primary)] to-[var(--secondary)] p-5 text-white shadow-sm min-h-[156px]">
+                <div className="relative z-10 max-w-md">
+                  <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/20">
+                    <ChefHat className="h-6 w-6" />
+                  </div>
+                  <h1 className="text-2xl font-black tracking-tight">Create Amazing Orders</h1>
+                  <p className="mt-1 text-sm font-semibold text-white/90">Quick • Easy • Professional</p>
+                  <p className="mt-2 max-w-sm text-xs leading-relaxed text-white/85">
+                    Select items from the menu and create orders for dine-in, parcel or a new table.
+                  </p>
                 </div>
-                <p className="text-xs text-slate-500 font-medium mt-0.5">
-                  {arrangeMode
-                    ? "Drag categories, then open a category and drag its dishes. This order is used everywhere."
-                    : activeTables.length > 0
-                      ? `${activeTables.length} table${activeTables.length > 1 ? "s" : ""} running · billing counter`
-                      : "Streamlined counter billing, parcels & table order mapping"}
-                </p>
+                <div className="pointer-events-none absolute -right-6 -bottom-8 hidden h-40 w-40 rounded-full bg-white/10 sm:block" />
+                <div className="pointer-events-none absolute right-10 top-6 hidden h-16 w-16 rounded-full bg-white/10 sm:block" />
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: "DINE_IN", title: "Dine In", hint: "Add to a running table", icon: Utensils, tint: "bg-emerald-50 text-emerald-600" },
+                  { id: "PARCEL", title: "Parcel", hint: "Takeaway order", icon: ShoppingBag, tint: "bg-rose-50 text-rose-500" },
+                  { id: "NEW_TABLE", title: "New Table", hint: "Start a free table", icon: Plus, tint: "bg-sky-50 text-sky-600" },
+                ].map((mode) => {
+                  const ModeIcon = mode.icon;
+                  const active = orderMode === mode.id;
+                  return (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => setOrderMode(mode.id)}
+                      className={`flex flex-col items-center justify-center rounded-2xl border bg-white px-2 py-4 text-center shadow-sm transition ${
+                        active ? "border-rose-300 ring-2 ring-rose-100" : "border-slate-100 hover:border-rose-200"
+                      }`}
+                    >
+                      <span className={`mb-2 flex h-10 w-10 items-center justify-center rounded-2xl ${mode.tint}`}>
+                        <ModeIcon className="h-5 w-5" />
+                      </span>
+                      <span className="text-sm font-black text-slate-900">{mode.title}</span>
+                      <span className="mt-0.5 hidden text-[10px] font-medium text-slate-400 sm:block">{mode.hint}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
-            <button
-              type="button"
-              onClick={() => setArrangeMode((current) => !current)}
-              disabled={savingOrder}
-              className={`px-3 py-2 rounded-xl text-xs font-black border transition-colors ${
-                arrangeMode
-                  ? "bg-slate-900 text-white border-slate-900"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-              }`}
-            >
-              {savingOrder ? "Saving..." : arrangeMode ? "Done arranging" : "Arrange menu"}
-            </button>
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
-              <input
-                type="text"
-                placeholder="Search dishes or combos..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100 focus:bg-white transition-all"
-              />
-            </div>
-          </div>
 
-          {/* Category Filters Horizontal Scroll */}
-          <div
-            className={`flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar ${
-              arrangeMode ? "touch-none" : ""
-            }`}
-          >
-            {categories.map((cat, index) => (
+            <div className={`flex items-stretch gap-2 overflow-x-auto no-scrollbar pb-1 ${arrangeMode ? "touch-none" : ""}`}>
+              {categories.map((cat, index) => {
+                const Icon = categoryIcon(cat);
+                const count = catalog.filter((item) => cat === "ALL" || item.category === cat).length;
+                const active = activeTab === cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    data-category-index={index}
+                    onClick={() => {
+                      if (!arrangeMode || cat === "ALL") setActiveTab(cat);
+                    }}
+                    onPointerDown={(event) => onCategoryPointerDown(event, index)}
+                    className={`flex shrink-0 items-center gap-2 rounded-2xl border px-3 py-2 text-left touch-none ${
+                      active
+                        ? "border-[var(--primary)] bg-[var(--primary-light)] text-[var(--primary-dark)] shadow-sm"
+                        : "border-[var(--border)] bg-white text-[var(--text-secondary)] hover:border-[var(--primary)]/40"
+                    } ${dragKey === `category:${cat}` ? "opacity-60" : ""} ${
+                      arrangeMode && cat !== "ALL" ? "cursor-grab active:cursor-grabbing" : ""
+                    }`}
+                  >
+                    {arrangeMode && cat !== "ALL" ? (
+                      <GripVertical className="h-4 w-4 shrink-0" />
+                    ) : (
+                      <Icon
+                        className={`h-4 w-4 shrink-0 ${
+                          active ? "text-[var(--primary)]" : "text-[var(--text-muted)]"
+                        }`}
+                      />
+                    )}
+                    <span className="min-w-0">
+                      <span className="block whitespace-nowrap text-xs font-black leading-tight">
+                        {categoryLabel(cat)}
+                      </span>
+                      <span
+                        className={`block whitespace-nowrap text-[10px] font-medium ${
+                          active ? "text-[var(--primary)]/70" : "text-[var(--text-muted)]"
+                        }`}
+                      >
+                        {count} item{count === 1 ? "" : "s"}
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="relative min-w-[200px] flex-1">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  ref={searchRef}
+                  type="text"
+                  placeholder="Search dishes..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-16 text-sm text-slate-800 outline-none focus:border-rose-300 focus:ring-2 focus:ring-rose-100"
+                />
+                <span className="pointer-events-none absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-md border border-slate-200 px-1.5 py-0.5 text-[10px] font-bold text-slate-400 sm:inline">
+                  Ctrl K
+                </span>
+              </div>
+              <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-600">
+                Sort:
+                <select
+                  value={arrangeMode ? "default" : sortMode}
+                  disabled={arrangeMode}
+                  onChange={(event) => setSortMode(event.target.value)}
+                  className="bg-transparent outline-none"
+                >
+                  <option value="default">Default</option>
+                  <option value="name">Name</option>
+                  <option value="price">Price</option>
+                </select>
+              </label>
               <button
-                key={cat}
                 type="button"
-                data-category-index={index}
-                onClick={() => {
-                  if (!arrangeMode || cat === "ALL") setActiveTab(cat);
-                }}
-                onPointerDown={(event) => onCategoryPointerDown(event, index)}
-                className={`px-4 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 touch-none ${
-                  activeTab === cat
-                    ? "bg-rose-600 text-white shadow-sm shadow-rose-200"
-                    : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:border-slate-300"
-                } ${dragKey === `category:${cat}` ? "opacity-60" : ""} ${
-                  arrangeMode && cat !== "ALL" ? "cursor-grab active:cursor-grabbing" : ""
+                disabled={arrangeMode}
+                onClick={() => setOffersOnly((current) => !current)}
+                className={`flex items-center gap-1.5 rounded-xl border px-3 py-2.5 text-xs font-black ${
+                  offersOnly
+                    ? "border-rose-500 bg-rose-500 text-white"
+                    : "border-orange-200 bg-orange-50 text-orange-600"
                 }`}
               >
-                {cat === "COMBO" ? (
-                  <span className="flex items-center gap-1.5">
-                    {arrangeMode && <GripVertical className="w-3.5 h-3.5" />}
-                    <Sparkles className="w-3.5 h-3.5" /> Combos & Deals
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-1.5">
-                    {arrangeMode && cat !== "ALL" && (
-                      <GripVertical className="w-3.5 h-3.5" />
-                    )}
-                    {cat}
-                  </span>
-                )}
+                <Flame className="h-3.5 w-3.5" /> Offers
               </button>
-            ))}
-          </div>
+              <button
+                type="button"
+                onClick={() => setArrangeMode((current) => !current)}
+                disabled={savingOrder}
+                className={`rounded-xl border px-3 py-2.5 text-xs font-black ${
+                  arrangeMode
+                    ? "border-slate-900 bg-slate-900 text-white"
+                    : "border-rose-200 bg-white text-rose-500"
+                }`}
+              >
+                {savingOrder ? "Saving..." : arrangeMode ? "Done arranging" : "Arrange"}
+              </button>
+              <Link
+                to="/table-monitor"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-black text-slate-600"
+              >
+                Table View
+              </Link>
+            </div>
 
-          {/* Product Cards Grid */}
-          <div className="flex-1">
+            {arrangeMode && activeTab === "ALL" && (
+              <p className="text-xs font-semibold text-slate-500">
+                Category order is ready. Open one category to drag its dishes.
+              </p>
+            )}
+            {arrangeMode && activeTab !== "ALL" && searchQuery.trim() && (
+              <p className="text-xs font-semibold text-slate-500">
+                Clear search before dragging dishes.
+              </p>
+            )}
+
             {fetchingData ? (
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
-                {Array.from({ length: 10 }).map((_, idx) => (
-                  <div
-                    key={idx}
-                    className="bg-white p-4 rounded-2xl border border-slate-200 animate-pulse"
-                  >
-                    <div className="w-full h-32 rounded-xl bg-slate-100 mb-3" />
-                    <div className="h-3 w-3/4 bg-slate-100 rounded mb-2" />
-                    <div className="h-2.5 w-1/2 bg-slate-100 rounded" />
-                    <div className="flex justify-between items-center mt-3 pt-2.5 border-t border-slate-100">
-                      <div className="h-3 w-10 bg-slate-100 rounded" />
-                      <div className="w-7 h-7 rounded-lg bg-slate-100" />
-                    </div>
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                {Array.from({ length: 8 }).map((_, idx) => (
+                  <div key={idx} className="animate-pulse rounded-2xl border border-slate-100 bg-white p-2.5">
+                    <div className="mb-3 h-28 rounded-xl bg-slate-100" />
+                    <div className="mb-2 h-3 w-3/4 rounded bg-slate-100" />
+                    <div className="h-8 rounded-xl bg-slate-100" />
                   </div>
                 ))}
               </div>
-            ) : filteredCatalog.length === 0 ? (
-              <div className="flex flex-col items-center justify-center h-80 bg-white rounded-2xl border border-slate-200 p-6 text-center">
-                <UtensilsCrossed className="w-12 h-12 text-slate-300 mb-2" />
-                <p className="text-sm font-bold text-slate-800">
-                  No menu items found
-                </p>
-                <p className="text-xs text-slate-400 mt-1 max-w-xs">
-                  Try switching categories or clear out the search keyword.
-                </p>
+            ) : visibleCatalog.length === 0 ? (
+              <div className="flex h-72 flex-col items-center justify-center rounded-2xl border border-slate-100 bg-white text-center">
+                <UtensilsCrossed className="mb-2 h-10 w-10 text-slate-300" />
+                <p className="text-sm font-bold text-slate-800">No menu items found</p>
+                <p className="mt-1 text-xs text-slate-400">Try another category or clear the search.</p>
               </div>
             ) : (
-              <>
-              {arrangeMode && activeTab === "ALL" && (
-                <p className="mb-3 text-xs font-semibold text-slate-500">
-                  Category order is ready. Open one category to drag its dishes.
-                </p>
-              )}
-              {arrangeMode && activeTab !== "ALL" && searchQuery.trim() && (
-                <p className="mb-3 text-xs font-semibold text-slate-500">
-                  Clear search before dragging dishes.
-                </p>
-              )}
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                {filteredCatalog.map((product, index) => {
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+                {visibleCatalog.map((product, index) => {
                   const isCombo = product.catalogType === "COMBO";
                   const qtyInCart = cartQtyMap[product._id];
-
+                  const image = menuImage(product.image);
                   return (
                     <div
                       key={product._id}
@@ -1824,9 +2048,7 @@ export default function CounterPOS() {
                       onClick={() => {
                         if (!arrangeMode) addToCart(product);
                       }}
-                      onPointerDown={(event) =>
-                        onItemPointerDown(event, product, index)
-                      }
+                      onPointerDown={(event) => onItemPointerDown(event, product, index)}
                       role="button"
                       tabIndex={0}
                       onKeyDown={(e) => {
@@ -1836,273 +2058,268 @@ export default function CounterPOS() {
                           addToCart(product);
                         }
                       }}
-                      className={`group bg-white p-4 rounded-2xl border hover:shadow-lg hover:shadow-slate-200/60 hover:-translate-y-0.5 transition-all duration-300 cursor-pointer flex flex-col justify-between relative overflow-hidden focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 ${
-                        canArrangeItems ? "touch-none cursor-grab active:cursor-grabbing" : ""
+                      className={`rounded-2xl border p-2.5 text-left shadow-sm transition ${
+                        canArrangeItems ? "touch-none cursor-grab active:cursor-grabbing" : "cursor-pointer"
                       } ${
                         qtyInCart
-                          ? "border-rose-300 ring-1 ring-rose-100"
-                          : "border-slate-200 hover:border-rose-200"
-                      } ${dragKey === `item:${product._id}` ? "opacity-60" : ""}`}
+                          ? "border-[var(--primary)] bg-[var(--primary-light)] ring-2 ring-[rgba(244,63,94,0.16)]"
+                          : "border-[var(--border)] bg-white hover:border-[var(--primary)]/35"
+                      } ${
+                        dragKey === `item:${product._id}` ? "opacity-60" : ""
+                      }`}
                     >
-                      {isCombo && (
-                        <span className="absolute top-3 right-3 bg-gradient-to-r from-amber-500 to-amber-600 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider z-10">
-                          Combo
-                        </span>
-                      )}
-
-                      {qtyInCart > 0 && (
-                        <span className="absolute top-3 left-3 bg-rose-600 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center z-10 shadow-sm">
-                          {qtyInCart}
-                        </span>
-                      )}
-
-                      <div>
-                        {product.image ? (
-                          <div className="w-full h-32 rounded-xl overflow-hidden mb-3 bg-slate-100">
-                            <img
-                              src={
-                                product.image
-                                  ? product.image.startsWith("http")
-                                    ? product.image
-                                    : `${import.meta.env.VITE_APP_API_BASE.replace("/api", "")}${product.image}`
-                                  : null
-                              }
-                              alt={product.name}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                            />
-                          </div>
+                      <div className="relative mb-2 h-28 overflow-hidden rounded-xl bg-slate-100">
+                        {image ? (
+                          <img src={image} alt={product.name} className="h-full w-full object-cover" loading="lazy" decoding="async" />
                         ) : (
-                          <div className="w-full h-32 rounded-xl bg-slate-50 flex items-center justify-center mb-3 border border-dashed border-slate-200 text-slate-300">
-                            <UtensilsCrossed className="w-8 h-8" />
+                          <div className="flex h-full items-center justify-center text-slate-300">
+                            <UtensilsCrossed className="h-8 w-8" />
                           </div>
                         )}
-                        <h4 className="font-bold text-slate-900 text-xs line-clamp-1 group-hover:text-rose-700">
-                          {product.name}
-                        </h4>
-                        <p className="text-[11px] text-slate-400 line-clamp-1 mt-0.5 font-medium">
-                          {product.description || product.category}
-                        </p>
+                        {isCombo && (
+                          <span className="absolute left-2 top-2 rounded-full bg-[var(--secondary)] px-2 py-0.5 text-[10px] font-black text-white">
+                            Combo
+                          </span>
+                        )}
+                        {qtyInCart > 0 && (
+                          <span className="absolute right-2 top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--primary)] px-1 text-[10px] font-black text-white">
+                            {qtyInCart}
+                          </span>
+                        )}
                       </div>
-                      <div className="flex justify-between items-center mt-3 pt-2.5 border-t border-slate-100">
-                        <span className="font-black text-slate-900 text-sm font-mono">
-                          ₹{product.price}
-                        </span>
-                        <div className="w-7 h-7 bg-slate-100 text-slate-600 rounded-lg flex items-center justify-center group-hover:bg-rose-600 group-hover:text-white transition-all">
-                          <Plus className="w-3.5 h-3.5" />
-                        </div>
+                      <div className="flex items-center gap-1.5 px-0.5">
+                        <span className={`h-2 w-2 shrink-0 rounded-full ${product.isVeg === false ? "bg-[var(--nonveg)]" : "bg-[var(--veg)]"}`} />
+                        <h4 className="truncate text-sm font-bold text-[var(--text-primary)]">{product.name}</h4>
                       </div>
+                      <p className="mt-1 px-0.5 text-sm font-black text-[var(--text-primary)]">₹{product.price}</p>
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (!arrangeMode) addToCart(product);
+                        }}
+                        className={`mt-2 w-full rounded-xl border py-1.5 text-sm font-bold transition ${
+                          qtyInCart
+                            ? "border-[var(--primary)] bg-[var(--primary)] text-white hover:bg-[var(--primary-dark)]"
+                            : "border-[var(--primary)]/30 text-[var(--primary)] hover:bg-[var(--primary-light)]"
+                        }`}
+                      >
+                        {qtyInCart ? `Added · ${qtyInCart}` : "+ Add"}
+                      </button>
                     </div>
                   );
                 })}
               </div>
-              </>
             )}
           </div>
-        </div>
 
-        {/* Right 4 Cols: Docket-style Cart & Billing Sidebar.
-            Mobile: fixed bottom sheet, so totals + action buttons are
-            ALWAYS reachable without scrolling the product grid.
-            Desktop (lg+): sticky full-height sidebar, unchanged. */}
-        <div
-          className={`fixed bottom-0 inset-x-0 z-40 bg-white border-t border-slate-200 rounded-t-3xl shadow-[0_-8px_30px_rgba(15,23,42,0.12)]
-          lg:col-span-4 lg:sticky lg:top-0 lg:z-auto lg:inset-x-auto lg:h-[calc(100vh)] lg:rounded-2xl lg:border lg:shadow-sm lg:shadow-slate-200/40
-          flex flex-col overflow-hidden transition-[max-height] duration-300 ease-out
-          ${mobileCartOpen ? "max-h-[82vh]" : "max-h-[64px]"} lg:max-h-none`}
-        >
-          {/* Collapsible header + item list — always shown on desktop, toggled on mobile */}
           <div
-            className={`${mobileCartOpen ? "flex" : "hidden"} lg:flex flex-col flex-1 min-h-0 overflow-y-auto no-scrollbar px-6 pt-5 lg:pt-6`}
+            className={`fixed inset-x-0 bottom-0 z-40 flex flex-col overflow-hidden rounded-t-3xl border border-[var(--border)] bg-white shadow-[0_-8px_30px_rgba(15,23,42,0.12)] transition-[max-height] duration-300 lg:sticky lg:top-4 lg:z-20 lg:h-[calc(100vh-7.5rem)] lg:max-h-[calc(100vh-7.5rem)] lg:self-start lg:rounded-3xl lg:shadow-[var(--shadow-card)] ${
+              mobileCartOpen ? "max-h-[82vh]" : "max-h-[132px]"
+            }`}
           >
-            <div className="flex justify-between items-center mb-4 pb-3.5 border-b border-dashed border-slate-200 shrink-0">
-              <h3 className="font-black text-slate-900 text-sm uppercase tracking-wider flex items-center gap-2">
-                <ShoppingBag className="w-4 h-4 text-rose-600" /> Current Bill
-              </h3>
-              <span className="text-[11px] font-extrabold bg-rose-600 text-white px-2.5 py-1 rounded-lg font-mono">
-                {cartItemCount} item{cartItemCount === 1 ? "" : "s"}
+            <button
+              type="button"
+              onClick={() => setMobileCartOpen((open) => !open)}
+              className="flex items-center justify-between border-b border-slate-100 px-4 py-3 lg:hidden"
+            >
+              <span className="text-xs font-bold text-slate-700">
+                {cartItemCount} item{cartItemCount === 1 ? "" : "s"} · ₹{Number(total).toLocaleString("en-IN")}
               </span>
-            </div>
+              {mobileCartOpen ? <ChevronDown className="h-4 w-4 text-slate-400" /> : <ChevronUp className="h-4 w-4 text-slate-400" />}
+            </button>
 
-            {/* Cart Item List */}
-            <div className="space-y-2.5 pb-2">
-              {cart.length === 0 ? (
-                <div className="py-16 lg:py-20 text-center flex flex-col items-center justify-center">
-                  <ShoppingBag className="w-10 h-10 text-slate-200 mb-2" />
-                  <p className="text-xs font-bold text-slate-400">
-                    Cart is empty
+            <div className={`${mobileCartOpen ? "flex" : "hidden"} min-h-0 flex-1 flex-col lg:flex`}>
+              <div className="flex items-center justify-between px-4 pb-2 pt-4">
+                <h3 className="text-base font-black text-slate-900">Current Order</h3>
+                <button
+                  type="button"
+                  onClick={() => setCart([])}
+                  disabled={cart.length === 0}
+                  className="text-xs font-bold text-[var(--primary)] disabled:text-slate-300"
+                >
+                  Clear All
+                </button>
+              </div>
+
+              <div className="mx-4 grid grid-cols-3 gap-1 rounded-2xl bg-slate-50 p-1">
+                {[
+                  { id: "DINE_IN", label: "Dine In", icon: UtensilsCrossed },
+                  { id: "PARCEL", label: "Parcel", icon: ShoppingBag },
+                  { id: "NEW_TABLE", label: "Table", icon: Plus },
+                ].map((mode) => {
+                  const ModeIcon = mode.icon;
+                  const active = orderMode === mode.id;
+                  return (
+                    <button
+                      key={mode.id}
+                      type="button"
+                      onClick={() => setOrderMode(mode.id)}
+                      className={`flex items-center justify-center gap-1 rounded-xl py-2 text-[11px] font-black ${
+                        active
+                          ? "bg-[var(--primary)] text-white shadow-sm"
+                          : "text-slate-500"
+                      }`}
+                    >
+                      <ModeIcon className="h-3.5 w-3.5" />
+                      {mode.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-4 py-3">
+                {orderMode === "PARCEL" ? (
+                  <p className="mb-3 rounded-xl bg-[var(--primary-light)] px-3 py-2 text-[11px] font-semibold text-[var(--primary-dark)]">
+                    {openParcels.length > 0
+                      ? "An open parcel is already running. Create Order will let you add these items to it, or start a new parcel."
+                      : "This order will be sent as a new parcel."}
                   </p>
-                  <p className="text-[11px] text-slate-300 mt-0.5">
-                    Tap catalog items to build order
-                  </p>
-                </div>
-              ) : (
-                cart.map((item, idx) => (
-                  <div
-                    key={item._id}
-                    className={`flex justify-between items-center py-2.5 ${
-                      idx !== cart.length - 1
-                        ? "border-b border-dashed border-slate-150"
-                        : ""
-                    }`}
-                  >
-                    <div className="flex-1 pr-2 min-w-0">
-                      <span className="font-bold text-slate-900 text-xs block line-clamp-1">
-                        {item.name}
-                      </span>
-                      <span className="text-[11px] text-slate-500 font-medium font-mono">
-                        ₹{item.price} × {item.quantity} = ₹
-                        {(item.price * item.quantity).toFixed(0)}
-                      </span>
-                      {itemDiscountMap[item._id] > 0 && (
-                        <span className="inline-block mt-1 text-[10px] text-emerald-700 font-bold bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 rounded-md">
-                          -₹{itemDiscountMap[item._id]} offer
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <div className="flex items-center bg-slate-50 border border-slate-200 rounded-lg overflow-hidden">
-                        <button
-                          onClick={() => updateQty(item._id, -1)}
-                          className="p-1.5 hover:bg-rose-50 hover:text-rose-600 text-slate-600 cursor-pointer transition-colors"
-                        >
-                          <Minus className="w-3 h-3" />
-                        </button>
-                        <span className="px-2 text-xs font-black text-slate-900 font-mono">
-                          {item.quantity}
-                        </span>
-                        <button
-                          onClick={() => updateQty(item._id, 1)}
-                          className="p-1.5 hover:bg-rose-50 hover:text-rose-600 text-slate-600 cursor-pointer transition-colors"
-                        >
-                          <Plus className="w-3 h-3" />
-                        </button>
-                      </div>
+                ) : (
+                  <div className="mb-3 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-[11px] font-bold text-slate-500">
+                        {orderMode === "NEW_TABLE" ? "Free table" : "Running table"}
+                      </p>
                       <button
-                        onClick={() => removeFromCart(item._id)}
-                        className="text-slate-400 p-1.5 hover:bg-rose-600 hover:text-white rounded-lg cursor-pointer transition-colors"
+                        type="button"
+                        onClick={() => {
+                          if (orderMode === "NEW_TABLE") setShowNewTableModal(true);
+                          else setShowTableModal(true);
+                        }}
+                        className="text-[11px] font-bold text-[var(--primary)]"
                       >
-                        <Trash2 className="w-3.5 h-3.5" />
+                        View Tables
                       </button>
                     </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (orderMode === "NEW_TABLE") setShowNewTableModal(true);
+                        else setShowTableModal(true);
+                      }}
+                      className={`flex w-full items-center justify-between rounded-xl border px-3 py-2.5 text-left transition ${
+                        (orderMode === "NEW_TABLE" ? newTableNumber : selectedTable)
+                          ? "border-[var(--primary)] bg-[var(--primary-light)]"
+                          : "border-[var(--border)] bg-white hover:border-[var(--primary)]/35"
+                      }`}
+                    >
+                      <span>
+                        <span className="block text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                          {orderMode === "NEW_TABLE" ? "Selected free table" : "Selected running table"}
+                        </span>
+                        <span className="mt-0.5 block text-sm font-black text-slate-900">
+                          {orderMode === "NEW_TABLE"
+                            ? newTableNumber
+                              ? `Table ${newTableNumber}`
+                              : "Tap to choose a free table"
+                            : selectedTable
+                              ? `Table ${selectedTable}`
+                              : "Tap to choose a running table"}
+                        </span>
+                      </span>
+                      <span className="rounded-lg bg-white px-2 py-1 text-[10px] font-black text-[var(--primary)] shadow-sm">
+                        {orderMode === "NEW_TABLE"
+                          ? `${freeTables.length} free`
+                          : `${activeTables.length} active`}
+                      </span>
+                    </button>
                   </div>
-                ))
-              )}
-            </div>
-          </div>
-
-          {/* Perforated tear-line — signature ticket motif, shown whenever the list is visible */}
-          <div
-            aria-hidden="true"
-            className={`${mobileCartOpen ? "block" : "hidden"} lg:block h-3 shrink-0`}
-            style={{
-              backgroundImage:
-                "radial-gradient(circle at 6px 6px, #FAF7F2 4px, transparent 4.5px)",
-              backgroundSize: "12px 12px",
-              backgroundRepeat: "repeat-x",
-              backgroundPosition: "center",
-            }}
-          />
-
-          {/* Mobile-only compact bar — tap to expand/collapse the item list.
-              Always visible so the total is never more than a glance away. */}
-          <button
-            type="button"
-            onClick={() => setMobileCartOpen((o) => !o)}
-            className="lg:hidden flex items-center justify-between px-5 py-3 border-b border-slate-100 shrink-0"
-          >
-            <span className="flex items-center gap-2 text-xs font-bold text-slate-700">
-              <ShoppingBag className="w-4 h-4 text-rose-600" />
-              {cartItemCount} item{cartItemCount === 1 ? "" : "s"}
-              <span className="text-slate-300">·</span>
-              <span className="font-mono font-black text-slate-900">
-                ₹{total.toFixed(0)}
-              </span>
-            </span>
-            {mobileCartOpen ? (
-              <ChevronDown className="w-4 h-4 text-slate-400" />
-            ) : (
-              <ChevronUp className="w-4 h-4 text-slate-400" />
-            )}
-          </button>
-
-          {/* Bill Calculation & Action Buttons — ALWAYS visible, mobile and desktop,
-              so Parcel / Add to Table never require scrolling. */}
-          <div className="p-4 sm:p-6 lg:pt-3 space-y-3 lg:space-y-4 shrink-0">
-            <div
-              className={`${mobileCartOpen ? "block" : "hidden"} lg:block space-y-1.5 text-xs`}
-            >
-              <div className="flex justify-between text-slate-500 font-medium">
-                <span>Subtotal</span>
-                <span className="font-mono">₹{subtotal.toFixed(2)}</span>
-              </div>
-              {appliedDiscount > 0 && (
-                <div className="flex justify-between text-emerald-600 font-bold">
-                  <span>Discount</span>
-                  <span className="font-mono">
-                    - ₹{appliedDiscount.toFixed(2)}
-                  </span>
-                </div>
-              )}
-              <div className="flex justify-between items-center text-slate-900 font-black text-base pt-2.5 mt-1 border-t border-dashed border-slate-200">
-                <span>Grand Total</span>
-                <span className="font-mono">₹{total.toFixed(2)}</span>
-              </div>
-            </div>
-
-            <input
-              type="text"
-              value={customerNameInput}
-              maxLength={60}
-              onChange={(event) => setCustomerNameInput(event.target.value)}
-              placeholder="Customer name (optional)"
-              className="w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-rose-400 focus:ring-2 focus:ring-rose-100 focus:bg-white"
-            />
-            <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
-              <button
-                onClick={() => {
-                  if (cart.length === 0) return alert("Cart is empty!");
-                  if (openParcels.length > 0) {
-                    setShowParcelModal(true);
-                    return;
-                  }
-                  handleParcelOrder();
-                }}
-                disabled={loading || cart.length === 0}
-                className="py-3 lg:py-3.5 bg-rose-600 text-white rounded-xl font-bold text-xs hover:bg-rose-700 transition-all cursor-pointer shadow-sm shadow-rose-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
-              >
-                {loading ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                ) : (
-                  <Package className="w-4 h-4" />
                 )}
-                Parcel
-              </button>
-              <button
-                onClick={() => {
-                  if (cart.length === 0) return alert("Cart is empty!");
-                  setShowTableModal(true);
-                }}
-                disabled={loading || cart.length === 0}
-                className="py-3 lg:py-3.5 bg-slate-900 text-white rounded-xl font-bold text-xs hover:bg-slate-800 transition-all cursor-pointer shadow-sm shadow-slate-300 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400"
-              >
-                <UtensilsCrossed className="w-4 h-4" /> Add to Table
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  if (cart.length === 0) {
-                    return alert("Cart is empty!");
-                  }
 
-                  setNewTableNumber("");
-                  setShowNewTableModal(true);
-                }}
-                disabled={loading || cart.length === 0}
-                className="col-span-2 sm:col-span-1 py-3 lg:py-3.5 bg-emerald-600 text-white rounded-xl font-bold text-xs hover:bg-emerald-700 transition-all cursor-pointer shadow-sm shadow-emerald-200 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
-              >
-                <Plus className="w-4 h-4" />
-                New Table Order
-              </button>
+                {cart.length === 0 ? (
+                  <div className="py-8 text-center">
+                    <ShoppingBag className="mx-auto mb-2 h-8 w-8 text-slate-200" />
+                    <p className="text-xs font-bold text-slate-400">Cart is empty</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {cart.map((item) => {
+                      const image = menuImage(item.image);
+                      return (
+                        <div key={item._id} className="flex items-center gap-2">
+                          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-slate-100">
+                            {image ? (
+                              <img src={image} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" />
+                            ) : (
+                              <div className="flex h-full items-center justify-center text-slate-300">
+                                <UtensilsCrossed className="h-4 w-4" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs font-bold text-slate-900">{item.name}</p>
+                            <p className="text-[11px] font-semibold text-slate-400">₹{item.price}</p>
+                            {itemDiscountMap[item._id] > 0 && (
+                              <p className="text-[10px] font-bold text-emerald-600">-₹{itemDiscountMap[item._id]} offer</p>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1 rounded-full border border-slate-200 px-1 py-0.5">
+                            <button type="button" onClick={() => updateQty(item._id, -1)} className="p-1 text-slate-500">
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <span className="w-4 text-center text-xs font-black">{item.quantity}</span>
+                            <button type="button" onClick={() => updateQty(item._id, 1)} className="p-1 text-slate-500">
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </div>
+                          <p className="w-12 text-right text-xs font-black text-slate-800">
+                            ₹{(item.price * item.quantity).toFixed(0)}
+                          </p>
+                          <button type="button" onClick={() => removeFromCart(item._id)} className="text-slate-300 hover:text-rose-500">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="shrink-0 space-y-3 border-t border-slate-100 px-4 py-3">
+              <div className={`${mobileCartOpen ? "space-y-3" : "hidden"} lg:block lg:space-y-3`}>
+                <div>
+                  <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-bold text-slate-500">
+                    <UserRound className="h-3.5 w-3.5" /> Customer Details (Optional)
+                  </p>
+                  <input
+                    type="text"
+                    value={customerNameInput}
+                    maxLength={60}
+                    onChange={(event) => setCustomerNameInput(event.target.value)}
+                    placeholder="Customer Name"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-slate-800 outline-none focus:border-rose-300 focus:bg-white"
+                  />
+                </div>
+                <div className="space-y-1 text-sm">
+                  <div className="flex justify-between text-slate-500">
+                    <span>Item Total ({cartItemCount} item{cartItemCount === 1 ? "" : "s"})</span>
+                    <span className="font-semibold text-slate-700">₹{Number(subtotal).toLocaleString("en-IN")}</span>
+                  </div>
+                  {appliedDiscount > 0 && (
+                    <div className="flex justify-between font-semibold text-emerald-600">
+                      <span>Discount</span>
+                      <span>-₹{Number(appliedDiscount).toLocaleString("en-IN")}</span>
+                    </div>
+                  )}
+                  <div className="flex items-end justify-between pt-1">
+                    <span className="font-black text-slate-900">Grand Total</span>
+                    <span className="text-xl font-black text-slate-900">₹{Number(total).toLocaleString("en-IN")}</span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={submitCurrentOrder}
+                  disabled={loading || cart.length === 0}
+                  className="flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-500 py-3.5 text-sm font-black text-white shadow-sm shadow-rose-200 hover:bg-rose-600 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ReceiptText className="h-4 w-4" />}
+                  {loading ? "Sending..." : "Create Order"}
+                  {!loading && <ArrowRight className="h-4 w-4" />}
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -2182,93 +2399,143 @@ export default function CounterPOS() {
             </div>
           </div>
         )}
-        {/* Table Selection Modal */}
+        {/* Table Selection Modal — running tables */}
         {showTableModal && (
-          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-[2px] flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-2xl border border-slate-100">
-              <div className="flex items-start justify-between">
+          <div
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-[2px]"
+            onClick={() => !loading && setShowTableModal(false)}
+            role="presentation"
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="running-table-modal-title"
+              onClick={(event) => event.stopPropagation()}
+              className="flex max-h-[min(88vh,640px)] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-[var(--border)] bg-white shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
                 <div>
-                  <h3 className="font-black text-slate-900 text-base tracking-tight">
+                  <h3
+                    id="running-table-modal-title"
+                    className="text-base font-black tracking-tight text-slate-900"
+                  >
                     Select Running Table
                   </h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    Tap an active table to append these items.
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    Choose an active table, then confirm to push cart items.
                   </p>
                 </div>
                 <button
-                  onClick={() => setShowTableModal(false)}
-                  className="text-slate-400 hover:text-slate-700 transition-colors p-1"
+                  type="button"
+                  onClick={() => !loading && setShowTableModal(false)}
+                  className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                  aria-label="Close"
                 >
                   <X size={18} />
                 </button>
               </div>
 
-              {activeTables.length === 0 ? (
-                <p className="text-[11px] text-rose-700 font-semibold bg-rose-50 border border-rose-200 p-3 rounded-xl leading-relaxed">
-                  ⚠️ No active running tables found right now. Open a table
-                  order from regular orders first.
-                </p>
-              ) : (
-                <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto pr-1">
-                  {activeTables.map((tbl) => {
-                    const isSelected = selectedTable === tbl;
-                    return (
-                      <button
-                        key={tbl}
-                        onClick={() => setSelectedTable(tbl)}
-                        className={`aspect-square rounded-xl text-xs font-black flex flex-col items-center justify-center gap-0.5 transition-all cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 ${
-                          isSelected
-                            ? "bg-rose-600 text-white shadow-sm shadow-rose-200"
-                            : "bg-slate-50 text-slate-700 border border-slate-200 hover:border-rose-300 hover:bg-rose-50"
-                        }`}
-                      >
-                        <span className="text-[9px] font-bold uppercase opacity-70">
-                          Table
-                        </span>
-                        <span className="text-sm font-mono">{tbl}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6">
+                {activeTables.length === 0 ? (
+                  <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-semibold leading-relaxed text-rose-700">
+                    No active running tables right now. Open a table order first, then add items here.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                    {activeTables.map((tbl) => {
+                      const isSelected = String(selectedTable) === String(tbl);
+                      return (
+                        <button
+                          key={tbl}
+                          type="button"
+                          onClick={() => setSelectedTable(tbl)}
+                          className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-2xl border text-xs font-black transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgba(244,63,94,0.35)] ${
+                            isSelected
+                              ? "border-[var(--primary)] bg-[var(--primary)] text-white shadow-sm"
+                              : "border-[var(--border)] bg-[var(--surface-muted)] text-slate-700 hover:border-[var(--primary)]/40 hover:bg-[var(--primary-light)]"
+                          }`}
+                        >
+                          <span className="text-[9px] font-bold uppercase opacity-70">Table</span>
+                          <span className="font-mono text-base">{tbl}</span>
+                          <span className={`text-[8px] font-black uppercase ${isSelected ? "text-white/80" : "text-[var(--primary)]"}`}>
+                            Active
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
 
-              <div className="flex gap-2 pt-2">
+                {selectedTable ? (
+                  <div className="mt-4 flex items-center justify-between rounded-2xl border border-[var(--border)] bg-[var(--primary-light)] px-4 py-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase tracking-wide text-slate-400">Selected</p>
+                      <p className="mt-0.5 font-mono text-sm font-black text-slate-900">
+                        Table {selectedTable}
+                      </p>
+                    </div>
+                    <span className="rounded-lg bg-white px-2 py-1 text-[10px] font-black text-[var(--primary)]">
+                      READY
+                    </span>
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="flex gap-2 border-t border-slate-100 px-5 py-4 sm:px-6">
                 <button
+                  type="button"
                   onClick={() => setShowTableModal(false)}
-                  className="flex-1 py-3 border border-slate-200 rounded-xl font-bold text-xs text-slate-600 hover:bg-slate-50 transition-colors cursor-pointer"
+                  disabled={loading}
+                  className="flex-1 rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
+                  type="button"
                   onClick={handleAddToTableSubmit}
-                  disabled={loading || !selectedTable}
-                  className="flex-1 py-3 bg-rose-600 text-white rounded-xl font-bold text-xs hover:bg-rose-700 transition-colors cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                  disabled={loading || !selectedTable || cart.length === 0}
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[var(--primary)] py-3 text-xs font-bold text-white transition hover:bg-[var(--primary-dark)] disabled:opacity-50"
                 >
-                  {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                  {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
                   {loading ? "Pushing..." : "Confirm & Push"}
                 </button>
               </div>
             </div>
           </div>
         )}
-        {showNewTableModal && (
-          <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-[2px] flex items-center justify-center z-[60] p-4 animate-in fade-in duration-200">
-            <div className="bg-white rounded-2xl p-6 w-full max-w-md space-y-5 shadow-2xl border border-slate-100">
-              {/* HEADER */}
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                      <UtensilsCrossed className="w-4 h-4" />
-                    </div>
 
-                    <h3 className="font-black text-slate-900 text-base tracking-tight">
+        {showNewTableModal && (
+          <div
+            className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-[2px]"
+            onClick={() => {
+              if (!loading) {
+                setShowNewTableModal(false);
+              }
+            }}
+            role="presentation"
+          >
+            <div
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="new-table-modal-title"
+              onClick={(event) => event.stopPropagation()}
+              className="flex max-h-[min(88vh,680px)] w-full max-w-lg flex-col overflow-hidden rounded-3xl border border-[var(--border)] bg-white shadow-2xl"
+            >
+              <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-4 sm:px-6">
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                      <UtensilsCrossed className="h-4 w-4" />
+                    </div>
+                    <h3
+                      id="new-table-modal-title"
+                      className="text-base font-black tracking-tight text-slate-900"
+                    >
                       New Table Order
                     </h3>
                   </div>
-
-                  <p className="text-xs text-slate-500 mt-2">
-                    Select a free table to create a completely new order.
+                  <p className="mt-2 text-xs text-slate-500">
+                    Pick a free table to start a fresh order.
                   </p>
                   <input
                     type="text"
@@ -2276,120 +2543,96 @@ export default function CounterPOS() {
                     maxLength={60}
                     onChange={(event) => setCustomerNameInput(event.target.value)}
                     placeholder="Customer name (optional)"
-                    className="mt-3 w-full px-3 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-emerald-400"
+                    className="mt-3 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-800 outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-[rgba(244,63,94,0.12)]"
                   />
                 </div>
-
                 <button
                   type="button"
                   onClick={() => {
                     if (!loading) {
                       setShowNewTableModal(false);
-                      setNewTableNumber("");
                     }
                   }}
                   disabled={loading}
-                  className="text-slate-400 hover:text-slate-700 transition-colors p-1 disabled:opacity-40"
+                  className="rounded-lg p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"
+                  aria-label="Close"
                 >
                   <X size={18} />
                 </button>
               </div>
 
-              {/* INFO */}
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3">
-                <p className="text-[11px] text-emerald-800 font-semibold leading-relaxed">
-                  🟢 Only a free table can be selected.
-                  <br />
-                  Running tables must use <b>Add to Table</b>.
-                </p>
-              </div>
-
-              {/* TABLE LIST */}
-              {freeTables.length === 0 ? (
-                <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center">
-                  <p className="text-xs font-bold text-slate-600">
-                    No tables available
-                  </p>
-
-                  <p className="text-[11px] text-slate-400 mt-1">
-                    Please check your table configuration.
+              <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4 sm:px-6">
+                <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+                  <p className="text-[11px] font-semibold leading-relaxed text-emerald-800">
+                    Only free tables can start a new order. Running tables use Dine In → View Tables.
                   </p>
                 </div>
-              ) : (
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
-                  {freeTables.map((table, index) => {
-                    const tableNumber = getTableNumber(table);
 
-                    if (!tableNumber) {
-                      return null;
-                    }
-
-                    const running = getTableRunningStatus(table);
-
-                    const isSelected = newTableNumber === tableNumber;
-
-                    return (
-                      <button
-                        key={table._id || table.id || tableNumber || index}
-                        type="button"
-                        disabled={loading || running}
-                        onClick={() => {
-                          if (!running) {
-                            setNewTableNumber(tableNumber);
-                          }
-                        }}
-                        className={`relative aspect-square rounded-xl text-xs font-black flex flex-col items-center justify-center gap-1 transition-all focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 ${
-                          running
-                            ? "bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed"
-                            : isSelected
-                              ? "bg-emerald-600 text-white border border-emerald-600 shadow-md shadow-emerald-200"
-                              : "bg-white text-slate-700 border border-slate-200 hover:border-emerald-300 hover:bg-emerald-50 cursor-pointer"
-                        }`}
-                      >
-                        <span className="text-[9px] uppercase tracking-wide opacity-70">
-                          Table
-                        </span>
-
-                        <span className="text-sm font-mono">{tableNumber}</span>
-
-                        <span
-                          className={`text-[8px] uppercase font-black ${
-                            running
-                              ? "text-slate-400"
-                              : isSelected
-                                ? "text-emerald-100"
-                                : "text-emerald-600"
-                          }`}
-                        >
-                          {running ? "RUNNING" : "FREE"}
-                        </span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-
-              {/* SELECTED TABLE */}
-              {newTableNumber && (
-                <div className="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-4 py-3">
-                  <div>
-                    <p className="text-[10px] uppercase font-bold text-slate-400">
-                      Selected Table
-                    </p>
-
-                    <p className="text-sm font-black text-slate-900 font-mono mt-0.5">
-                      Table {newTableNumber}
+                {freeTables.length === 0 ? (
+                  <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-5 text-center">
+                    <p className="text-xs font-bold text-slate-600">No free tables available</p>
+                    <p className="mt-1 text-[11px] text-slate-400">
+                      Check table monitor or wait for a table to clear.
                     </p>
                   </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4 md:grid-cols-5">
+                    {freeTables.map((table, index) => {
+                      const tableNumber = getTableNumber(table);
+                      if (!tableNumber) return null;
+                      const running = getTableRunningStatus(table);
+                      const isSelected = String(newTableNumber) === String(tableNumber);
+                      return (
+                        <button
+                          key={table._id || table.id || tableNumber || index}
+                          type="button"
+                          disabled={loading || running}
+                          onClick={() => {
+                            if (!running) setNewTableNumber(tableNumber);
+                          }}
+                          className={`relative flex aspect-square flex-col items-center justify-center gap-1 rounded-2xl border text-xs font-black transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300 ${
+                            running
+                              ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+                              : isSelected
+                                ? "border-emerald-600 bg-emerald-600 text-white shadow-md shadow-emerald-200"
+                                : "cursor-pointer border-[var(--border)] bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50"
+                          }`}
+                        >
+                          <span className="text-[9px] uppercase tracking-wide opacity-70">Table</span>
+                          <span className="font-mono text-sm">{tableNumber}</span>
+                          <span
+                            className={`text-[8px] font-black uppercase ${
+                              running
+                                ? "text-slate-400"
+                                : isSelected
+                                  ? "text-emerald-100"
+                                  : "text-emerald-600"
+                            }`}
+                          >
+                            {running ? "RUNNING" : "FREE"}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
 
-                  <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 border border-emerald-200 px-2 py-1 rounded-lg">
-                    NEW ORDER
-                  </span>
-                </div>
-              )}
+                {newTableNumber ? (
+                  <div className="mt-4 flex items-center justify-between rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                    <div>
+                      <p className="text-[10px] font-bold uppercase text-slate-400">Selected Table</p>
+                      <p className="mt-0.5 font-mono text-sm font-black text-slate-900">
+                        Table {newTableNumber}
+                      </p>
+                    </div>
+                    <span className="rounded-lg border border-emerald-200 bg-emerald-100 px-2 py-1 text-[10px] font-black text-emerald-700">
+                      NEW ORDER
+                    </span>
+                  </div>
+                ) : null}
+              </div>
 
-              {/* ACTIONS */}
-              <div className="flex gap-2 pt-1">
+              <div className="flex gap-2 border-t border-slate-100 px-5 py-4 sm:px-6">
                 <button
                   type="button"
                   disabled={loading}
@@ -2397,20 +2640,18 @@ export default function CounterPOS() {
                     setShowNewTableModal(false);
                     setNewTableNumber("");
                   }}
-                  className="flex-1 py-3 border border-slate-200 rounded-xl font-bold text-xs text-slate-600 hover:bg-slate-50 transition-colors disabled:opacity-50"
+                  className="flex-1 rounded-xl border border-slate-200 py-3 text-xs font-bold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
                 >
                   Cancel
                 </button>
-
                 <button
                   type="button"
                   disabled={loading || !newTableNumber || cart.length === 0}
                   onClick={handleNewTableOrderSubmit}
-                  className="flex-1 py-3 bg-emerald-600 text-white rounded-xl font-bold text-xs hover:bg-emerald-700 transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                  className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
                 >
-                  {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-
-                  {loading ? "Creating..." : "Create New Order"}
+                  {loading && <Loader2 className="h-3.5 w-3.5 animate-spin" />}
+                  {loading ? "Creating..." : "Create Table Order"}
                 </button>
               </div>
             </div>

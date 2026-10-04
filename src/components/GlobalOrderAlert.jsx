@@ -7,17 +7,24 @@ import { useNavigate } from "react-router-dom";
 import { useSocket } from "../context/SocketContext";
 import { useAuth } from "../context/AuthContext";
 
-// const getRestaurantId = (order) => {
-//   if (!order?.restaurantId) {
-//     return null;
-//   }
+const getOrderRestaurantId = (order) => {
+  if (!order?.restaurantId) {
+    return null;
+  }
 
-//   if (typeof order.restaurantId === "object") {
-//     return order.restaurantId?._id ? String(order.restaurantId._id) : null;
-//   }
+  if (typeof order.restaurantId === "object") {
+    return order.restaurantId?._id ? String(order.restaurantId._id) : null;
+  }
 
-//   return String(order.restaurantId);
-// };
+  return String(order.restaurantId);
+};
+
+const isSameTenantOrder = (order, restaurantId) => {
+  if (!restaurantId) return false;
+  const eventRestaurantId = getOrderRestaurantId(order);
+  if (!eventRestaurantId) return true;
+  return String(eventRestaurantId) === String(restaurantId);
+};
 
 export default function GlobalOrderAlert() {
   const { user } = useAuth();
@@ -409,12 +416,14 @@ export default function GlobalOrderAlert() {
    */
 
   useEffect(() => {
-    if (!socket) {
+    if (!socket || !restaurantId) {
       return;
     }
 
     const handleNewOrder = (order) => {
-      console.log("🚨 GLOBAL NEW ORDER ALERT:", order);
+      if (!isSameTenantOrder(order, restaurantId)) {
+        return;
+      }
 
       showAlert(order, "NEW_ORDER_RECEIVED");
     };
@@ -427,19 +436,16 @@ export default function GlobalOrderAlert() {
         : [];
 
       if (!order?._id) {
-        console.warn("⚠️ Running order alert ignored: invalid order");
+        return;
+      }
+
+      if (!isSameTenantOrder(order, restaurantId)) {
         return;
       }
 
       if (newItems.length === 0) {
-        console.warn("⚠️ Running order alert ignored: no new items", payload);
         return;
       }
-
-      console.log("🚨 GLOBAL RUNNING ORDER ALERT:", {
-        orderId: order.orderId,
-        newItems,
-      });
 
       showAlert(
         {
@@ -463,7 +469,7 @@ export default function GlobalOrderAlert() {
 
       socket.off("RUNNING_ORDER_UPDATED", handleRunningOrderUpdated);
     };
-  }, [socket, showAlert]);
+  }, [socket, restaurantId, showAlert]);
 
   /*
    * --------------------------------------------------

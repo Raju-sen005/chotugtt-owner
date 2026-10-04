@@ -1,10 +1,20 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 
-import MerchantLayout from "./layouts/MerchantLayout";
-import PublicMenu from "./features/public/PublicMenu";
 import AuthGate from "./features/auth/AuthGate";
-import SubscriptionCheckout from "./components/SubscriptionCheckout";
+
+const MerchantLayout = lazy(() => import("./layouts/MerchantLayout"));
+const PublicMenu = lazy(() => import("./features/public/PublicMenu"));
+const SubscriptionCheckout = lazy(() => import("./components/SubscriptionCheckout"));
+
+function ScreenLoading() {
+  return (
+    <div className="flex min-h-dvh items-center justify-center bg-[var(--background)]">
+      <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-[var(--primary)]" />
+    </div>
+  );
+}
 
 export default function App() {
   const { user } = useAuth();
@@ -37,6 +47,7 @@ export default function App() {
     user?.requiresSubscription === true;
 
   return (
+    <Suspense fallback={<ScreenLoading />}>
     <Routes>
       {/*
       |--------------------------------------------------------------------------
@@ -107,5 +118,6 @@ export default function App() {
         }
       />
     </Routes>
+    </Suspense>
   );
 }

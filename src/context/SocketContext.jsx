@@ -18,6 +18,24 @@ const SocketContext = createContext(null);
 
 const SOCKET_URL = import.meta.env.VITE_APP_API_BASE;
 
+const socketLog = (...args) => {
+  if (import.meta.env.DEV) {
+    console.log(...args);
+  }
+};
+
+const socketWarn = (...args) => {
+  if (import.meta.env.DEV) {
+    console.warn(...args);
+  }
+};
+
+const socketError = (...args) => {
+  if (import.meta.env.DEV) {
+    console.error(...args);
+  }
+};
+
 /*
  * --------------------------------------------------
  * CONFIGURATION
@@ -74,6 +92,10 @@ const isTenantEvent = (payload, restaurantId) => {
    * trust the Socket.IO server-side tenant room.
    *
    * If it does include restaurantId, validate it.
+   */
+  /*
+   * Server already isolates by restaurant room.
+   * When payload includes restaurantId, validate it.
    */
   if (!eventRestaurantId) {
     return true;
@@ -135,7 +157,7 @@ export const SocketProvider = ({ children }) => {
      * is not available.
      */
     if (!orderId) {
-      console.log(
+      socketLog(
         `🔊 Notification sound triggered from ${source}`
       );
 
@@ -177,7 +199,7 @@ export const SocketProvider = ({ children }) => {
       now - previousTimestamp <
         SOUND_DEDUP_WINDOW_MS
     ) {
-      console.log(
+      socketLog(
         `🔇 Duplicate notification sound ignored: ${normalizedOrderId}`
       );
 
@@ -192,7 +214,7 @@ export const SocketProvider = ({ children }) => {
       now
     );
 
-    console.log(
+    socketLog(
       `🔊 Notification sound triggered from ${source}:`,
       normalizedOrderId
     );
@@ -215,7 +237,7 @@ export const SocketProvider = ({ children }) => {
 
     if (!user || !restaurantId) {
       if (socketRef.current) {
-        console.log(
+        socketLog(
           "🧹 Disconnecting socket because tenant is unavailable"
         );
 
@@ -240,14 +262,14 @@ export const SocketProvider = ({ children }) => {
      */
 
     if (socketRef.current) {
-      console.log(
+      socketLog(
         "♻️ Existing socket already present"
       );
 
       return;
     }
 
-    console.log(
+    socketLog(
       "🔌 Creating tenant socket:",
       restaurantId
     );
@@ -302,12 +324,12 @@ export const SocketProvider = ({ children }) => {
      */
 
     const handleConnect = () => {
-      console.log(
+      socketLog(
         "🟢 Socket connected:",
         socketInstance.id
       );
 
-      console.log(
+      socketLog(
         "🏪 Authenticated tenant:",
         restaurantId
       );
@@ -331,7 +353,7 @@ export const SocketProvider = ({ children }) => {
      */
 
     const handleNewOrder = (order) => {
-      console.log(
+      socketLog(
         "🔔 NEW_ORDER_RECEIVED:",
         order
       );
@@ -349,7 +371,7 @@ export const SocketProvider = ({ children }) => {
           restaurantId
         )
       ) {
-        console.warn(
+        socketWarn(
           "🚫 Ignoring cross-tenant order event"
         );
 
@@ -383,7 +405,7 @@ export const SocketProvider = ({ children }) => {
     const handleRunningOrderUpdated = (
       payload
     ) => {
-      console.log(
+      socketLog(
         "🔔 RUNNING_ORDER_UPDATED:",
         payload
       );
@@ -397,7 +419,7 @@ export const SocketProvider = ({ children }) => {
           restaurantId
         )
       ) {
-        console.warn(
+        socketWarn(
           "🚫 Ignoring cross-tenant running-order event"
         );
 
@@ -427,7 +449,7 @@ export const SocketProvider = ({ children }) => {
     const handleNotificationSound = (
       payload
     ) => {
-      console.log(
+      socketLog(
         "🔊 PLAY_NOTIFICATION_SOUND:",
         payload
       );
@@ -438,7 +460,7 @@ export const SocketProvider = ({ children }) => {
           restaurantId
         )
       ) {
-        console.warn(
+        socketWarn(
           "🚫 Ignoring cross-tenant notification sound"
         );
 
@@ -460,7 +482,7 @@ export const SocketProvider = ({ children }) => {
     const handleDisconnect = (
       reason
     ) => {
-      console.warn(
+      socketWarn(
         "🟡 Socket disconnected:",
         reason
       );
@@ -475,7 +497,7 @@ export const SocketProvider = ({ children }) => {
     const handleConnectError = (
       error
     ) => {
-      console.error(
+      socketError(
         "🔴 Socket connection error:",
         error?.message || error
       );
@@ -490,7 +512,7 @@ export const SocketProvider = ({ children }) => {
     const handleReconnectAttempt = (
       attempt
     ) => {
-      console.log(
+      socketLog(
         `🔄 Socket reconnect attempt #${attempt}`
       );
     };
@@ -504,7 +526,7 @@ export const SocketProvider = ({ children }) => {
     const handleReconnect = (
       attempt
     ) => {
-      console.log(
+      socketLog(
         `🟢 Socket reconnected after ${attempt} attempt(s)`
       );
     };
@@ -566,7 +588,7 @@ export const SocketProvider = ({ children }) => {
      */
 
     return () => {
-      console.log(
+      socketLog(
         "🧹 Cleaning tenant socket:",
         restaurantId
       );

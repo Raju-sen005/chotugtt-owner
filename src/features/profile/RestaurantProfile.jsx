@@ -14,15 +14,17 @@ import {
   AlertCircle,
   Trash2,
   Building,
-  Sparkles,
   //   ShieldCheck,
   CreditCard,
   //   Users,
   //   UserPlus,
   //   Trash2,
-  QrCode,
+  Link2,
+  Percent,
+  Star,
+  Printer,
+  Palette,
 } from "lucide-react";
-import Input from "../../components/ui/Input";
 import {
   BILL_TEMPLATES,
   getSelectedBillTemplate,
@@ -33,6 +35,18 @@ import BillTemplatePaymentModal from "../../components/BillTemplatePaymentModal"
 // 🔑 FIX: this import was missing — getBillReceiptCSS() was being called
 // below without ever being imported, which throws a ReferenceError.
 import { getBillReceiptCSS } from "../../constants/billReceiptStyles";
+
+const THEME_SWATCHES = [
+  "#EF4444",
+  "#F43F5E",
+  "#3B82F6",
+  "#14B8A6",
+  "#F97316",
+  "#22C55E",
+  "#EAB308",
+  "#8B5CF6",
+  "#0EA5E9",
+];
 
 function BillTemplatePreviewModal({ templateId, onClose }) {
   const sampleHtml = `
@@ -138,6 +152,7 @@ export default function RestaurantProfile() {
   );
   const [paymentTemplate, setPaymentTemplate] = useState(null);
   const [previewTemplateId, setPreviewTemplateId] = useState(null);
+  const [showAllTemplates, setShowAllTemplates] = useState(false);
 
   // 🔑 FIX: restored rollback + error handling + query invalidation.
   // The version this reverted to applied the template optimistically with
@@ -612,6 +627,30 @@ export default function RestaurantProfile() {
     }
   };
 
+  const logoSrc =
+    logoPreview &&
+    (logoPreview.startsWith("http") || logoPreview.startsWith("blob:")
+      ? logoPreview
+      : `${String(import.meta.env.VITE_APP_API_BASE || "").replace(/\/api(?:\/v1)?\/?$/, "")}${logoPreview}`);
+  const publicMenuLink = restaurantId
+    ? `${window.location.origin}/catalog/${restaurantId}`
+    : "";
+  const visibleTemplates = showAllTemplates
+    ? BILL_TEMPLATES
+    : BILL_TEMPLATES.slice(0, 4);
+  const planExpiry = restaurant?.subscriptionExpiresAt
+    ? new Date(restaurant.subscriptionExpiresAt)
+    : null;
+  const planExpiryLabel =
+    planExpiry && !Number.isNaN(planExpiry.getTime())
+      ? planExpiry.toLocaleDateString("en-IN", {
+          day: "2-digit",
+          month: "short",
+          year: "numeric",
+        })
+      : "";
+  const planExpired = planExpiryLabel && planExpiry.getTime() <= Date.now();
+
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] space-y-4">
@@ -643,7 +682,7 @@ export default function RestaurantProfile() {
     <>
       {showSuccessPopup && (
         <div className="fixed top-6 right-6 z-[9999] animate-in slide-in-from-right-5 fade-in duration-300">
-          <div className="flex items-start gap-3 bg-white border border-emerald-200 shadow-2xl rounded-2xl px-5 py-4 min-w-[320px] max-w-[400px]">
+          <div className="flex items-start gap-3 bg-white border border-emerald-200 shadow-2xl rounded-2xl px-5 py-4 w-[calc(100%-2rem)] max-w-sm">
             <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
               <CheckCircle2 size={22} strokeWidth={2.5} />
             </div>
@@ -992,764 +1031,328 @@ export default function RestaurantProfile() {
           </div>
         </div>
       )}
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 font-sans bg-[#F9FAFB] min-h-screen">
-        {/* Hero Header Banner */}
-        <div className="relative overflow-hidden bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 p-6 sm:p-8 rounded-3xl text-white shadow-xl flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 border border-slate-800">
-          <div className="absolute -right-10 -bottom-10 w-48 h-48 bg-red-500/10 rounded-full blur-3xl pointer-events-none" />
-
-          <div className="flex items-center gap-5 relative z-10">
-            <div className="p-4 bg-white/10 backdrop-blur-md text-red-400 rounded-2xl border border-white/10 shadow-inner">
-              <Store size={32} />
+      <div className="-m-4 bg-[var(--background)] p-4 font-sans text-slate-900 md:-m-6 md:p-5 lg:-m-8 lg:p-5">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[var(--primary)] via-[var(--primary)] to-[var(--secondary)] p-5 text-white">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
+                <Store className="h-6 w-6" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-black tracking-tight">Restaurant Profile</h1>
+                <p className="mt-1 max-w-xl text-sm text-white/85">
+                  Manage your restaurant details, branding, billing template and other settings.
+                </p>
+              </div>
             </div>
-            <div className="space-y-1">
-              <span className="text-[10px] font-extrabold tracking-widest text-red-400 uppercase bg-red-500/10 px-2.5 py-1 rounded-md border border-red-500/20">
-                Workspace Hub
-              </span>
-              <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-                Restaurant Profile & Management
-              </h1>
-              <p className="text-xs sm:text-sm text-slate-300 max-w-xl">
-                Configure your business metadata, UPI payment QR, and control
-                staff member access.
+            <div className="min-w-[220px] rounded-2xl bg-white px-4 py-3 text-slate-800 shadow-sm">
+              <p className="text-[11px] font-bold text-slate-400">Restaurant Status</p>
+              <p className={`mt-1 flex items-center gap-2 text-sm font-black ${restaurant?.isApproved ? "text-emerald-600" : "text-amber-600"}`}>
+                <span className={`h-2 w-2 rounded-full ${restaurant?.isApproved ? "bg-emerald-500" : "bg-amber-500"}`} />
+                {restaurant?.isApproved ? "Approved" : "Pending"}
+              </p>
+              <p className="mt-1 text-[11px] font-semibold text-slate-500">
+                {restaurant?.isApproved ? "Your restaurant is live and active." : "Waiting for approval."}
+                {planExpiryLabel ? ` Plan ${planExpired ? "expired" : "expires"} ${planExpiryLabel}.` : ""}
               </p>
             </div>
-          </div>
-
-          <div className="relative z-10 shrink-0">
-            {restaurant?.isApproved ? (
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-bold rounded-2xl backdrop-blur-md shadow-sm">
-                <CheckCircle2 size={16} /> Verified & Approved
-              </div>
-            ) : (
-              <div className="flex items-center gap-2 px-4 py-2.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 text-xs font-bold rounded-2xl backdrop-blur-md shadow-sm">
-                <AlertCircle size={16} /> Pending Verification
-              </div>
-            )}
           </div>
         </div>
 
-        {/* Main Form Dashboard */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column: Logo & UPI QR Identity */}
-            <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-6 flex flex-col justify-between">
-              <div className="space-y-6">
-                <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-                  <h2 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-2">
-                    <Sparkles size={14} className="text-red-500" /> Brand Logo
-                  </h2>
-                  <span className="text-[10px] text-slate-400 font-semibold">
-                    Max 5MB
-                  </span>
-                </div>
-
-                <div className="flex flex-col items-center justify-center space-y-4">
-                  <div className="w-28 h-28 rounded-3xl bg-slate-50 border-2 border-dashed border-slate-200 overflow-hidden relative flex items-center justify-center text-slate-400 shadow-inner group">
-                    {logoPreview ? (
-                      <img
-                        src={
-                          logoPreview.startsWith("http") ||
-                          logoPreview.startsWith("blob:")
-                            ? logoPreview
-                            : `${import.meta.env.VITE_APP_API_BASE.replace("/api", "")}${logoPreview}`
-                        }
-                        alt="Logo"
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                    ) : (
-                      <Building size={36} className="text-slate-300" />
-                    )}
-                  </div>
-
-                  <label className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 cursor-pointer transition-all">
-                    <Upload size={14} className="text-slate-500" />
-                    <span>Upload Logo</span>
-                    <input
-                      type="file"
-                      accept="image/*"
-                      onChange={handleLogoChange}
-                      className="hidden"
-                    />
-                  </label>
-                </div>
-
-                {/* UPI QR Display Card */}
-                <div className="pt-4 border-t border-slate-100 space-y-3">
-                  <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-2">
-                    <QrCode size={14} className="text-emerald-500" /> Active UPI
-                    Payment QR
-                  </h3>
-                  <div className="flex flex-col items-center justify-center p-4 bg-slate-50 border border-slate-200 rounded-2xl">
-                    {upiQrCode ? (
-                      <img
-                        src={upiQrCode}
-                        alt="UPI QR Code"
-                        className="w-32 h-32 object-contain rounded-xl shadow-sm bg-white p-1.5"
-                      />
-                    ) : (
-                      <div className="w-32 h-32 flex items-center text-center justify-center text-[11px] text-slate-400 font-medium">
-                        Save UPI ID below to generate QR
-                      </div>
-                    )}
-                    <span className="text-[10px] text-slate-500 mt-2 font-mono">
-                      {upiId || "No UPI ID Configured"}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right Column: General Information & UPI ID */}
-            <div className="lg:col-span-2 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
-              <h2 className="text-xs font-black uppercase tracking-wider text-slate-900 border-b border-slate-100 pb-4">
-                General Identity & Payment Configuration
-              </h2>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <Input
-                  label="Restaurant Business Name"
-                  required
-                  placeholder="e.g., Spice Garden"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                />
-
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    Custom Storefront URL Slug
-                  </label>
-                  <div className="relative flex items-center">
-                    <Globe
-                      size={16}
-                      className="absolute left-4 text-slate-400"
-                    />
-                    <input
-                      type="text"
-                      required
-                      placeholder="spice-garden"
-                      value={slug}
-                      onChange={(e) =>
-                        setSlug(e.target.value.toLowerCase().trim())
-                      }
-                      className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm text-slate-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all shadow-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    Contact Phone Number
-                  </label>
-                  <div className="relative flex items-center">
-                    <Phone
-                      size={16}
-                      className="absolute left-4 text-slate-400"
-                    />
-                    <input
-                      type="text"
-                      required
-                      placeholder="+91 98765 43210"
-                      value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm text-slate-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all shadow-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    Official Business Email
-                  </label>
-                  <div className="relative flex items-center">
-                    <Mail
-                      size={16}
-                      className="absolute left-4 text-slate-400"
-                    />
-                    <input
-                      type="email"
-                      required
-                      placeholder="support@spicegarden.com"
-                      value={email}
-                      onChange={(e) => setEmail(e.target.value)}
-                      className="w-full pl-11 pr-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm text-slate-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all shadow-xs"
-                    />
-                  </div>
-                </div>
-
-                <div className="sm:col-span-2 space-y-1.5">
-                  <div className="flex items-center justify-between gap-3">
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                      Restaurant UPI ID
-                    </label>
-
-                    {restaurant?.upiId && !upiChangeMode && (
-                      <button
-                        type="button"
-                        onClick={handleRequestUpiOtp}
-                        disabled={upiOtpLoading}
-                        className="
-            text-[10px]
-            font-bold
-            text-red-600
-            hover:text-red-700
-            bg-red-50
-            hover:bg-red-100
-            border
-            border-red-100
-            px-3
-            py-1.5
-            rounded-xl
-            transition-all
-            disabled:opacity-50
-          "
-                      >
-                        {upiOtpLoading ? "Sending OTP..." : "Change UPI"}
-                      </button>
-                    )}
-                  </div>
-
-                  {restaurant?.upiId && !upiChangeMode && (
-                    <p className="text-[10px] text-amber-600 font-semibold">
-                      🔒 UPI ID is locked. Verify your registered owner email to
-                      change it.
-                    </p>
-                  )}
-
-                  {upiChangeMode && (
-                    <p className="text-[10px] text-emerald-600 font-semibold">
-                      ✓ Identity verified. You can now change your UPI ID.
-                    </p>
-                  )}
-
-                  <div className="relative flex items-center">
-                    <CreditCard
-                      size={16}
-                      className="absolute left-4 text-emerald-500"
-                    />
-
-                    <input
-                      type="text"
-                      placeholder="restaurantname@okhdfcbank"
-                      disabled={Boolean(restaurant?.upiId) && !upiChangeMode}
-                      value={upiId}
-                      onChange={(e) =>
-                        setUpiId(e.target.value.trim().toLowerCase())
-                      }
-                      className="
-        w-full
-        pl-11
-        pr-4
-        py-3
-        rounded-2xl
-        border
-        border-slate-200
-        bg-white
-        text-sm
-        text-slate-900
-        focus:border-red-500
-        focus:ring-4
-        focus:ring-red-500/10
-        transition-all
-        shadow-xs
-        disabled:bg-slate-100
-        disabled:text-slate-500
-        disabled:cursor-not-allowed
-      "
-                    />
-                  </div>
-                </div>
-                <div className="mt-4">
-                  {(() => {
-                    const expiryDate = restaurant?.subscriptionExpiresAt
-                      ? new Date(restaurant.subscriptionExpiresAt)
-                      : null;
-
-                    if (!expiryDate || Number.isNaN(expiryDate.getTime())) {
-                      return (
-                        <div className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-slate-200 text-slate-500">
-                            <AlertCircle size={18} strokeWidth={2.5} />
-                          </div>
-
-                          <div>
-                            <p className="text-xs font-black text-slate-800">
-                              Plan Expiry
-                            </p>
-                            <p className="mt-0.5 text-[11px] font-medium text-slate-500">
-                              Plan expiry date unavailable
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    }
-
-                    const isExpired = expiryDate.getTime() <= Date.now();
-
-                    const formattedDate = expiryDate.toLocaleString("en-IN", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                      hour12: true,
-                    });
-
-                    return (
-                      <div
-                        className={`flex items-center gap-3 rounded-2xl border px-4 py-3 transition-all ${
-                          isExpired
-                            ? "border-red-200 bg-red-50"
-                            : "border-emerald-200 bg-emerald-50"
-                        }`}
-                      >
-                        {/* Status Icon */}
-                        <div
-                          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                            isExpired
-                              ? "bg-red-100 text-red-600"
-                              : "bg-emerald-100 text-emerald-600"
-                          }`}
-                        >
-                          {isExpired ? (
-                            <AlertCircle size={19} strokeWidth={2.5} />
-                          ) : (
-                            <CheckCircle2 size={19} strokeWidth={2.5} />
-                          )}
-                        </div>
-
-                        {/* Status Content */}
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p
-                              className={`text-xs font-black ${
-                                isExpired ? "text-red-800" : "text-emerald-800"
-                              }`}
-                            >
-                              {isExpired
-                                ? "Subscription Expired"
-                                : "Subscription Active"}
-                            </p>
-
-                            <span
-                              className={`rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${
-                                isExpired
-                                  ? "bg-red-100 text-red-700"
-                                  : "bg-emerald-100 text-emerald-700"
-                              }`}
-                            >
-                              {isExpired ? "Expired" : "Active"}
-                            </span>
-                          </div>
-
-                          <p
-                            className={`mt-1 text-[11px] font-semibold ${
-                              isExpired ? "text-red-600" : "text-emerald-600"
-                            }`}
-                          >
-                            {isExpired
-                              ? `Your plan expired on ${formattedDate}`
-                              : `Your plan expires on ${formattedDate}`}
-                          </p>
-                        </div>
-                      </div>
-                    );
-                  })()}
-                </div>
-              </div>
-            </div>
-
-            {/* GOOGLE REVIEW QR */}
-            <div className="pt-4 border-t border-slate-100 space-y-3">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-2">
-                  <QrCode size={14} className="text-blue-500" />
-                  Google Review QR
-                </h3>
-
-                <span className="text-[9px] font-bold text-slate-400 uppercase">
-                  Customer Reviews
-                </span>
-              </div>
-
-              <div className="flex flex-col items-center justify-center p-4 bg-slate-50 border border-slate-200 rounded-2xl">
-                {googleReviewQrPreview ? (
-                  <img
-                    src={googleReviewQrPreview}
-                    alt="Google Review QR Code"
-                    className="w-32 h-32 object-contain rounded-xl shadow-sm bg-white p-2"
-                  />
-                ) : (
-                  <div className="w-32 h-32 flex items-center justify-center text-center text-[11px] text-slate-400 font-medium">
-                    Upload your Google Review QR
-                  </div>
-                )}
-
-                <p className="text-[10px] text-slate-500 text-center mt-2">
-                  Customers can scan this QR to leave a Google review.
-                </p>
-
-                <label className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-2xl border border-blue-100 bg-blue-50 hover:bg-blue-100 text-xs font-bold text-blue-700 cursor-pointer transition-all">
-                  <Upload size={14} />
-
-                  <span>
-                    {googleReviewQrPreview
-                      ? "Replace Review QR"
-                      : "Upload Review QR"}
-                  </span>
-
-                  <input
-                    type="file"
-                    accept="image/jpeg,image/png,image/webp"
-                    onChange={handleGoogleReviewQrChange}
-                    className="hidden"
-                  />
-                </label>
-
-                <span className="text-[9px] text-slate-400 mt-2">
-                  JPG, PNG or WebP • Max 5MB
-                </span>
-              </div>
-            </div>
-
-            <div className="sm:col-span-2 pt-4 mt-2 border-t border-slate-100">
-              <div className="flex items-center gap-2 mb-4">
-                <Building size={14} className="text-blue-500" />
-                <h3 className="text-xs font-black uppercase tracking-wider text-slate-900">
-                  Business Compliance
-                </h3>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                <div className="space-y-1.5">
-                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                    FSSAI Number
-                  </label>
-
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={14}
-                    placeholder="e.g. 12345678901234"
-                    value={fssaiNumber}
-                    onChange={(e) =>
-                      setFssaiNumber(
-                        e.target.value.replace(/\D/g, "").slice(0, 14),
-                      )
-                    }
-                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm text-slate-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all shadow-xs"
-                  />
-
-                  <p className="text-[10px] text-slate-400">
-                    14-digit FSSAI license/registration number
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
-                  {/* GST NUMBER */}
-                  <div className="space-y-1.5">
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                      GST Number
-                    </label>
-
-                    <input
-                      type="text"
-                      maxLength={15}
-                      placeholder="e.g. 08ABCDE1234F1Z5"
-                      value={gstNumber}
-                      onChange={(e) =>
-                        setGstNumber(
-                          e.target.value
-                            .toUpperCase()
-                            .replace(/\s/g, "")
-                            .slice(0, 15),
-                        )
-                      }
-                      className="w-full rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold outline-none focus:border-rose-400"
-                    />
-                  </div>
-
-                  {/* TAX RATE */}
-                  <div className="space-y-1.5">
-                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                      GST / Tax Rate
-                    </label>
-
-                    <div className="relative">
-                      <input
-                        type="number"
-                        min="0"
-                        max="100"
-                        step="0.01"
-                        placeholder="e.g. 5"
-                        value={taxRate}
-                        onChange={(e) => {
-                          const value = e.target.value;
-
-                          if (value === "") {
-                            setTaxRate("");
-                            return;
-                          }
-
-                          const num = Number(value);
-
-                          if (num >= 0 && num <= 100) {
-                            setTaxRate(value);
-                          }
-                        }}
-                        className="w-full rounded-xl border border-slate-200 px-4 py-3 pr-12 text-sm font-semibold outline-none focus:border-rose-400"
-                      />
-
-                      <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-black text-slate-400">
-                        %
-                      </span>
-                    </div>
-
-                    <p className="text-[10px] text-slate-400">
-                      This tax rate will be automatically applied to bills.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Address Location Section */}
-          <div className="bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs space-y-6">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-              <h2 className="text-xs font-black uppercase tracking-wider text-slate-900 flex items-center gap-2">
-                <MapPin size={16} className="text-red-500" /> Physical Branch
-                Location
-              </h2>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-              <div className="sm:col-span-2 lg:col-span-4">
-                <Input
-                  label="Street Address & Landmark"
-                  placeholder="Shop No. 4, Main Market Road"
-                  value={street}
-                  onChange={(e) => setStreet(e.target.value)}
-                />
-              </div>
-              <Input
-                label="City"
-                placeholder="Jaipur"
-                value={city}
-                onChange={(e) => setCity(e.target.value)}
-              />
-              <Input
-                label="State / Province"
-                placeholder="Rajasthan"
-                value={state}
-                onChange={(e) => setState(e.target.value)}
-              />
-              <Input
-                label="Zip / Postal Code"
-                placeholder="302001"
-                value={zip}
-                onChange={(e) => setZip(e.target.value)}
-              />
-            </div>
-          </div>
-
-          <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-xs sm:p-6">
-            <div className="mb-5 flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-500">
-                  Billing
-                </p>
-                <h2 className="mt-1 text-xl font-black text-slate-900">
-                  Bill template
+        <form onSubmit={handleSubmit} className="mt-4 space-y-4">
+          <div className="grid items-start gap-4 xl:grid-cols-2">
+            <section className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+              <div className="mb-4 flex items-center justify-between gap-3">
+                <h2 className="flex items-center gap-2 text-sm font-black text-slate-900">
+                  <Store size={15} className="text-rose-500" /> Basic Information
                 </h2>
-                <p className="mt-1 text-sm font-medium text-slate-500">
-                  Select the design used when bills are generated and printed.
-                </p>
-              </div>
-              <span className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-slate-600">
-                {
-                  BILL_TEMPLATES.find(
-                    (template) => template.id === selectedBillTemplate,
-                  )?.name
-                }
-              </span>
-            </div>
-
-            {templateError && (
-              <p className="mt-3 text-xs font-bold text-rose-600">
-                {templateError}
-              </p>
-            )}
-
-            <div className="grid gap-3 sm:grid-cols-2 mt-3">
-              {BILL_TEMPLATES.map((template) => {
-                const isSelected = selectedBillTemplate === template.id;
-                return (
-                  <button
-                    key={template.id}
-                    type="button"
-                    disabled={Boolean(templateSaving)}
-                    onClick={() => handleBillTemplateChange(template)}
-                    className={`rounded-2xl border p-4 text-left transition ${
-                      isSelected
-                        ? "border-rose-500 bg-rose-50 ring-2 ring-rose-100"
-                        : "border-slate-200 bg-slate-50/60 hover:border-slate-300"
-                    } cursor-pointer ${
-                      templateSaving && templateSaving !== template.id
-                        ? "opacity-50 cursor-not-allowed"
-                        : ""
-                    }`}
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="font-black text-slate-900">
-                        {template.name}
-                      </span>
-                      <span
-                        className={`rounded-full px-2 py-1 text-[9px] font-black ${
-                          template.tier === "PRO"
-                            ? "bg-amber-100 text-amber-700"
-                            : "bg-emerald-100 text-emerald-700"
-                        }`}
-                      >
-                        {template.tier}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-xs font-medium leading-5 text-slate-500">
-                      {template.description}
-                    </p>
-                    <div className="mt-3 flex items-center justify-between">
-                      {templateSaving === template.id && (
-                        <span className="text-[9px] font-bold text-slate-400">
-                          Applying…
-                        </span>
-                      )}
-                      <span
-                        role="button"
-                        tabIndex={0}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPreviewTemplateId(template.id);
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" || e.key === " ") {
-                            e.stopPropagation();
-                            setPreviewTemplateId(template.id);
-                          }
-                        }}
-                        className="ml-auto text-[10px] font-black text-rose-600 hover:text-rose-700 hover:underline cursor-pointer"
-                      >
-                        Preview
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-
-          {paymentTemplate && (
-            <BillTemplatePaymentModal
-              template={paymentTemplate}
-              onClose={() => setPaymentTemplate(null)}
-              onSuccess={handleTemplatePaymentSuccess}
-            />
-          )}
-
-          {previewTemplateId && (
-            <BillTemplatePreviewModal
-              templateId={previewTemplateId}
-              onClose={() => setPreviewTemplateId(null)}
-            />
-          )}
-
-          {/* Sticky Action Footer Bar */}
-          {/* Sticky Action Footer Bar */}
-          <div className="bg-white/80 backdrop-blur-md p-4 rounded-3xl border border-slate-200/80 shadow-lg">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <div className="hidden sm:block text-xs text-slate-500 font-medium pl-2">
-                Changes apply instantly across online menus and payment
-                gateways.
-              </div>
-
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
-                {/* DELETE RESTAURANT */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDeleteRestaurantError("");
-                    setDeleteConfirmation("");
-                    setDeleteRestaurantOpen(true);
-                  }}
-                  disabled={
-                    updateProfileMutation.isPending || deleteRestaurantLoading
-                  }
-                  className="
-          w-full
-          sm:w-auto
-          flex
-          items-center
-          justify-center
-          gap-2
-          bg-red-50
-          hover:bg-red-100
-          text-red-600
-          border
-          border-red-200
-          font-bold
-          text-xs
-          px-6
-          py-4
-          rounded-2xl
-          transition-all
-          shadow-sm
-          cursor-pointer
-          disabled:opacity-50
-          disabled:cursor-not-allowed
-        "
-                >
-                  <Trash2 size={16} strokeWidth={2.5} />
-
-                  <span>Delete Restaurant</span>
-                </button>
-
-                {/* SAVE PROFILE */}
                 <button
                   type="submit"
                   disabled={updateProfileMutation.isPending}
-                  className="
-          w-full
-          sm:w-auto
-          flex
-          items-center
-          justify-center
-          gap-2
-          bg-slate-900
-          hover:bg-slate-800
-          text-white
-          font-bold
-          text-xs
-          px-8
-          py-4
-          rounded-2xl
-          transition-all
-          shadow-md
-          cursor-pointer
-          disabled:opacity-50
-          disabled:cursor-not-allowed
-        "
+                  className="inline-flex items-center gap-1 rounded-xl bg-rose-500 px-3 py-2 text-xs font-black text-white disabled:opacity-50"
                 >
-                  <Save size={16} strokeWidth={2.5} />
-
-                  <span>
-                    {updateProfileMutation.isPending
-                      ? "Saving..."
-                      : "Save Profile & UPI Details"}
-                  </span>
+                  <Save size={13} />
+                  {updateProfileMutation.isPending ? "Saving..." : "Save Changes"}
                 </button>
               </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-bold text-slate-500">Restaurant Name *</span>
+                  <input required value={name} onChange={(e) => setName(e.target.value)} placeholder="Restaurant name" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold outline-none focus:border-rose-300 focus:bg-white" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-bold text-slate-500">Restaurant Slug *</span>
+                  <div className="relative">
+                    <Globe size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input required value={slug} onChange={(e) => setSlug(e.target.value.toLowerCase().trim())} placeholder="spice-garden" className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-8 pr-3 text-sm font-semibold outline-none focus:border-rose-300 focus:bg-white" />
+                  </div>
+                </label>
+                {publicMenuLink && (
+                  <p className="sm:col-span-2 text-[11px] font-semibold text-rose-500">
+                    <Link2 size={12} className="mr-1 inline" />
+                    Menu link: {publicMenuLink}
+                  </p>
+                )}
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-bold text-slate-500">Phone Number *</span>
+                  <div className="relative">
+                    <Phone size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input required value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="Phone number" className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-8 pr-3 text-sm font-semibold outline-none focus:border-rose-300 focus:bg-white" />
+                  </div>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-bold text-slate-500">Email Address *</span>
+                  <div className="relative">
+                    <Mail size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email address" className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-8 pr-3 text-sm font-semibold outline-none focus:border-rose-300 focus:bg-white" />
+                  </div>
+                </label>
+              </div>
+            </section>
+
+            <section className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+              <h2 className="mb-4 flex items-center gap-2 text-sm font-black text-slate-900">
+                <Palette size={15} className="text-orange-500" /> Logo & Branding
+              </h2>
+              <div className="grid gap-4 sm:grid-cols-[160px_minmax(0,1fr)]">
+                <div>
+                  <p className="mb-1 text-[11px] font-bold text-slate-500">Restaurant Logo</p>
+                  <div className="flex h-28 items-center justify-center overflow-hidden rounded-2xl border border-dashed border-slate-200 bg-slate-50">
+                    {logoSrc ? <img src={logoSrc} alt="Restaurant logo" className="h-full w-full object-cover" /> : <Building size={28} className="text-slate-300" />}
+                  </div>
+                  <label className="mt-2 flex cursor-pointer items-center justify-center gap-1 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-[11px] font-bold text-rose-600">
+                    <Upload size={13} /> Upload Logo
+                    <input type="file" accept="image/*" onChange={handleLogoChange} className="hidden" />
+                  </label>
+                  <p className="mt-1 text-center text-[10px] font-medium text-slate-400">PNG, JPG</p>
+                </div>
+                <div>
+                  <p className="mb-1 text-[11px] font-bold text-slate-500">Theme Color</p>
+                  <div className="mb-2 flex items-center gap-2">
+                    <input type="color" value={themeColor || "#EF4444"} onChange={(e) => setThemeColor(e.target.value)} aria-label="Theme color" className="h-10 w-10 cursor-pointer rounded-lg border border-slate-200 bg-white p-1" />
+                    <input value={themeColor} onChange={(e) => setThemeColor(e.target.value)} className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold uppercase outline-none focus:border-rose-300" />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {THEME_SWATCHES.map((color) => (
+                      <button
+                        key={color}
+                        type="button"
+                        onClick={() => setThemeColor(color)}
+                        aria-label={color}
+                        className={`h-6 w-6 rounded-full border-2 ${themeColor?.toLowerCase() === color.toLowerCase() ? "border-slate-900" : "border-white"}`}
+                        style={{ background: color }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <div className="grid items-start gap-4 xl:grid-cols-2">
+            <section className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+              <h2 className="mb-4 flex items-center gap-2 text-sm font-black text-slate-900">
+                <MapPin size={15} className="text-rose-500" /> Address Information
+              </h2>
+              <label className="mb-3 block">
+                <span className="mb-1 block text-[11px] font-bold text-slate-500">Street Address</span>
+                <input value={street} onChange={(e) => setStreet(e.target.value)} placeholder="Street address" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold outline-none focus:border-rose-300 focus:bg-white" />
+              </label>
+              <div className="grid gap-3 sm:grid-cols-3">
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-bold text-slate-500">City</span>
+                  <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="City" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold outline-none focus:border-rose-300 focus:bg-white" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-bold text-slate-500">State</span>
+                  <input value={state} onChange={(e) => setState(e.target.value)} placeholder="State" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold outline-none focus:border-rose-300 focus:bg-white" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-bold text-slate-500">PIN Code</span>
+                  <input value={zip} onChange={(e) => setZip(e.target.value)} placeholder="PIN code" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold outline-none focus:border-rose-300 focus:bg-white" />
+                </label>
+              </div>
+            </section>
+
+            <section className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+              <h2 className="mb-4 flex items-center gap-2 text-sm font-black text-slate-900">
+                <Building size={15} className="text-orange-500" /> Business Details
+              </h2>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-bold text-slate-500">FSSAI Number</span>
+                  <input inputMode="numeric" maxLength={14} value={fssaiNumber} onChange={(e) => setFssaiNumber(e.target.value.replace(/\D/g, "").slice(0, 14))} placeholder="14-digit FSSAI number" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold outline-none focus:border-rose-300 focus:bg-white" />
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-[11px] font-bold text-slate-500">GST Number</span>
+                  <input maxLength={15} value={gstNumber} onChange={(e) => setGstNumber(e.target.value.toUpperCase().replace(/\s/g, "").slice(0, 15))} placeholder="GST number" className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold outline-none focus:border-rose-300 focus:bg-white" />
+                </label>
+                <label className="block sm:col-span-2">
+                  <span className="mb-1 block text-[11px] font-bold text-slate-500">Default Tax Rate (%)</span>
+                  <div className="relative">
+                    <Percent size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.01"
+                      value={taxRate}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === "") {
+                          setTaxRate("");
+                          return;
+                        }
+                        const num = Number(value);
+                        if (num >= 0 && num <= 100) setTaxRate(value);
+                      }}
+                      placeholder="5"
+                      className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-8 pr-3 text-sm font-semibold outline-none focus:border-rose-300 focus:bg-white"
+                    />
+                  </div>
+                  <p className="mt-1 text-[10px] font-medium text-slate-400">Applied on bills when tax is used.</p>
+                </label>
+              </div>
+            </section>
+          </div>
+
+          <div className="grid items-start gap-4 xl:grid-cols-3">
+            <section className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900">
+                <CreditCard size={15} className="text-rose-500" /> Payment & UPI Details
+              </h2>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-[11px] font-bold text-slate-500">UPI ID</span>
+                {restaurant?.upiId && !upiChangeMode && (
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-600">Verified</span>
+                )}
+              </div>
+              <input
+                value={upiId}
+                disabled={Boolean(restaurant?.upiId) && !upiChangeMode}
+                onChange={(e) => setUpiId(e.target.value.trim().toLowerCase())}
+                placeholder="name@upi"
+                className="mb-2 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold outline-none focus:border-rose-300 disabled:cursor-not-allowed disabled:text-slate-500"
+              />
+              {restaurant?.upiId && !upiChangeMode && (
+                <button type="button" onClick={handleRequestUpiOtp} disabled={upiOtpLoading} className="mb-3 rounded-xl bg-rose-500 px-3 py-2 text-[11px] font-black text-white disabled:opacity-50">
+                  {upiOtpLoading ? "Sending OTP..." : "Change UPI"}
+                </button>
+              )}
+              {restaurant?.upiId && !upiChangeMode && (
+                <p className="mb-2 text-[10px] font-semibold text-amber-600">UPI ID stays locked until the owner email OTP is verified.</p>
+              )}
+              {upiChangeMode && (
+                <p className="mb-2 text-[10px] font-semibold text-emerald-600">Identity verified. Update the UPI ID, then save.</p>
+              )}
+              <p className="mb-1 text-[11px] font-bold text-slate-500">UPI QR Code</p>
+              <div className="flex h-28 items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-slate-50">
+                {upiQrCode ? <img src={upiQrCode} alt="UPI QR code" className="h-24 w-24 object-contain" /> : <p className="px-4 text-center text-[11px] font-semibold text-slate-400">Save a UPI ID to generate this QR</p>}
+              </div>
+            </section>
+
+            <section className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900">
+                <Star size={15} className="text-amber-500" /> Google Review QR Code
+              </h2>
+              <div className="flex h-36 items-center justify-center overflow-hidden rounded-2xl border border-dashed border-slate-200 bg-slate-50">
+                {googleReviewQrPreview ? <img src={googleReviewQrPreview} alt="Google review QR" className="h-32 w-32 object-contain" /> : <p className="px-4 text-center text-[11px] font-semibold text-slate-400">Upload your Google review QR</p>}
+              </div>
+              <label className="mt-3 flex cursor-pointer items-center justify-center gap-1 rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-[11px] font-bold text-rose-600">
+                <Upload size={13} /> {googleReviewQrPreview ? "Replace QR Code" : "Upload QR Code"}
+                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleGoogleReviewQrChange} className="hidden" />
+              </label>
+              <p className="mt-2 text-center text-[10px] font-medium text-slate-400">PNG, JPG. Customers scan this to leave a review.</p>
+            </section>
+
+            <section className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="flex items-center gap-2 text-sm font-black text-slate-900">
+                  <Printer size={15} className="text-rose-500" /> Bill Template
+                </h2>
+                <button type="button" onClick={() => setShowAllTemplates((open) => !open)} className="text-[11px] font-black text-rose-500">
+                  {showAllTemplates ? "Show Less" : "View All"}
+                </button>
+              </div>
+              {templateError && <p className="mb-2 text-[11px] font-bold text-rose-600">{templateError}</p>}
+              <div className="grid grid-cols-2 gap-2">
+                {visibleTemplates.map((template) => {
+                  const isSelected = selectedBillTemplate === template.id;
+                  return (
+                    <button
+                      key={template.id}
+                      type="button"
+                      disabled={Boolean(templateSaving)}
+                      onClick={() => handleBillTemplateChange(template)}
+                      className={`rounded-2xl border p-2 text-left ${isSelected ? "border-rose-400 ring-2 ring-rose-100" : "border-slate-100"} ${templateSaving && templateSaving !== template.id ? "opacity-50" : ""}`}
+                    >
+                      <span className="mb-1 block h-16 rounded-lg bg-slate-50 px-2 py-1">
+                        <span className="block h-1.5 w-8 rounded bg-slate-300" />
+                        <span className="mt-1 block h-1 w-full rounded bg-slate-200" />
+                        <span className="mt-1 block h-1 w-2/3 rounded bg-slate-200" />
+                      </span>
+                      <span className="block truncate text-[11px] font-black text-slate-800">{template.name}</span>
+                      <span className="mt-1 flex items-center justify-between">
+                        <span className={`rounded-full px-1.5 py-0.5 text-[9px] font-black ${template.tier === "PRO" ? "bg-amber-100 text-amber-700" : "bg-emerald-100 text-emerald-700"}`}>{template.tier}</span>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setPreviewTemplateId(template.id);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.stopPropagation();
+                              setPreviewTemplateId(template.id);
+                            }
+                          }}
+                          className="text-[10px] font-black text-rose-500"
+                        >
+                          Preview
+                        </span>
+                      </span>
+                      {templateSaving === template.id && <span className="text-[9px] font-bold text-slate-400">Applying…</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          </div>
+
+          {paymentTemplate && (
+            <BillTemplatePaymentModal template={paymentTemplate} onClose={() => setPaymentTemplate(null)} onSuccess={handleTemplatePaymentSuccess} />
+          )}
+          {previewTemplateId && (
+            <BillTemplatePreviewModal templateId={previewTemplateId} onClose={() => setPreviewTemplateId(null)} />
+          )}
+
+          <div className="flex flex-col gap-3 rounded-3xl border border-rose-100 bg-rose-50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white text-rose-600">
+                <Trash2 size={18} />
+              </div>
+              <div>
+                <p className="text-sm font-black text-rose-700">Delete Restaurant</p>
+                <p className="text-[11px] font-semibold text-rose-500">This permanently deletes the restaurant and its related data. This action cannot be undone.</p>
+              </div>
             </div>
+            <button
+              type="button"
+              onClick={() => {
+                setDeleteRestaurantError("");
+                setDeleteConfirmation("");
+                setDeleteRestaurantOpen(true);
+              }}
+              disabled={updateProfileMutation.isPending || deleteRestaurantLoading}
+              className="inline-flex items-center justify-center gap-1 rounded-xl border border-rose-200 bg-white px-4 py-2.5 text-xs font-black text-rose-600 disabled:opacity-50"
+            >
+              <Trash2 size={14} /> Delete Restaurant
+            </button>
           </div>
         </form>
       </div>
+
     </>
   );
 }

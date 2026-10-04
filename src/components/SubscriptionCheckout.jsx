@@ -9,16 +9,16 @@ import { useAuth } from "../context/AuthContext";
 import {
   ArrowRight,
   Check,
+  ChefHat,
   CircleCheck,
   Clock3,
   Loader2,
   LockKeyhole,
+  LogOut,
   Printer,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
-
-import logo from "../assets/cho.png";
 
 /*
 |--------------------------------------------------------------------------
@@ -249,7 +249,7 @@ const formatDuration = (plan) => {
 */
 
 export default function SubscriptionCheckout() {
-  const { refreshSession, user } = useAuth();
+  const { refreshSession, user, logout } = useAuth();
 
   const [plans, setPlans] = useState([]);
   const [plansLoading, setPlansLoading] = useState(true);
@@ -436,7 +436,7 @@ export default function SubscriptionCheckout() {
       clearPaymentTimeout();
 
       window.location.replace(
-        "/dashboard",
+        "/",
       );
     }, [clearPaymentTimeout]);
 
@@ -1013,42 +1013,78 @@ export default function SubscriptionCheckout() {
   */
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-rose-100 selection:text-rose-700">
+    <div className="min-h-screen bg-[var(--background)] text-slate-900 selection:bg-rose-100 selection:text-rose-700">
       {/* ================================================================
           TOP NAVIGATION
           ================================================================ */}
 
-      <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/95 backdrop-blur-xl">
-        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-white">
-              <img
-                src={logo}
-                alt="ChotuGTT"
-                className="h-9 w-auto object-contain"
-              />
-            </div>
+      <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950 text-white">
+        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[var(--primary)] shadow-sm">
+              <ChefHat size={20} strokeWidth={2.25} />
+            </span>
 
-            <div>
-              <div className="text-[17px] font-black tracking-tight text-slate-950">
-                Chotu
-                <span className="text-rose-600">
-                  GTT
-                </span>
-              </div>
-
-              <div className="hidden text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400 sm:block">
-                Restaurant Management
-              </div>
+            <div className="min-w-0 leading-tight">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">
+                Restaurant
+              </p>
+              <p className="truncate text-base font-black tracking-tight sm:text-lg">
+                Chotu<span className="text-[var(--secondary)]">GTT</span>
+              </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-[11px] font-bold text-amber-700 sm:px-4">
-            <LockKeyhole size={13} />
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <div
+              className={`hidden items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold sm:inline-flex ${
+                hasActiveSubscription
+                  ? "border border-emerald-400/30 bg-emerald-500/15 text-emerald-300"
+                  : "border border-amber-400/30 bg-amber-500/15 text-amber-200"
+              }`}
+            >
+              {hasActiveSubscription ? (
+                <ShieldCheck size={13} />
+              ) : (
+                <LockKeyhole size={13} />
+              )}
+              <span>
+                {hasActiveSubscription
+                  ? `${activePlanLabel} active`
+                  : "Subscription required"}
+              </span>
+            </div>
 
-            <span>
-              Subscription required
-            </span>
+            {(user?.name || user?.role) && (
+              <div className="hidden items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5 md:flex">
+                {user?.name ? (
+                  <span className="max-w-[120px] truncate text-sm font-semibold text-white">
+                    {user.name}
+                  </span>
+                ) : null}
+                {user?.role ? (
+                  <span className="rounded-md bg-[var(--primary)]/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#FB7185]">
+                    {user.role}
+                  </span>
+                ) : null}
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  await logout();
+                } finally {
+                  window.location.replace("/");
+                }
+              }}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-2.5 py-2 text-sm font-semibold text-white/80 transition hover:border-rose-400/40 hover:bg-rose-500/15 hover:text-white"
+              title="Sign out"
+            >
+              <LogOut size={16} />
+              <span className="hidden sm:inline">Sign out</span>
+            </button>
           </div>
         </div>
       </header>
@@ -1157,7 +1193,7 @@ export default function SubscriptionCheckout() {
             </p>
             <button
               type="button"
-              onClick={() => window.location.assign("/dashboard")}
+              onClick={() => window.location.assign("/")}
               className="mt-3 inline-flex items-center gap-2 rounded-xl bg-emerald-700 px-4 py-2 text-xs font-black text-white"
             >
               Open dashboard

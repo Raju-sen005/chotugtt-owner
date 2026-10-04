@@ -1,16 +1,16 @@
 import { useState } from "react";
+import { Eye, EyeOff, ImagePlus } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
-import { ImagePlus } from "lucide-react";
-// import logoImage from "../../assets/cho.png";
+import AuthShell, { AuthField, authInputClass } from "./AuthShell";
 
 export default function RegisterTenant({ onSwitchToLogin }) {
   const { registerTenant } = useAuth();
   const [isRegistering, setIsRegistering] = useState(false);
-  // Registration States
   const [restaurantName, setRestaurantName] = useState("");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState("");
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
@@ -19,43 +19,30 @@ export default function RegisterTenant({ onSwitchToLogin }) {
   const [error, setError] = useState("");
   const [successData, setSuccessData] = useState(null);
 
-  // --------------------------------------------------
-  // REGISTER FORM VALIDATION
-  // --------------------------------------------------
+  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
-  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-  email.trim(),
-);
+  const isValidPhone = /^[0-9]{10}$/.test(phone.trim());
 
-const isValidPhone = /^[0-9]{10}$/.test(
-  phone.trim(),
-);
+  const isValidRestaurantName = restaurantName.trim().length >= 2;
 
-const isValidRestaurantName =
-  restaurantName.trim().length >= 2;
+  const isValidOwnerName = name.trim().length >= 2;
 
-const isValidOwnerName =
-  name.trim().length >= 2;
+  const isValidPassword = password.length >= 8;
 
-const isValidPassword =
-  password.length >= 8;
+  const isFormValid =
+    isValidRestaurantName &&
+    isValidOwnerName &&
+    isValidEmail &&
+    isValidPhone &&
+    isValidPassword &&
+    legalAccepted;
 
-const isFormValid =
-  isValidRestaurantName &&
-  isValidOwnerName &&
-  isValidEmail &&
-  isValidPhone &&
-  isValidPassword &&
-  legalAccepted;
-
-  // Automatic unique URL generator logic
   const generatedSlug = restaurantName
     .trim()
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "-")
     .replace(/-+/g, "-");
 
-  // Handle Logo Selection & Preview
   const handleLogoChange = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -66,10 +53,6 @@ const isFormValid =
 
   const handleRegister = async (e) => {
     e.preventDefault();
-
-    // --------------------------------------------------
-    // CLIENT-SIDE VALIDATION
-    // --------------------------------------------------
 
     if (!restaurantName.trim()) {
       setError("Restaurant name is required.");
@@ -107,10 +90,6 @@ const isFormValid =
       );
       return;
     }
-
-    // --------------------------------------------------
-    // START REGISTRATION
-    // --------------------------------------------------
 
     setError("");
     setIsRegistering(true);
@@ -166,292 +145,237 @@ const isFormValid =
 
   if (successData) {
     return (
-      <div className="h-screen bg-[#F8F9FA] flex items-center justify-center p-6 font-sans overflow-hidden">
-        <div className="bg-white p-8 md:p-10 rounded-3xl shadow-2xl max-w-md w-full text-center space-y-6 border border-slate-100 animate-fade-in">
-          <div>
-            <span className="text-4xl">🎉</span>
-            <h2 className="text-2xl font-black text-slate-900 mt-2">
-              Registration Live!
-            </h2>
-            <p className="text-xs text-slate-500 mt-1">
-              Your multi-tenant storefront setup has been allocated.
-            </p>
-          </div>
-
-          <div className="bg-slate-50 p-6 rounded-2xl border border-slate-100 inline-block shadow-inner">
+      <AuthShell
+        title="Restaurant is ready"
+        subtitle="Save this link. Sign in next to open your dashboard."
+        panelTitle="Your restaurant is on ChotuGTT."
+        panelPoints={[
+          "Menu and QR are tied to this account",
+          "Sign in to add dishes and tables",
+          "Staff can join after you create them",
+        ]}
+      >
+        <div className="space-y-5">
+          <div className="flex justify-center rounded-2xl border border-slate-100 bg-slate-50 p-5">
             <img
               src={successData.qr}
               alt="Restaurant QR"
-              className="mx-auto rounded-lg shadow-xs h-36 w-36 object-contain"
+              className="h-36 w-36 rounded-lg bg-white object-contain"
             />
           </div>
-
-          <div className="space-y-2 text-left">
-            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-              Your Live Menu Sub-URL:
-            </label>
+          <div>
+            <p className="mb-1.5 text-sm font-semibold text-slate-700">
+              Menu link
+            </p>
             <a
               href={successData.url}
               target="_blank"
               rel="noreferrer"
-              className="block p-3 rounded-xl bg-red-50 text-red-600 font-mono text-xs font-bold break-all border border-red-100 hover:bg-red-100 transition-all"
+              className="block break-all rounded-xl border border-rose-100 bg-rose-50 px-3.5 py-3 font-mono text-xs font-semibold text-[var(--primary)]"
             >
               {successData.url}
             </a>
           </div>
-
           <button
+            type="button"
             onClick={onSwitchToLogin}
-            className="w-full bg-gradient-to-r from-red-500 to-rose-600 text-white py-3.5 rounded-xl font-bold hover:opacity-95 active:scale-[0.99] transition-all shadow-md shadow-red-500/20 text-sm cursor-pointer"
+            className="w-full rounded-xl bg-[var(--primary)] py-3.5 text-sm font-bold text-white transition hover:bg-[var(--primary-dark)]"
           >
-            Proceed to Sign In
+            Proceed to sign in
           </button>
         </div>
-      </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="h-screen w-screen grid lg:grid-cols-12 bg-[#F8F9FA] font-sans overflow-hidden">
-      <div className="hidden lg:flex lg:col-span-5 bg-gradient-to-br from-rose-500 via-red-500 to-amber-500 p-8 xl:p-12 flex-col justify-between relative overflow-hidden h-full">
-        <div className="absolute inset-0 bg-black/10 backdrop-blur-[2px]" />
-        <div className="relative z-10 text-center">
-          {/* <img
-            src={logoImage}
-            alt="ChotuGTT"
-            className="h-44 xl:h-52 m-auto object-contain brightness-0 invert"
-          /> */}
-          <div className="m-auto object-contain brightness-0 invert relative left-[101px]">
-            <svg
-              version="1.0"
-              xmlns="http://www.w3.org/2000/svg"
-              width="306px"
-              height="79px"
-              viewBox="0 0 306 79"
-              preserveAspectRatio="xMidYMid meet"
-            >
-              <g fill="#00000000">
-                <path d="M0 39.48 l0 -39.48 153 0 153 0 0 39.48 0 39.48 -153 0 -153 0 0 -39.48z m29.18 23.21 c4.44 -0.59 8.48 -2.08 11.61 -4.32 2.08 -1.48 2.27 -0.93 -1.54 -4.60 l-3.30 -3.21 -0.82 0.60 c-1.48 1.11 -3.50 1.99 -5.57 2.42 -1.43 0.31 -5.01 0.31 -6.55 -0.02 -4.75 -0.97 -8.27 -4.33 -9.56 -9.15 -0.34 -1.30 -0.39 -1.79 -0.40 -4.03 0 -2.31 0.03 -2.68 0.42 -4.09 1.28 -4.66 4.26 -7.63 8.91 -8.90 1.11 -0.29 1.67 -0.34 3.84 -0.34 3.67 0 5.89 0.60 8.39 2.24 l1.20 0.79 0.86 -0.82 c0.49 -0.46 1.97 -1.90 3.30 -3.21 l2.42 -2.38 -0.57 -0.46 c-4.44 -3.58 -11.14 -5.60 -17.26 -5.20 -1.77 0.12 -2.02 0.17 -3.83 0.56 -8.93 1.97 -15.75 8.36 -17.74 16.61 -0.51 2.10 -0.76 4.50 -0.63 6.26 0.72 10.33 7.84 18.40 18.34 20.74 3.22 0.72 5.58 0.86 8.47 0.48z m73.54 0 c2.10 -0.32 3.55 -0.76 5.35 -1.62 3.67 -1.74 6.17 -4.21 7.85 -7.77 1.06 -2.27 1.37 -3.66 1.36 -6.11 -0.02 -2.27 -0.32 -3.67 -1.28 -5.78 -3.64 -8 -13.65 -11.74 -22.33 -8.31 -3.98 1.56 -7.73 5.18 -9.12 8.79 -0.89 2.33 -1.03 3.04 -1.02 5.46 0 1.97 0.06 2.39 0.42 3.59 1.40 4.60 4.16 7.82 8.51 9.99 3.39 1.68 6.88 2.28 10.26 1.76z m61.23 0.08 c5.44 -0.68 9.62 -3.35 11.64 -7.48 1.39 -2.82 1.50 -3.84 1.43 -14.27 l-0.05 -8.25 -5.04 -0.05 -5.04 -0.03 -0.05 9.36 c-0.05 9.33 -0.05 9.38 -0.39 10.01 -0.94 1.76 -1.90 2.30 -4.06 2.28 -1.76 0 -2.61 -0.34 -3.47 -1.34 -1 -1.17 -1 -1.17 -1 -11.24 l0 -9.07 -5.09 0 -5.11 0 0.05 9.61 c0.06 9.45 0.06 9.61 0.40 10.73 1.54 5.03 5.91 8.67 11.52 9.56 2.28 0.37 2.53 0.37 4.24 0.17z m45.42 -0.31 c1.02 -0.17 3.93 -1.05 4.15 -1.25 0.09 -0.08 0.28 -0.14 0.42 -0.14 0.34 0 2.17 -1.03 3.64 -2.04 1.28 -0.88 3.52 -3.15 4.55 -4.60 0.85 -1.19 1.94 -3.35 2.50 -4.90 0.66 -1.88 1.03 -3.93 1.13 -6.48 l0.09 -2.34 -10.09 0.03 -10.09 0.05 -0.05 1.43 -0.05 1.42 7.91 0 c4.35 0 8.07 0.05 8.27 0.09 0.31 0.09 0.34 0.19 0.34 1.06 0 1.96 -0.79 4.77 -1.91 6.76 -2.10 3.76 -6.31 6.62 -10.95 7.43 -1.59 0.26 -4.78 0.31 -6.51 0.06 -7.26 -1 -12.96 -6.23 -14.58 -13.40 -0.40 -1.77 -0.56 -5.35 -0.29 -7.34 0.45 -3.55 1.88 -6.89 4.07 -9.53 0.82 -0.97 3.33 -3.08 4.20 -3.50 0.37 -0.17 0.71 -0.37 0.76 -0.45 0.05 -0.08 0.29 -0.17 0.54 -0.23 0.25 -0.06 0.71 -0.23 1.03 -0.39 0.54 -0.26 1.26 -0.45 3.90 -1 0.56 -0.12 2.14 -0.26 3.55 -0.32 3.64 -0.14 5.61 0.26 8.71 1.79 1.71 0.85 2.85 1.65 4.41 3.13 l1.05 0.99 1.10 -1.11 1.10 -1.10 -1.20 -1.16 c-2.75 -2.65 -5.92 -4.41 -9.69 -5.38 -2.64 -0.68 -4.10 -0.80 -6.79 -0.63 -8.08 0.56 -15.02 5.24 -18.35 12.42 -1.36 2.92 -1.91 5.23 -2.04 8.36 -0.09 2.56 0.05 3.99 0.66 6.39 2.16 8.31 9.30 14.59 18.03 15.87 1.30 0.19 5.37 0.20 6.48 0.02z m-150.92 -9.56 c0 -8.70 0.02 -9.13 0.31 -9.90 0.37 -1 1.33 -1.99 2.39 -2.45 1.11 -0.49 3.52 -0.49 4.63 0 0.97 0.43 1.68 1.11 2.21 2.10 l0.42 0.77 0.08 9.25 0.08 9.25 5.06 0.05 5.04 0.03 0 -9.98 c0 -11.32 -0.03 -11.72 -1.19 -14.05 -0.68 -1.40 -2.65 -3.49 -4.10 -4.33 -1.26 -0.74 -3.64 -1.51 -5.31 -1.70 -2.67 -0.32 -5.71 0.43 -7.77 1.91 -0.52 0.37 -0.93 0.54 -1.30 0.54 l-0.54 0 0 -8.41 0 -8.41 -5.09 0 -5.09 0 0 22.21 0 22.21 5.09 0 5.09 0 0 -9.10z m78.20 -1.62 l0 -10.72 3.47 0 3.47 0 0 -3.93 0 -3.93 -3.47 0 -3.47 0 0 -6.32 0 -6.32 -5.09 0 -5.09 0 0 6.32 0 6.32 -3.39 0 -3.39 0 0 3.93 0 3.93 3.39 0 3.39 0 0 10.61 c0 5.85 0.05 10.67 0.11 10.72 0.05 0.06 2.34 0.11 5.09 0.11 l4.98 0 0 -10.72z m112.90 -8.64 l0 -19.36 7.68 -0.03 7.67 -0.05 0.05 -1.59 0.05 -1.57 -14.85 0 c-8.17 0 -15.95 0.05 -17.29 0.11 l-2.44 0.09 0.05 1.48 0.05 1.48 7.68 0.05 7.67 0.03 0 19.25 c0 10.60 0.05 19.31 0.11 19.36 0.05 0.06 0.88 0.11 1.85 0.11 l1.74 0 0 -19.36z m37.29 -0.03 l0.03 -19.33 7.63 0 c6.60 0 7.65 -0.03 7.73 -0.23 0.05 -0.12 0.11 -0.83 0.11 -1.57 l0.03 -1.36 -17.40 -0.05 -17.40 -0.03 0.05 1.57 0.05 1.59 7.68 0.05 7.67 0.03 0 18.79 c0 10.32 0.05 19.03 0.09 19.36 l0.11 0.59 1.79 -0.05 1.79 -0.05 0.05 -19.31z" />
-                <path d="M98.51 54.14 c-2.01 -0.51 -3.79 -2.24 -4.44 -4.30 -0.37 -1.23 -0.40 -3.75 -0.05 -4.97 0.51 -1.74 1.99 -3.39 3.58 -4.01 1.20 -0.46 3.45 -0.57 4.83 -0.23 3.18 0.82 5.03 4.10 4.47 7.99 -0.34 2.41 -1.50 4.09 -3.52 5.09 -0.96 0.46 -1.17 0.51 -2.67 0.54 -0.89 0.02 -1.88 -0.03 -2.21 -0.11z" />
-              </g>
-              <g fill="#000000">
-                <path d="M23.17 63.22 c-2.88 -0.34 -6.29 -1.34 -8.73 -2.56 -7.53 -3.78 -12.11 -10.78 -12.52 -19.17 -0.60 -11.78 7.23 -21.22 19.59 -23.61 0.43 -0.08 1.70 -0.22 2.81 -0.29 4.60 -0.34 9.44 0.52 13.46 2.41 1.47 0.69 3.90 2.24 5.01 3.18 l0.59 0.51 -2.59 2.56 c-1.43 1.40 -3.15 3.05 -3.79 3.67 l-1.17 1.13 -0.80 -0.63 c-2.51 -1.99 -6.42 -3.15 -9.73 -2.90 -5.71 0.45 -9.87 3.84 -11.34 9.28 -0.83 3.04 -0.48 6.97 0.86 9.66 1.42 2.82 3.52 4.80 6.37 5.97 2.90 1.20 6.72 1.30 9.82 0.22 1.37 -0.48 2.98 -1.34 4.01 -2.17 l0.96 -0.77 3.76 3.64 c2.07 2.01 3.76 3.69 3.76 3.72 0 0.09 -0.96 0.88 -2.22 1.79 -1.40 1 -3.90 2.31 -5.64 2.93 -3.73 1.34 -8.58 1.91 -12.46 1.47z" />
-                <path d="M97.94 63.22 c-4.21 -0.54 -8.61 -2.79 -11.06 -5.64 -1.68 -1.96 -2.62 -3.66 -3.39 -6.17 -0.39 -1.25 -0.42 -1.57 -0.42 -4.06 -0.02 -2.93 0.08 -3.49 1.02 -5.92 1.68 -4.36 6.26 -8.21 11.32 -9.50 2.68 -0.69 6.46 -0.79 8.98 -0.25 6.49 1.40 11.09 5.54 12.94 11.61 0.37 1.22 0.40 1.60 0.42 3.90 0.02 2.21 -0.03 2.71 -0.34 3.86 -1.28 4.69 -4.36 8.34 -8.87 10.49 -3.25 1.56 -7 2.14 -10.60 1.68z m5 -9.99 c1.28 -0.62 2.33 -1.68 2.88 -2.87 1.77 -3.81 -0.11 -8.31 -3.87 -9.27 -2.62 -0.66 -5.31 0.40 -6.76 2.67 -1.74 2.75 -1.02 6.91 1.50 8.75 1.48 1.06 2.31 1.34 4.06 1.26 0.97 -0.03 1.37 -0.14 2.19 -0.54z" />
-                <path d="M160.71 63.30 c-2.84 -0.42 -4.44 -0.88 -6.32 -1.85 -3.25 -1.70 -5.60 -4.49 -6.66 -7.94 -0.34 -1.13 -0.34 -1.26 -0.40 -11.20 l-0.05 -10.07 5.57 0 5.55 0 0 9.07 c0 10.07 0 10.07 1 11.24 0.77 0.91 1.68 1.31 2.99 1.31 1.71 0.02 2.75 -0.63 3.61 -2.25 0.34 -0.63 0.34 -0.68 0.39 -10.01 l0.05 -9.36 5.51 0.03 5.51 0.05 0.05 8.71 c0.06 10.95 -0.03 11.88 -1.43 14.73 -2.02 4.13 -6.20 6.80 -11.64 7.48 -1.25 0.15 -2.88 0.17 -3.70 0.06z" />
-                <path d="M47.81 39.79 l0 -22.67 5.55 0 5.55 0 0 8.41 c0 4.63 0.03 8.41 0.08 8.41 0.05 0 0.42 -0.25 0.83 -0.54 2.95 -2.13 7.56 -2.62 11.61 -1.25 2.04 0.69 3.05 1.33 4.60 2.87 1.59 1.59 2.34 2.95 2.79 5.12 0.26 1.33 0.29 2.19 0.29 11.89 l0 10.44 -5.51 -0.03 -5.52 -0.05 -0.08 -9.25 -0.08 -9.25 -0.42 -0.77 c-0.86 -1.63 -2.16 -2.41 -4.06 -2.41 -1.99 0 -3.61 1.05 -4.24 2.76 -0.29 0.77 -0.31 1.20 -0.31 9.90 l0 9.10 -5.55 0 -5.55 0 0 -22.67z" />
-                <path d="M126.12 62.36 c-0.06 -0.05 -0.11 -4.87 -0.11 -10.72 l0 -10.61 -3.39 0 -3.39 0 0 -4.40 0 -4.40 3.39 0 3.39 0 0 -6.32 0 -6.32 5.55 0 5.55 0 0 6.32 0 6.32 3.47 0 3.47 0 0 4.40 0 4.40 -3.47 0 -3.47 0 0 10.72 0 10.72 -5.44 0 c-3.01 0 -5.51 -0.05 -5.55 -0.11z" />
-              </g>
-              <g fill="#e75822">
-                <path d="M202.43 62.91 c-1.50 -0.22 -3.45 -0.74 -4.94 -1.33 -7.48 -2.93 -12.48 -9.27 -13.65 -17.31 -0.29 -1.93 -0.12 -6.51 0.29 -8.19 2.10 -8.42 7.62 -14.22 15.67 -16.43 2.56 -0.71 6.29 -1 8.79 -0.69 3.10 0.37 6.20 1.39 8.79 2.87 1.74 1 2.71 1.76 4.36 3.36 l1.42 1.39 -1.50 1.51 c-0.83 0.83 -1.56 1.51 -1.63 1.51 -0.06 0 -0.62 -0.49 -1.23 -1.10 -1.56 -1.54 -2.87 -2.50 -4.66 -3.38 -2.99 -1.47 -5.01 -1.91 -8.17 -1.77 -1.19 0.06 -2.61 0.20 -3.16 0.31 -2.56 0.52 -3.36 0.72 -3.90 1 -0.32 0.15 -0.79 0.32 -1.03 0.39 -0.25 0.06 -0.49 0.15 -0.54 0.23 -0.05 0.08 -0.39 0.28 -0.76 0.45 -0.86 0.42 -3.38 2.53 -4.20 3.50 -4.73 5.66 -5.55 14.04 -2.05 20.57 4.40 8.19 15.07 11.37 23.44 6.99 2.31 -1.20 4.72 -3.52 5.94 -5.71 1 -1.76 1.91 -4.80 1.91 -6.29 0 -0.39 -0.08 -0.52 -0.34 -0.60 -0.20 -0.05 -3.92 -0.09 -8.27 -0.09 l-7.91 0 0.05 -1.88 0.05 -1.90 10.55 -0.05 10.55 -0.03 -0.09 2.81 c-0.12 4.04 -0.66 6.32 -2.22 9.45 -1.74 3.49 -4.49 6.29 -8.19 8.39 -0.63 0.34 -1.25 0.63 -1.40 0.63 -0.14 0 -0.32 0.06 -0.42 0.14 -0.22 0.20 -3.13 1.08 -4.15 1.25 -1.11 0.19 -6.11 0.17 -7.40 -0.02z" />
-                <path d="M245.49 62.36 c-0.06 -0.05 -0.11 -8.76 -0.11 -19.36 l0 -19.25 -7.67 -0.03 -7.68 -0.05 -0.05 -1.94 -0.05 -1.94 2.44 -0.09 c1.34 -0.06 9.33 -0.11 17.75 -0.11 l15.32 0 -0.05 2.05 -0.05 2.04 -7.67 0.05 -7.68 0.03 0 19.36 0 19.36 -2.21 0 c-1.22 0 -2.27 -0.05 -2.31 -0.11z" />
-                <path d="M282.65 61.89 c-0.05 -0.32 -0.09 -9.04 -0.09 -19.36 l0 -18.79 -7.67 -0.03 -7.68 -0.05 -0.05 -2.05 -0.05 -2.04 17.86 0.03 17.86 0.05 -0.02 1.79 c0 0.97 -0.05 1.90 -0.11 2.04 -0.09 0.25 -0.72 0.26 -7.74 0.26 l-7.63 0 -0.03 19.33 -0.05 19.31 -2.25 0.05 -2.25 0.05 -0.11 -0.59z" />
-              </g>
-            </svg>
-          </div>
-          <p className="text-white/80 font-medium text-sm mt-1">
-            Partner Network Management
-          </p>
+    <AuthShell
+      wide
+      title="Create your restaurant"
+      subtitle="This account is the owner login for your menu, orders, and bills."
+      panelTitle="Open your restaurant on ChotuGTT."
+      panelPoints={[
+        "QR menu for every table",
+        "Counter, captain, and kitchen",
+        "Offers, bills, and staff in one place",
+      ]}
+      footer={
+        <>
+          Already have an account?{" "}
+          <button
+            type="button"
+            onClick={onSwitchToLogin}
+            className="font-bold text-[var(--primary)] hover:underline"
+          >
+            Sign in
+          </button>
+        </>
+      }
+    >
+      {error ? (
+        <div className="mb-4 rounded-xl border border-rose-100 bg-rose-50 px-3.5 py-3 text-sm font-medium text-rose-700">
+          {error}
         </div>
-      </div>
+      ) : null}
 
-      <div className="col-span-12 lg:col-span-7 flex items-center justify-center p-6 lg:p-8 h-full overflow-y-auto">
-        <div className="max-w-xl w-full space-y-4 my-auto">
-          <div className="space-y-0.5">
-            <h2 className="text-2xl font-black text-slate-900 tracking-tight">
-              Register Your Restaurant
-            </h2>
-            <p className="text-slate-500 text-xs">
-              Create your automated digital menu SaaS portal
-            </p>
+      <form onSubmit={handleRegister} className="space-y-4">
+        <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-slate-50 p-3">
+          <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+            {logoPreview ? (
+              <img
+                src={logoPreview}
+                alt="Logo preview"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <ImagePlus className="text-slate-400" size={22} />
+            )}
           </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-semibold text-slate-700">
+              Logo <span className="font-normal text-slate-400">optional</span>
+            </p>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleLogoChange}
+              className="mt-1 w-full text-xs text-slate-500 file:mr-3 file:rounded-lg file:border-0 file:bg-rose-50 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-[var(--primary)]"
+            />
+          </div>
+        </div>
 
-          {error && (
-            <div className="bg-rose-50/80 text-rose-600 p-3 rounded-xl text-xs font-semibold border border-rose-100 flex items-center gap-2">
-              ❌ {error}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <AuthField label="Restaurant name">
+            <input
+              type="text"
+              required
+              placeholder="Spice Garden"
+              value={restaurantName}
+              onChange={(e) => setRestaurantName(e.target.value)}
+              className={authInputClass}
+            />
+          </AuthField>
+          <AuthField label="Menu link" hint="Created from the restaurant name">
+            <div className="truncate rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-3 font-mono text-sm font-semibold text-slate-500">
+              /{generatedSlug || "your-restaurant"}
             </div>
-          )}
+          </AuthField>
+        </div>
 
-          <form onSubmit={handleRegister} className="space-y-3">
-            {/* 🖼️ Restaurant Logo Upload Section */}
-            <div className="flex items-center gap-4 bg-slate-50 p-3 rounded-2xl border border-slate-200">
-              <div className="relative h-14 w-14 rounded-xl bg-white border border-slate-200 flex items-center justify-center overflow-hidden shrink-0 shadow-xs">
-                {logoPreview ? (
-                  <img
-                    src={logoPreview}
-                    alt="Logo preview"
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <ImagePlus className="text-slate-400" size={24} />
-                )}
-              </div>
-              <div className="flex-1">
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                  Restaurant Logo (Optional)
-                </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoChange}
-                  className="w-full text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-red-50 file:text-red-600 hover:file:bg-red-100 cursor-pointer"
-                />
-              </div>
-            </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <AuthField label="Owner name">
+            <input
+              type="text"
+              required
+              placeholder="Your full name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className={authInputClass}
+            />
+          </AuthField>
+          <AuthField label="Mobile" hint="10 digits">
+            <input
+              type="text"
+              inputMode="numeric"
+              required
+              placeholder="9876543210"
+              value={phone}
+              onChange={(e) =>
+                setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))
+              }
+              className={authInputClass}
+            />
+          </AuthField>
+        </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                  Restaurant Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Haveli Foods"
-                  value={restaurantName}
-                  onChange={(e) => setRestaurantName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs font-medium focus:outline-none focus:border-red-500"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                  Auto Generated Slug/URL
-                </label>
-                <div className="px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-500 text-xs font-mono font-bold truncate">
-                  /{generatedSlug || "your-url"}
-                </div>
-              </div>
-            </div>
+        <AuthField label="Email">
+          <input
+            type="email"
+            required
+            autoComplete="email"
+            placeholder="owner@restaurant.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={authInputClass}
+          />
+        </AuthField>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                  Owner Full Name
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Raju Sen"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs font-medium focus:outline-none focus:border-red-500"
-                />
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                  Contact Mobile
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="9876543210"
-                  value={phone}
-                  onChange={(e) =>
-                    setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))
-                  }
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs font-medium focus:outline-none focus:border-red-500"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                Business Email Address
-              </label>
-              <input
-                type="email"
-                required
-                placeholder="owner@haveli.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs font-medium focus:outline-none focus:border-red-500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
-                Secure Dashboard Password
-              </label>
-              <input
-                type="password"
-                required
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-900 text-xs font-medium focus:outline-none focus:border-red-500"
-              />
-            </div>
-
-            <div className="mt-5">
-              <label className="flex items-start gap-3 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={legalAccepted}
-                  onChange={(e) => setLegalAccepted(e.target.checked)}
-                  className="mt-1 h-4 w-4 cursor-pointer"
-                />
-
-                <span className="text-sm text-gray-600 leading-5">
-                  I confirm that I have read, understood, and agree to the{" "}
-                  <a
-                    href="/terms-and-conditions"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline"
-                  >
-                    Terms & Conditions
-                  </a>
-                  ,{" "}
-                  <a
-                    href="/privacy-policy"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline"
-                  >
-                    Privacy Policy
-                  </a>
-                  , and{" "}
-                  <a
-                    href="/owner-agreement"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline"
-                  >
-                    Owner Agreement
-                  </a>
-                  .
-                </span>
-              </label>
-            </div>
-
+        <AuthField label="Password" hint="At least 8 characters">
+          <div className="relative">
+            <input
+              type={showPassword ? "text" : "password"}
+              required
+              autoComplete="new-password"
+              placeholder="Create a password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className={`${authInputClass} pr-11`}
+            />
             <button
-              type="submit"
-              disabled={isRegistering || !isFormValid}
-              className="w-full bg-gradient-to-r from-red-500 to-rose-600 text-white py-3.5 rounded-xl font-bold hover:opacity-95 active:scale-[0.99] transition-all shadow-md shadow-red-500/20 text-sm mt-2 cursor-pointer disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              type="button"
+              onClick={() => setShowPassword((open) => !open)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+              aria-label={showPassword ? "Hide password" : "Show password"}
             >
-              {isRegistering ? (
-                <>
-                  <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                  Register...
-                </>
-              ) : (
-                "Register"
-              )}
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
-          </form>
-
-          <div className="text-center pt-1">
-            <p className="text-xs text-slate-500">
-              Already have a store account?{" "}
-              <button
-                onClick={onSwitchToLogin}
-                className="text-red-500 font-extrabold hover:underline cursor-pointer"
-              >
-                Sign In
-              </button>
-            </p>
           </div>
-        </div>
-      </div>
-    </div>
+        </AuthField>
+
+        <label className="flex items-start gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <input
+            type="checkbox"
+            checked={legalAccepted}
+            onChange={(e) => setLegalAccepted(e.target.checked)}
+            className="mt-0.5 h-4 w-4 accent-[var(--primary)]"
+          />
+          <span className="text-sm leading-5 text-slate-600">
+            I have read and agree to the{" "}
+            <a
+              href="/terms-and-conditions"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-[var(--primary)] hover:underline"
+            >
+              Terms & Conditions
+            </a>
+            ,{" "}
+            <a
+              href="/privacy-policy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-[var(--primary)] hover:underline"
+            >
+              Privacy Policy
+            </a>
+            , and{" "}
+            <a
+              href="/owner-agreement"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-[var(--primary)] hover:underline"
+            >
+              Owner Agreement
+            </a>
+            .
+          </span>
+        </label>
+
+        <button
+          type="submit"
+          disabled={isRegistering || !isFormValid}
+          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--primary)] py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--primary-dark)] disabled:cursor-not-allowed disabled:opacity-70"
+        >
+          {isRegistering ? (
+            <>
+              <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" />
+              Creating account...
+            </>
+          ) : (
+            "Create account"
+          )}
+        </button>
+      </form>
+    </AuthShell>
   );
 }

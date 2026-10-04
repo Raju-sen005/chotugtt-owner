@@ -13,6 +13,9 @@ import {
   FolderPlus,
   ChevronDown,
   CheckCircle2,
+  Search,
+  RefreshCw,
+  LayoutGrid,
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback, memo, useMemo } from "react";
 import { QRCodeCanvas } from "qrcode.react";
@@ -36,107 +39,76 @@ const TableCard = memo(function TableCard({
   const tableNo = table.tableNumber;
   const isDisabled = table.isDisabled;
 
+  const shortUrl = url ? String(url).replace(/^https?:\/\//, "") : "";
+
   return (
     <div
-      className={`bg-white p-6 rounded-3xl border transition-all space-y-5 group flex flex-col justify-between ${
-        isDisabled
-          ? "border-amber-300 bg-amber-50/20 opacity-75"
-          : "border-slate-200/80 shadow-xs hover:border-slate-300"
+      className={`flex flex-col justify-between rounded-3xl border bg-white p-3 shadow-sm ${
+        isDisabled ? "border-amber-200 bg-amber-50/40" : "border-slate-100"
       }`}
     >
       <div>
-        <div className="flex justify-between items-center mb-4">
-          <div className="flex items-center gap-2.5">
-            <div
-              className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-[11px] px-1 ${
-                isDisabled
-                  ? "bg-amber-100 text-amber-700"
-                  : "bg-slate-100 text-slate-700"
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-black text-slate-900">{tableNo}</p>
+            <span
+              className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                isDisabled ? "bg-amber-100 text-amber-700" : "bg-emerald-50 text-emerald-600"
               }`}
-              title={tableNo}
             >
-              {String(tableNo).slice(0, 4)}
-            </div>
-            <div>
-              <span className="font-black text-slate-900 text-base block">
-                {tableNo}
-              </span>
-              {isDisabled && (
-                <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">
-                  Disabled / Locked
-                </span>
-              )}
-            </div>
+              <span className={`h-1.5 w-1.5 rounded-full ${isDisabled ? "bg-amber-500" : "bg-emerald-500"}`} />
+              {isDisabled ? "Disabled" : "Active"}
+            </span>
           </div>
-
           <div className="flex items-center gap-1">
             <button
               onClick={() => onToggle(tableNo, !isDisabled)}
-              className={`p-2 rounded-xl transition-all cursor-pointer ${
-                isDisabled
-                  ? "text-amber-600 bg-amber-50 hover:bg-amber-100"
-                  : "text-slate-400 hover:text-amber-600 hover:bg-amber-50"
-              }`}
+              className={`rounded-lg p-1.5 ${isDisabled ? "bg-amber-100 text-amber-700" : "text-slate-400 hover:bg-amber-50 hover:text-amber-600"}`}
               title={isDisabled ? "Enable Table QR" : "Disable Table QR"}
             >
-              <Power size={16} />
+              <Power size={14} />
             </button>
-
             <button
               onClick={() => onRemove(tableNo)}
               disabled={!canRemove}
-              className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl disabled:opacity-30 disabled:hover:text-slate-400 disabled:hover:bg-transparent transition-all cursor-pointer"
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-30"
               title="Remove Table"
             >
-              <Trash2 size={16} />
+              <Trash2 size={14} />
             </button>
           </div>
         </div>
 
-        <div
-          className={`flex justify-center p-6 rounded-2xl border transition-colors ${
-            isDisabled
-              ? "bg-amber-50/50 border-amber-100 grayscale-[30%]"
-              : "bg-slate-50/80 border-slate-100 group-hover:bg-slate-50"
-          }`}
-        >
+        <div className={`flex justify-center rounded-2xl border p-3 ${isDisabled ? "border-amber-100 bg-white/70" : "border-slate-100 bg-slate-50"}`}>
           {url ? (
-            <QRCodeCanvas
-              ref={qrRef}
-              value={url}
-              size={150}
-              level={"H"}
-              className="w-full max-w-[140px] h-auto shadow-xs rounded-lg"
-            />
+            <QRCodeCanvas ref={qrRef} value={url} size={132} level={"H"} className="h-auto w-full max-w-[132px] rounded-lg" />
           ) : (
-            <div className="text-xs text-slate-400 py-10">Loading QR...</div>
+            <div className="py-8 text-xs text-slate-400">Loading QR...</div>
           )}
         </div>
+        {/* <p className="mt-2 truncate text-center text-[10px] font-semibold text-slate-400" title={url || ""}>
+          {shortUrl || "Link not ready"}
+        </p> */}
       </div>
 
-      <div className="space-y-2.5">
+      <div className="mt-3 grid grid-cols-2 gap-2">
         <button
           onClick={() => onCopy(url, tableNo)}
           disabled={!url}
-          className={`w-full py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-all cursor-pointer ${
-            isCopied
-              ? "bg-emerald-50 text-emerald-600 border-emerald-200"
-              : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+          className={`inline-flex items-center justify-center gap-1 rounded-xl border py-2 text-[11px] font-bold ${
+            isCopied ? "border-emerald-200 bg-emerald-50 text-emerald-600" : "border-slate-200 bg-white text-slate-600"
           }`}
         >
-          {isCopied ? <CheckCircle size={14} /> : <Copy size={14} />}
-          {isCopied ? "Link Copied!" : "Copy Table Link"}
+          {isCopied ? <CheckCircle size={12} /> : <Copy size={12} />}
+          {isCopied ? "Copied" : "Copy Link"}
         </button>
-
-        <div className="grid">
-          <button
-            onClick={() => onPrint(tableNo)}
-            disabled={!url}
-            className="py-2.5 text-xs font-bold bg-slate-50 text-slate-700 border border-slate-200 rounded-xl hover:bg-slate-100 flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-          >
-            <Printer size={14} className="text-slate-500" /> Print Standee
-          </button>
-        </div>
+        <button
+          onClick={() => onPrint(tableNo)}
+          disabled={!url}
+          className="inline-flex items-center justify-center gap-1 rounded-xl bg-rose-500 py-2 text-[11px] font-black text-white disabled:opacity-50"
+        >
+          <Printer size={12} /> Print QR
+        </button>
       </div>
     </div>
   );
@@ -213,7 +185,7 @@ const SectionBlock = memo(function SectionBlock({
       </div>
 
       {!collapsed && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {tables.length === 0 ? (
             <div className="col-span-full text-xs text-slate-400 bg-white border border-dashed border-slate-200 rounded-2xl py-8 text-center">
               There are no tables in this section yet — add one using "Add
@@ -266,6 +238,10 @@ export default function TableMonitor() {
   const [isSavingSection, setIsSavingSection] = useState(false);
   const [showDeleteSectionModal, setShowDeleteSectionModal] = useState(false);
   const [sectionToDelete, setSectionToDelete] = useState(null);
+  const [tableSearch, setTableSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [sortMode, setSortMode] = useState("number");
+  const tableNameRef = useRef(null);
 
   const apiBase = import.meta.env.VITE_APP_API_BASE;
 
@@ -1147,6 +1123,9 @@ export default function TableMonitor() {
         }));
         setTables(formatted);
         setShowAddTable(false);
+        setNewTableName("");
+        setNewSectionInline("");
+        setCreatingNewSection(false);
         fetchSections();
 
         showSuccess(`Table ${cleanName} added successfully!`);
@@ -1385,6 +1364,33 @@ export default function TableMonitor() {
     }));
   }, [sections, tables]);
 
+  const visibleGroups = useMemo(() => {
+    const search = tableSearch.trim().toLowerCase();
+
+    return groupedBySections
+      .map(({ section, tables: sectionTables }) => {
+        const list = sectionTables.filter((table) => {
+          if (statusFilter === "ACTIVE" && table.isDisabled) return false;
+          if (statusFilter === "DISABLED" && !table.isDisabled) return false;
+          if (!search) return true;
+          return (
+            String(table.tableNumber || "").toLowerCase().includes(search) ||
+            section.toLowerCase().includes(search)
+          );
+        });
+        list.sort((left, right) => {
+          if (sortMode === "status") {
+            return Number(!!left.isDisabled) - Number(!!right.isDisabled);
+          }
+          return String(left.tableNumber).localeCompare(String(right.tableNumber), undefined, {
+            numeric: true,
+          });
+        });
+        return { section, tables: list };
+      })
+      .filter((group) => (statusFilter === "ALL" && !search ? true : group.tables.length > 0));
+  }, [groupedBySections, tableSearch, statusFilter, sortMode]);
+
   const renderCard = (table) => (
     <TableCard
       key={table.tableNumber}
@@ -1399,6 +1405,12 @@ export default function TableMonitor() {
       qrRef={(el) => (qrRefs.current[table.tableNumber] = el)}
     />
   );
+
+  const activeCount = tables.filter((table) => !table.isDisabled).length;
+  const disabledCount = tables.length - activeCount;
+  const activeShare = tables.length ? Math.round((activeCount / tables.length) * 100) : 0;
+  const disabledShare = tables.length ? Math.round((disabledCount / tables.length) * 100) : 0;
+  const currentTheme = QR_STANDEE_THEMES.find((theme) => theme.id === selectedStandeeTheme);
 
   if (showThemeSelector) {
     return (
@@ -1421,7 +1433,7 @@ export default function TableMonitor() {
     <>
       {showSuccessPopup && (
         <div className="fixed top-6 right-6 z-[9999] animate-in slide-in-from-right-5 fade-in duration-300">
-          <div className="flex items-start gap-3 bg-white border border-emerald-200 shadow-2xl rounded-2xl px-5 py-4 min-w-[320px] max-w-[400px]">
+          <div className="flex items-start gap-3 bg-white border border-emerald-200 shadow-2xl rounded-2xl px-5 py-4 w-[calc(100%-2rem)] max-w-sm">
             <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
               <CheckCircle2 size={22} strokeWidth={2.5} />
             </div>
@@ -1493,169 +1505,245 @@ export default function TableMonitor() {
         </div>
       )}
 
-      <div className="min-h-screen bg-[#F6F7FB] font-sans text-slate-900">
-        {/* Header Section */}
-        <div className="mx-auto max-w-7xl px-4 pb-4 pt-5 sm:px-6 lg:px-8 lg:pb-5 lg:pt-8">
-          <div className="flex flex-col gap-5 rounded-[28px] border border-slate-200/80 bg-white p-5 shadow-sm sm:p-6 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex min-w-0 items-center gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-red-50 text-red-600 ring-1 ring-red-100">
-                <QrCode size={25} />
+      <div className="-m-4 bg-[var(--background)] p-4 font-sans text-slate-900 md:-m-6 md:p-5 lg:-m-8 lg:p-5">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[var(--primary)] via-[var(--primary)] to-[var(--secondary)] p-5 text-white">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
+                <QrCode className="h-6 w-6" />
               </div>
-              <div className="min-w-0">
-                <h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">
-                  Table Monitor
-                </h1>
-                <p className="mt-1 text-xs text-slate-500 sm:text-sm">
-                  Manage tables, sections, QR links and standee printing.
-                </p>
+              <div>
+                <h1 className="text-2xl font-black tracking-tight">Table Monitor</h1>
+                <p className="mt-1 text-sm text-white/85">Manage table QR codes, generate links and monitor table status</p>
               </div>
             </div>
-
-            <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
-              <button
-                onClick={() => setShowAddSection(true)}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-xs font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 sm:flex-none"
-              >
-                <FolderPlus size={16} />
-                Add Section
-              </button>
-
-              <button
-                onClick={openAddTableModal}
-                disabled={!activeRestaurantId}
-                className="inline-flex flex-1 items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-red-500 to-rose-600 px-5 py-3 text-xs font-black text-white shadow-lg shadow-red-500/20 transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
-              >
-                <Plus size={16} />
-                Add Table
-              </button>
+            <div className="rounded-2xl bg-white/15 px-4 py-3 text-right">
+              <p className="text-[11px] font-bold text-white/80">Total Tables</p>
+              <p className="text-2xl font-black">{tables.length}</p>
+              <p className="mt-1 text-[11px] font-semibold text-emerald-100">{activeCount} active</p>
             </div>
           </div>
         </div>
 
-        {/* Info Stats Bar */}
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-                Total Tables
-              </p>
-              <p className="mt-1 text-2xl font-black tracking-tight text-slate-900">
-                {tables.length}
-              </p>
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            ["Total Tables", tables.length, QrCode, "text-emerald-600 bg-emerald-50", `${sections.length} sections`],
+            ["Active Tables", activeCount, CheckCircle2, "text-emerald-600 bg-emerald-50", `${activeShare}% active`],
+            ["Disabled Tables", disabledCount, Power, "text-amber-600 bg-amber-50", `${disabledShare}% disabled`],
+            ["Sections", sections.length, LayoutGrid, "text-violet-600 bg-violet-50", "Dining areas"],
+          ].map(([label, value, Icon, tint, note]) => (
+            <div key={label} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${tint}`}><Icon size={16} /></span>
+                <p className="text-[11px] font-bold text-slate-400">{label}</p>
+              </div>
+              <p className="mt-3 text-2xl font-black text-slate-900">{value}</p>
+              <p className="mt-1 text-[11px] font-bold text-slate-400">{note}</p>
             </div>
-
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-slate-400">
-                Sections
-              </p>
-              <p className="mt-1 text-2xl font-black tracking-tight text-slate-900">
-                {sections.length}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 shadow-sm">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-emerald-600">
-                Active QR
-              </p>
-              <p className="mt-1 text-2xl font-black tracking-tight text-emerald-800">
-                {tables.filter((table) => !table.isDisabled).length}
-              </p>
-            </div>
-
-            <div className="rounded-2xl border border-amber-100 bg-amber-50/70 p-4 shadow-sm">
-              <p className="text-[10px] font-black uppercase tracking-[0.14em] text-amber-600">
-                Disabled
-              </p>
-              <p className="mt-1 text-2xl font-black tracking-tight text-amber-800">
-                {tables.filter((table) => table.isDisabled).length}
-              </p>
-            </div>
-          </div>
+          ))}
         </div>
 
-        {/* Section-wise Tables */}
-        <div className="mx-auto max-w-7xl px-4 pb-2 pt-7 sm:px-6 lg:px-8">
-          <div className="mb-5 flex items-end justify-between">
-            <div>
-              <h3 className="text-base font-black text-slate-900 sm:text-lg">
-                Sections & Tables
-              </h3>
-              <p className="mt-1 text-xs text-slate-500">
-                Organize your dining area and manage each table QR.
-              </p>
+        <div className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+          <section className="min-w-0">
+            <div className="mb-3 flex flex-col gap-2 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm lg:flex-row lg:items-center">
+              <div className="relative min-w-0 flex-1">
+                <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={tableSearch}
+                  onChange={(e) => setTableSearch(e.target.value)}
+                  placeholder="Search by table number..."
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-8 pr-3 text-xs font-semibold outline-none focus:border-rose-300 focus:bg-white"
+                />
+              </div>
+              <div className="flex gap-1 overflow-x-auto">
+                {[
+                  ["ALL", "All", tables.length],
+                  ["ACTIVE", "Active", activeCount],
+                  ["DISABLED", "Disabled", disabledCount],
+                ].map(([key, label, count]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setStatusFilter(key)}
+                    className={`whitespace-nowrap rounded-xl px-3 py-2 text-xs font-black ${statusFilter === key ? "bg-rose-500 text-white" : "bg-slate-50 text-slate-600"}`}
+                  >
+                    {label} ({count})
+                  </button>
+                ))}
+              </div>
+              <select
+                value={sortMode}
+                onChange={(e) => setSortMode(e.target.value)}
+                aria-label="Sort tables"
+                className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-600 outline-none"
+              >
+                <option value="number">Table No.</option>
+                <option value="status">Status</option>
+              </select>
+              <button
+                type="button"
+                onClick={() => {
+                  fetchTables();
+                  fetchSections();
+                }}
+                className="inline-flex items-center justify-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600"
+              >
+                <RefreshCw size={13} /> Refresh
+              </button>
+              <button
+                type="button"
+                onClick={() => tableNameRef.current?.focus()}
+                className="inline-flex items-center justify-center gap-1 rounded-xl bg-rose-500 px-3 py-2 text-xs font-black text-white"
+              >
+                <Plus size={13} /> Add Table
+              </button>
             </div>
-          </div>
 
-          <div className="space-y-9">
-            {groupedBySections.length === 0 ? (
-              <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center shadow-sm">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-100 text-slate-500">
-                  <FolderPlus size={24} />
+            <div className="space-y-6">
+              {groupedBySections.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center">
+                  <FolderPlus className="mx-auto mb-3 text-slate-400" size={24} />
+                  <h3 className="text-sm font-black text-slate-900">No sections yet</h3>
+                  <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-slate-500">
+                    Create a section such as AC, Non-AC, Rooftop or VIP, then add tables inside it.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddSection(true)}
+                    className="mt-4 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white"
+                  >
+                    <FolderPlus size={14} /> Create Section
+                  </button>
                 </div>
-                <h3 className="mt-4 text-base font-black text-slate-900">
-                  No sections yet
-                </h3>
-                <p className="mx-auto mt-1 max-w-md text-xs leading-5 text-slate-500">
-                  Create your first section such as AC, Non-AC, Rooftop or VIP,
-                  then add tables inside it.
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setShowAddSection(true)}
-                  className="mt-5 inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-black text-white transition hover:bg-slate-800"
-                >
-                  <FolderPlus size={15} />
-                  Create Section
+              ) : visibleGroups.length === 0 ? (
+                <div className="rounded-3xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center text-xs font-semibold text-slate-500">
+                  No tables match this search or filter.
+                </div>
+              ) : (
+                visibleGroups.map(({ section, tables: sectionTables }) => (
+                  <SectionBlock
+                    key={section}
+                    section={section}
+                    tables={sectionTables}
+                    onRenameSection={renameSection}
+                    onDeleteSection={deleteSection}
+                    renderCard={renderCard}
+                  />
+                ))
+              )}
+            </div>
+          </section>
+
+          <aside className="space-y-3 xl:sticky xl:top-4">
+            <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+              <h2 className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900">
+                <Plus size={15} className="text-rose-500" /> Add New Table
+              </h2>
+              <label className="mb-2 block">
+                <span className="mb-1 block text-[11px] font-bold text-slate-500">Table Number *</span>
+                <input
+                  ref={tableNameRef}
+                  value={newTableName}
+                  onChange={(e) => setNewTableName(e.target.value)}
+                  placeholder="Enter table number (e.g. 1, 2, T1)"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold outline-none focus:border-rose-300 focus:bg-white"
+                />
+              </label>
+              <div className="mb-3">
+                <span className="mb-1 block text-[11px] font-bold text-slate-500">Section *</span>
+                {!creatingNewSection ? (
+                  <select
+                    value={newTableSection}
+                    onChange={(e) => {
+                      if (e.target.value === "__new__") setCreatingNewSection(true);
+                      else setNewTableSection(e.target.value);
+                    }}
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold outline-none focus:border-rose-300"
+                  >
+                    {sections.length === 0 && <option value="">No section yet</option>}
+                    {sections.map((name) => (
+                      <option key={name} value={name}>{name}</option>
+                    ))}
+                    <option value="__new__">+ Create New Section</option>
+                  </select>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      value={newSectionInline}
+                      onChange={(e) => setNewSectionInline(e.target.value)}
+                      placeholder="e.g. AC, Rooftop"
+                      className="flex-1 rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-semibold outline-none focus:border-rose-300"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setCreatingNewSection(false);
+                        setNewSectionInline("");
+                      }}
+                      className="rounded-xl border border-slate-200 px-3 text-slate-500"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={submitAddTable}
+                disabled={isSavingTable || !activeRestaurantId}
+                className="inline-flex w-full items-center justify-center gap-1 rounded-xl bg-rose-500 py-2.5 text-sm font-black text-white disabled:opacity-50"
+              >
+                <Plus size={14} /> {isSavingTable ? "Creating..." : "Create Table"}
+              </button>
+            </div>
+
+            <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="flex items-center gap-2 text-sm font-black text-slate-900">
+                  <Palette size={15} className="text-violet-500" /> QR Standee Theme
+                </h2>
+                <button type="button" onClick={() => setShowThemeSelector(true)} className="text-[11px] font-black text-rose-500">
+                  View All
                 </button>
               </div>
-            ) : (
-              groupedBySections.map(({ section, tables: sectionTables }) => (
-                <SectionBlock
-                  key={section}
-                  section={section}
-                  tables={sectionTables}
-                  onRenameSection={renameSection}
-                  onDeleteSection={deleteSection}
-                  renderCard={renderCard}
-                />
-              ))
-            )}
-          </div>
+              <p className="mb-2 text-[11px] font-semibold text-slate-400">Current: {currentTheme?.name || "Classic"}</p>
+              <div className="grid grid-cols-3 gap-2">
+                {QR_STANDEE_THEMES.slice(0, 3).map((theme) => (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    onClick={() => handleStandeeThemeChange(theme.id)}
+                    className={`rounded-xl border p-2 text-center ${selectedStandeeTheme === theme.id ? "border-rose-400" : "border-slate-100"}`}
+                  >
+                    <span className="mx-auto mb-1 block h-8 w-8 rounded-lg" style={{ background: theme.preview.primary }} />
+                    <span className="text-[10px] font-bold text-slate-600">{theme.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+              <h2 className="mb-2 text-sm font-black text-slate-900">Quick Actions</h2>
+              <button type="button" onClick={() => setShowAddSection(true)} className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-xs font-bold text-slate-600 hover:bg-slate-50">
+                <FolderPlus size={14} /> Add Section
+              </button>
+              <button type="button" onClick={() => setShowThemeSelector(true)} className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-xs font-bold text-slate-600 hover:bg-slate-50">
+                <Palette size={14} /> Choose Standee Theme
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  fetchTables();
+                  fetchSections();
+                }}
+                className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-xs font-bold text-slate-600 hover:bg-slate-50"
+              >
+                <RefreshCw size={14} /> Refresh Tables
+              </button>
+            </div>
+          </aside>
         </div>
       </div>
-
-      {/* QR STANDEE THEME — secondary setting, kept at the bottom */}
-      <section className="mt-10 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-violet-50 text-violet-600">
-              <QrCode size={20} />
-            </div>
-            <div>
-              <h3 className="text-sm font-black text-slate-900 sm:text-base">
-                QR Standee Design
-              </h3>
-              <p className="mt-1 text-xs text-slate-500">
-                Current theme:{" "}
-                <span className="font-bold text-slate-700">
-                  {QR_STANDEE_THEMES.find(
-                    (theme) => theme.id === selectedStandeeTheme,
-                  )?.name || "Classic"}
-                </span>
-              </p>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => setShowThemeSelector(true)}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-5 py-3 text-xs font-black text-slate-800 transition hover:border-violet-200 hover:bg-violet-50 hover:text-violet-700 sm:w-auto"
-          >
-            <Palette size={16} />
-            Choose QR Theme
-          </button>
-        </div>
-      </section>
 
       {/* Add Table Modal */}
       {showAddTable && (

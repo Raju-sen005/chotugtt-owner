@@ -1,10 +1,164 @@
 @import "tailwindcss";
 
-/* @layer base {
-  body {
-    @apply bg-slate-50 text-slate-900 antialiased font-sans;
-  }
-} */
+/*
+|--------------------------------------------------------------------------
+| ChotuGTT Brand Color System — single source of truth
+|--------------------------------------------------------------------------
+*/
+
+:root {
+  --primary: #f43f5e;
+  --primary-dark: #e11d48;
+  --primary-light: #fff1f2;
+
+  --secondary: #f97316;
+  --secondary-light: #fff7ed;
+
+  --background: #f8fafc;
+  --surface: #ffffff;
+  --surface-muted: #f1f5f9;
+
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  --text-disabled: #94a3b8;
+
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+
+  --success: #10b981;
+  --warning: #f59e0b;
+  --info: #3b82f6;
+  --preparing: #f97316;
+  --danger: #ef4444;
+  --neutral: #64748b;
+
+  --veg: #16a34a;
+  --nonveg: #dc2626;
+
+  --purple: #8b5cf6;
+  --cyan: #06b6d4;
+
+  --shadow-card: 0 4px 20px rgba(15, 23, 42, 0.06);
+  --gradient-brand: linear-gradient(135deg, #e11d48 0%, #f43f5e 45%, #f97316 100%);
+}
+
+/*
+|--------------------------------------------------------------------------
+| Tailwind v4 theme tokens
+| Map rose scale to ChotuGTT primary so existing rose-* classes stay on-brand.
+|--------------------------------------------------------------------------
+*/
+
+@theme {
+  --color-brand: #f43f5e;
+  --color-brand-dark: #e11d48;
+  --color-brand-light: #fff1f2;
+  --color-accent: #f97316;
+  --color-accent-light: #fff7ed;
+  --color-page: #f8fafc;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f1f5f9;
+  --color-ink: #0f172a;
+  --color-ink-secondary: #334155;
+  --color-ink-muted: #64748b;
+  --color-line: #e2e8f0;
+  --color-line-strong: #cbd5e1;
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+  --color-info: #3b82f6;
+  --color-preparing: #f97316;
+  --color-danger: #ef4444;
+  --color-veg: #16a34a;
+  --color-nonveg: #dc2626;
+  --color-parcel: #8b5cf6;
+  --color-cyan: #06b6d4;
+
+  --color-rose-50: #fff1f2;
+  --color-rose-100: #ffe4e6;
+  --color-rose-200: #fecdd3;
+  --color-rose-300: #fda4af;
+  --color-rose-400: #fb7185;
+  --color-rose-500: #f43f5e;
+  --color-rose-600: #e11d48;
+  --color-rose-700: #be123c;
+  --color-rose-800: #9f1239;
+  --color-rose-900: #881337;
+
+  --color-red-50: #fff1f2;
+  --color-red-100: #ffe4e6;
+  --color-red-200: #fecdd3;
+  --color-red-300: #fda4af;
+  --color-red-400: #fb7185;
+  --color-red-500: #f43f5e;
+  --color-red-600: #e11d48;
+  --color-red-700: #be123c;
+
+  --color-orange-50: #fff7ed;
+  --color-orange-100: #ffedd5;
+  --color-orange-200: #fed7aa;
+  --color-orange-300: #fdba74;
+  --color-orange-400: #fb923c;
+  --color-orange-500: #f97316;
+  --color-orange-600: #ea580c;
+  --color-orange-700: #c2410c;
+
+  --color-emerald-500: #10b981;
+  --color-emerald-600: #059669;
+  --color-amber-500: #f59e0b;
+  --color-amber-600: #d97706;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+html {
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  overflow-x: hidden;
+  background: var(--background);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+.gtt-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+  border-radius: 1rem;
+}
+
+.gtt-btn-primary {
+  background: var(--primary);
+  color: #ffffff;
+  transition: background-color 150ms ease, transform 150ms ease, opacity 150ms ease;
+}
+
+.gtt-btn-primary:hover:not(:disabled) {
+  background: var(--primary-dark);
+}
+
+.gtt-btn-primary:active:not(:disabled) {
+  transform: scale(0.99);
+}
+
+.gtt-gradient-brand {
+  background-image: var(--gradient-brand);
+}
+
+.gtt-input:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 4px rgba(244, 63, 94, 0.12);
+  outline: none;
+}
 
 @media print {
   body * {
@@ -25,6 +179,10 @@
   }
 }
 
-
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

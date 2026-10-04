@@ -23,6 +23,31 @@ const AuthContext = createContext(null);
 axios.defaults.withCredentials = true;
 axios.defaults.baseURL = `${import.meta.env.VITE_APP_API_BASE}`;
 
+let unauthorizedHandler = null;
+
+export const setUnauthorizedHandler = (handler) => {
+  unauthorizedHandler = handler;
+};
+
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status;
+    const url = String(error?.config?.url || "");
+    const isAuthProbe =
+      url.includes("/auth/me") ||
+      url.includes("/auth/login") ||
+      url.includes("/auth/register") ||
+      url.includes("/auth/logout");
+
+    if (status === 401 && !isAuthProbe && typeof unauthorizedHandler === "function") {
+      unauthorizedHandler(error);
+    }
+
+    return Promise.reject(error);
+  },
+);
+
 /*
 |--------------------------------------------------------------------------
 | Subscription Configuration
@@ -546,6 +571,20 @@ const redirectToSubscription = useCallback(() => {
     verifySession,
   ]);
 
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      clearSubscriptionTimer();
+      queryClient.clear();
+      if (mountedRef.current) {
+        setUser(null);
+      }
+    });
+
+    return () => {
+      setUnauthorizedHandler(null);
+    };
+  }, [clearSubscriptionTimer, queryClient]);
+
   /*
   |--------------------------------------------------------------------------
   | Login
@@ -872,25 +911,19 @@ const redirectToSubscription = useCallback(() => {
   |--------------------------------------------------------------------------
   */
 
-  // useEffect(() => {
-  //   if (!user) {
-  //     return undefined;
-  //   }
+  useEffect(() => {
+    if (!user) {
+      return undefined;
+    }
 
-  //   const interval =
-  //     window.setInterval(() => {
-  //       verifySession();
-  //     }, SUBSCRIPTION_CHECK_INTERVAL);
+    const interval = window.setInterval(() => {
+      verifySession();
+    }, SUBSCRIPTION_CHECK_INTERVAL);
 
-  //   return () => {
-  //     window.clearInterval(
-  //       interval,
-  //     );
-  //   };
-  // }, [
-  //   user,
-  //   verifySession,
-  // ]);
+    return () => {
+      window.clearInterval(interval);
+    };
+  }, [user, verifySession]);
 
   /*
   |--------------------------------------------------------------------------
@@ -898,33 +931,19 @@ const redirectToSubscription = useCallback(() => {
   |--------------------------------------------------------------------------
   */
 
-  // useEffect(() => {
-  //   const handleVisibilityChange =
-  //     () => {
-  //       if (
-  //         document.visibilityState ===
-  //           "visible" &&
-  //         user
-  //       ) {
-  //         verifySession();
-  //       }
-  //     };
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible" && user) {
+        verifySession();
+      }
+    };
 
-  //   document.addEventListener(
-  //     "visibilitychange",
-  //     handleVisibilityChange,
-  //   );
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
-  //   return () => {
-  //     document.removeEventListener(
-  //       "visibilitychange",
-  //       handleVisibilityChange,
-  //     );
-  //   };
-  // }, [
-  //   user,
-  //   verifySession,
-  // ]);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [user, verifySession]);
 
   /*
   |--------------------------------------------------------------------------
@@ -985,7 +1004,13 @@ const redirectToSubscription = useCallback(() => {
     <AuthContext.Provider
       value={value}
     >
-      {!loading && children}
+      {loading ? (
+        <div className="flex min-h-dvh items-center justify-center bg-[var(--background)]">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-[var(--primary)]" />
+        </div>
+      ) : (
+        children
+      )}
     </AuthContext.Provider>
   );
 };

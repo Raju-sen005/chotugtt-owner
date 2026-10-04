@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import {
@@ -6,19 +7,21 @@ import {
   UtensilsCrossed,
   Edit2,
   Trash2,
-  IndianRupee,
   Image as ImageIcon,
-  Layers,
   Sparkles,
   Upload,
   Leaf,
   Beef,
+  Search,
+  ChefHat,
+  X,
 } from "lucide-react";
 import Input from "../../components/ui/Input";
 import Modal from "../../components/ui/Modal";
 import { useSocket } from "../../context/SocketContext";
 import { useAuth } from "../../context/AuthContext";
 import { orderCategoryNames, sortMenuEntries } from "../../utils/menuOrder";
+import { resolveMediaUrl } from "../../utils/mediaUrl";
 
 export default function MenuCatalog() {
   const queryClient = useQueryClient();
@@ -44,6 +47,10 @@ export default function MenuCatalog() {
   const [price, setPrice] = useState("");
   const [category, setCategory] = useState("");
   const [isVeg, setIsVeg] = useState(true); // 🆕 Veg/Non-Veg toggle state
+  const [itemAvailable, setItemAvailable] = useState(true);
+  const [menuSearch, setMenuSearch] = useState("");
+  const [vegFilter, setVegFilter] = useState("ALL");
+  const [sortMode, setSortMode] = useState("default");
 
   // 🔑 File state and image preview state
   const [imageFile, setImageFile] = useState(null);
@@ -323,14 +330,33 @@ export default function MenuCatalog() {
   );
 
   const filteredMenuItems = useMemo(() => {
-    if (activeCategoryFilter === "ALL") return allCatalogItems;
+    let rows = allCatalogItems;
     if (activeCategoryFilter === "COMBO") {
-      return allCatalogItems.filter((item) => item.isCombo);
+      rows = rows.filter((item) => item.isCombo);
+    } else if (activeCategoryFilter !== "ALL") {
+      rows = rows.filter((item) => item.category === activeCategoryFilter);
     }
-    return allCatalogItems.filter(
-      (item) => item.category === activeCategoryFilter,
-    );
-  }, [allCatalogItems, activeCategoryFilter]);
+
+    if (vegFilter === "VEG") rows = rows.filter((item) => item.isVeg !== false);
+    if (vegFilter === "NONVEG") rows = rows.filter((item) => item.isVeg === false);
+
+    const query = menuSearch.trim().toLowerCase();
+    if (query) {
+      rows = rows.filter((item) =>
+        `${item.name || ""} ${item.category || ""} ${item.description || ""}`
+          .toLowerCase()
+          .includes(query),
+      );
+    }
+
+    if (sortMode === "name") {
+      rows = [...rows].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    } else if (sortMode === "price") {
+      rows = [...rows].sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
+    }
+
+    return rows;
+  }, [allCatalogItems, activeCategoryFilter, vegFilter, menuSearch, sortMode]);
 
   const comboCalculatedPrice = useMemo(() => {
     return menuItems.items
@@ -348,6 +374,7 @@ export default function MenuCatalog() {
       formMode === "COMBO" ? comboCalculatedPrice : price,
     );
     formData.append("isVeg", isVeg ? "true" : "false"); // 🆕
+    formData.append("isAvailable", itemAvailable ? "true" : "false");
 
     if (formMode === "DISH") {
       formData.append("category", category);
@@ -507,6 +534,7 @@ export default function MenuCatalog() {
   const handleOpenAddModal = useCallback(() => {
     setEditingItem(null);
     setIsVeg(true); // 🆕 default veg for a fresh item
+    setItemAvailable(true);
     setIsModalOpen(true);
   }, []);
 
@@ -519,6 +547,7 @@ export default function MenuCatalog() {
     setImagePreview(item.image || "");
     setImageFile(null);
     setIsVeg(item.isVeg !== false); // 🆕 populate existing veg/non-veg value
+    setItemAvailable(item.isAvailable !== false);
 
     if (item.isCombo) {
       setFormMode("COMBO");
@@ -542,6 +571,7 @@ export default function MenuCatalog() {
     setSelectedItems([]);
     setFormMode("DISH");
     setIsVeg(true); // 🆕
+    setItemAvailable(true);
   }, []);
 
   const handleFileChange = (e) => {
@@ -665,7 +695,7 @@ export default function MenuCatalog() {
 
       {showSuccessPopup && (
         <div className="fixed top-6 right-6 z-[10001] animate-in slide-in-from-right-5 fade-in duration-300">
-          <div className="flex items-start gap-3 bg-white border border-emerald-200 shadow-2xl rounded-2xl px-5 py-4 min-w-[320px] max-w-[400px]">
+          <div className="flex items-start gap-3 bg-white border border-emerald-200 shadow-2xl rounded-2xl px-5 py-4 w-[calc(100%-2rem)] max-w-sm">
             <div className="w-10 h-10 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
               <svg
                 width="22"
@@ -698,7 +728,7 @@ export default function MenuCatalog() {
 
       {showErrorPopup && (
         <div className="fixed top-6 right-6 z-[10002] animate-in slide-in-from-right-5 fade-in duration-300">
-          <div className="flex items-start gap-3 bg-white border border-rose-200 shadow-2xl rounded-2xl px-5 py-4 min-w-[320px] max-w-[400px]">
+          <div className="flex items-start gap-3 bg-white border border-rose-200 shadow-2xl rounded-2xl px-5 py-4 w-[calc(100%-2rem)] max-w-sm">
             <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
               <span className="text-lg font-black">!</span>
             </div>
@@ -745,258 +775,144 @@ export default function MenuCatalog() {
           </p>
         </div>
       </div> */}
-      <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-10 space-y-8 font-sans bg-[#F8F9FA] min-h-screen">
-        {/* Header Section */}
-        <div className="flex flex-col gap-4 bg-white p-6 sm:p-8 rounded-3xl border border-slate-200/80 shadow-xs">
-          {/* Header */}
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-red-50 text-red-600 rounded-2xl border border-red-100">
-                <Layers size={28} />
+      <div className="-m-4 bg-[var(--background)] p-4 font-sans md:-m-6 md:p-5 lg:-m-8 lg:p-5">
+        <div className="grid items-stretch gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[var(--primary)] via-[var(--primary)] to-[var(--secondary)] p-5 text-white">
+            <div className="relative z-10 flex flex-wrap items-start justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
+                  <UtensilsCrossed className="h-6 w-6" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-black tracking-tight">Menu Catalog</h1>
+                  <p className="mt-1 max-w-md text-sm text-white/85">
+                    Manage your restaurant menu, add delicious items, combos and keep your menu updated.
+                  </p>
+                </div>
               </div>
-
-              <div>
-                <h1 className="text-xl md:text-2xl font-black text-slate-900 tracking-tight">
-                  Digital Menu Catalog
-                </h1>
-
-                <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                  Configure categories, single dishes, and active operational
-                  items pricing.
-                </p>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-2xl bg-white/15 px-4 py-3">
+                  <p className="text-[10px] font-bold uppercase text-white/80">Total Items</p>
+                  <p className="text-2xl font-black">{menuItems.items.length}</p>
+                </div>
+                <div className="rounded-2xl bg-white/15 px-4 py-3">
+                  <p className="text-[10px] font-bold uppercase text-white/80">Total Combos</p>
+                  <p className="text-2xl font-black">{menuItems.combos.length}</p>
+                </div>
               </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              {/* Add Dish */}
-              <button
-                onClick={handleOpenAddModal}
-                disabled={!isApproved}
-                title={
-                  !isApproved ? "Restaurant pending verification" : undefined
-                }
-                className="flex items-center justify-center gap-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs px-6 py-3.5 rounded-2xl transition-all shadow-xs shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Plus size={16} strokeWidth={3} />
-                Add New Dish
-              </button>
-
-              {/* AI Upload */}
-              <button
-                onClick={() => {
-                  if (isAiLocked) {
-                    showError(
-                      "AI menu upload can be used only once every 30 days. Please wait until your next available date.",
-                    );
-                    return;
-                  }
-
-                  setIsAiModalOpen(true);
-                }}
-                disabled={!isApproved || isAiLocked}
-                title={
-                  !isApproved
-                    ? "Restaurant pending verification"
-                    : isAiLocked
-                      ? "AI menu upload is available only once every 30 days"
-                      : "Upload restaurant menu using AI"
-                }
-                className="flex items-center justify-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-bold text-xs px-5 py-3.5 rounded-2xl transition-all shadow-xs shrink-0 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Sparkles size={16} strokeWidth={2.5} />
-
-                {isAiLocked
-                  ? "AI Upload Used — Wait 30 Days"
-                  : "Upload Menu Image via AI"}
-              </button>
             </div>
           </div>
-
-          {/* AI Usage Information */}
-          <div
-            className={`flex items-start gap-3 px-4 py-3.5 rounded-2xl border ${
-              isAiLocked
-                ? "bg-amber-50 border-amber-200 text-amber-800"
-                : "bg-purple-50 border-purple-200 text-purple-700"
-            }`}
-          >
-            <Sparkles size={16} className="mt-0.5 shrink-0" strokeWidth={2.5} />
-
-            <div>
-              <p className="text-xs font-black">
-                AI Menu Upload — Once Every 30 Days
-              </p>
-
-              <p className="text-[11px] font-medium mt-1 leading-relaxed">
-                This monthly upload accepts multiple menu page images together.
-                A single image is not accepted. Upload every page in one go so
-                AI can add the full menu at once.
-              </p>
-
-              {isAiLocked && aiNextAvailableDate && (
-                <p className="text-[11px] font-bold mt-1.5">
-                  🔒 AI upload is currently unavailable. You can use it again
-                  from{" "}
-                  <strong>
-                    {aiNextAvailableDate.toLocaleDateString("en-IN", {
-                      day: "2-digit",
-                      month: "short",
-                      year: "numeric",
-                    })}
-                  </strong>
-                  .
+          <div className="rounded-3xl border border-rose-100 bg-gradient-to-b from-rose-50 to-white p-4 shadow-sm">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <p className="text-sm font-black text-slate-900">AI Menu Import</p>
+                <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                  Add menu items using AI from menu images. Upload every page together.
                 </p>
-              )}
-
-              {!isAiLocked && (
-                <p className="text-[11px] font-bold mt-1.5 text-purple-800">
-                  ✨ Your AI upload is available for this period.
-                </p>
-              )}
+              </div>
+              <span className="rounded-full bg-rose-500 px-2 py-0.5 text-[9px] font-black text-white">POPULAR</span>
             </div>
+            {isAiLocked && aiNextAvailableDate && (
+              <p className="mt-2 text-[11px] font-bold text-amber-700">
+                Next upload{" "}
+                {aiNextAvailableDate.toLocaleDateString("en-IN", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                if (isAiLocked) {
+                  showError("AI menu upload can be used only once every 30 days. Please wait until your next available date.");
+                  return;
+                }
+                setIsAiModalOpen(true);
+              }}
+              disabled={!isApproved || isAiLocked}
+              className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-500 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <Upload size={16} />
+              {isAiLocked ? "AI Upload Used" : "Upload Menu Images"}
+            </button>
           </div>
         </div>
-
-        {/* Category Filter Pills */}
-        {menuItems.items.length > 0 && (
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 scrollbar-none">
-            {categoriesList.map((cat) => (
-              <button
-                key={cat}
-                onClick={() => setActiveCategoryFilter(cat)}
-                className={`px-5 py-2.5 rounded-2xl text-xs font-bold tracking-wider border whitespace-nowrap transition-all duration-200 cursor-pointer ${
-                  activeCategoryFilter === cat
-                    ? "bg-red-500 text-white border-red-500 shadow-sm shadow-red-500/10"
-                    : "bg-white text-slate-600 border-slate-200/80 hover:bg-slate-50"
-                }`}
-              >
-                {cat}
+        <div className="mt-4 flex gap-2 overflow-x-auto no-scrollbar pb-1">
+          {categoriesList.map((cat) => {
+            const count = cat === "ALL" ? allCatalogItems.length : cat === "COMBO" ? allCatalogItems.filter((item) => item.isCombo).length : allCatalogItems.filter((item) => item.category === cat).length;
+            const active = activeCategoryFilter === cat;
+            return (
+              <button key={cat} type="button" onClick={() => setActiveCategoryFilter(cat)} className={`whitespace-nowrap rounded-2xl border px-3 py-2 text-xs font-black ${active ? "border-rose-500 bg-rose-500 text-white" : "border-slate-100 bg-white text-slate-600"}`}>
+                {cat === "ALL" ? "All Items" : cat === "COMBO" ? "Combos" : cat} {count}
               </button>
-            ))}
+            );
+          })}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <div className="relative min-w-[200px] flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input value={menuSearch} onChange={(event) => setMenuSearch(event.target.value)} placeholder="Search menu items..." className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-rose-300" />
           </div>
-        )}
-
-        {/* Catalog Grid / Empty State */}
-        {filteredMenuItems.length === 0 ? (
-          <div className="bg-white rounded-3xl border border-slate-200/80 p-16 text-center shadow-xs flex flex-col items-center justify-center max-w-xl mx-auto space-y-4">
-            <div className="p-4 bg-red-50 rounded-2xl text-red-500 border border-red-100">
-              <UtensilsCrossed size={32} />
+          <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-600">
+            Sort:
+            <select value={sortMode} onChange={(event) => setSortMode(event.target.value)} className="bg-transparent outline-none">
+              <option value="default">Default</option>
+              <option value="name">Name</option>
+              <option value="price">Price</option>
+            </select>
+          </label>
+          {[["ALL", "All"], ["VEG", "Veg"], ["NONVEG", "Non-Veg"]].map(([key, label]) => (
+            <button key={key} type="button" onClick={() => setVegFilter(key)} className={`rounded-xl border px-3 py-2.5 text-xs font-black ${vegFilter === key ? "border-rose-500 bg-rose-500 text-white" : "border-slate-200 bg-white text-slate-600"}`}>{label}</button>
+          ))}
+          {/* <Link to="/counter" className="rounded-xl border border-rose-200 bg-white px-3 py-2.5 text-xs font-black text-rose-500">Arrange Menu</Link> */}
+          <button type="button" onClick={handleOpenAddModal} disabled={!isApproved} className="inline-flex items-center gap-1 rounded-xl bg-rose-500 px-3 py-2.5 text-xs font-black text-white disabled:opacity-50"><Plus size={14} /> Add Item</button>
+        </div>
+        <div className={`mt-4 grid items-start gap-4 ${isModalOpen ? "xl:grid-cols-[minmax(0,1fr)_340px]" : ""}`}>
+          {filteredMenuItems.length === 0 ? (
+            <div className="rounded-3xl border border-slate-100 bg-white px-6 py-16 text-center">
+              <ChefHat className="mx-auto mb-2 h-8 w-8 text-slate-300" />
+              <p className="text-sm font-bold text-slate-800">No menu items found</p>
             </div>
-            <div className="space-y-1">
-              <h3 className="font-black text-slate-900 text-base">
-                No Menu Items Listed
-              </h3>
-              <p className="text-xs text-slate-500 font-medium leading-relaxed">
-                {activeCategoryFilter !== "ALL"
-                  ? `No dishes found matching target selection criteria "${activeCategoryFilter}" filter context.`
-                  : "Your operational store terminal catalog database appears empty. Click add button to spawn live entities."}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {filteredMenuItems.map((item) => (
-              <div
-                key={item._id}
-                className="relative bg-white rounded-3xl border border-slate-200/80 shadow-xs hover:border-red-200 transition-all duration-300 flex flex-col justify-between overflow-hidden group"
-              >
-                {item.isCombo && (
-                  <div className="absolute top-4 right-4 z-10 bg-purple-500 text-white text-[9px] px-2.5 py-1 rounded-full font-bold uppercase tracking-wider flex items-center gap-1 shadow-xs">
-                    <Sparkles size={10} /> COMBO
-                  </div>
-                )}
-
-                <div className="p-6 flex gap-4 items-start">
-                  <div className="w-20 h-20 rounded-2xl bg-slate-50 border border-slate-100 shrink-0 overflow-hidden relative flex items-center justify-center text-slate-300">
-                    {item.image ? (
-                      <img
-                        src={
-                          item.image
-                            ? item.image.startsWith("http")
-                              ? item.image
-                              : `${import.meta.env.VITE_APP_API_BASE.replace("/api", "")}${item.image}`
-                            : null
-                        }
-                        alt={item.name}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                    ) : (
-                      <ImageIcon size={24} />
-                    )}
-                  </div>
-
-                  <div className="space-y-1.5 flex-1 min-w-0 pr-6">
-                    <div className="flex items-center gap-1.5">
-                      {/* 🆕 Veg/Non-Veg indicator dot (standard square marker) */}
-                      <span
-                        title={item.isVeg !== false ? "Veg" : "Non-Veg"}
-                        className={`w-3 h-3 shrink-0 border-2 flex items-center justify-center rounded-[3px] ${
-                          item.isVeg !== false
-                            ? "border-emerald-600"
-                            : "border-red-600"
-                        }`}
-                      >
-                        <span
-                          className={`w-1.5 h-1.5 rounded-full ${
-                            item.isVeg !== false
-                              ? "bg-emerald-600"
-                              : "bg-red-600"
-                          }`}
-                        />
-                      </span>
-                      <span className="text-[9px] bg-slate-100 text-slate-600 font-black px-2.5 py-0.5 rounded-lg uppercase tracking-wider inline-block">
-                        {item.category}
-                      </span>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+              {filteredMenuItems.map((item) => {
+                const image = resolveMediaUrl(item.image);
+                return (
+                  <div key={item._id} className="rounded-2xl border border-slate-100 bg-white p-2.5 shadow-sm">
+                    <div className="relative mb-2 h-28 overflow-hidden rounded-xl bg-slate-100">
+                      {image ? <img src={image} alt={item.name} className="h-full w-full object-cover" loading="lazy" decoding="async" /> : <div className="flex h-full items-center justify-center text-slate-300"><ImageIcon size={22} /></div>}
+                      {item.isCombo && <span className="absolute left-2 top-2 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-black text-white">Combo</span>}
                     </div>
-                    <h3 className="font-black text-slate-900 text-base tracking-tight truncate">
-                      {item.name}
-                    </h3>
-                    <p className="text-xs text-slate-500 font-medium line-clamp-2 leading-relaxed">
-                      {item.description ||
-                        "No direct kitchen culinary preparations logs specified."}
-                    </p>
+                    <div className="flex items-center gap-1.5 px-0.5">
+                      <span className={`h-2 w-2 rounded-full ${item.isVeg === false ? "bg-red-500" : "bg-emerald-500"}`} />
+                      <h3 className="truncate text-sm font-bold text-slate-900">{item.name}</h3>
+                    </div>
+                    <div className="mt-1 flex items-center justify-between px-0.5">
+                      <p className="text-sm font-black text-slate-800">₹{Number(item.price || 0).toLocaleString("en-IN")}</p>
+                      <span className={`text-[10px] font-bold ${item.isAvailable === false ? "text-slate-400" : "text-emerald-600"}`}>{item.isAvailable === false ? "Hidden" : "Available"}</span>
+                    </div>
+                    <div className="mt-2 flex gap-2">
+                      <button type="button" onClick={() => handleOpenEditModal(item)} className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl border border-slate-200 py-1.5 text-[11px] font-bold text-slate-600"><Edit2 size={12} /> Edit</button>
+                      <button type="button" onClick={() => handleDeleteClick(item)} className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl border border-rose-100 py-1.5 text-[11px] font-bold text-rose-500"><Trash2 size={12} /> Delete</button>
+                    </div>
+                    <p className="mt-1 truncate px-0.5 text-[10px] font-semibold text-slate-400">{item.category}</p>
                   </div>
-                </div>
+                );
+              })}
+            </div>
+          )}
 
-                <div className="px-6 py-4 bg-slate-50/50 border-t border-slate-100 flex justify-between items-center">
-                  <span className="text-base font-black text-slate-900 flex items-center tracking-tight">
-                    <IndianRupee
-                      size={15}
-                      strokeWidth={2.5}
-                      className="mt-0.5 text-slate-700"
-                    />
-                    {item.price?.toLocaleString("en-IN")}
-                  </span>
-
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleOpenEditModal(item)}
-                      className="p-2.5 rounded-xl text-slate-400 hover:text-slate-900 hover:bg-white border border-transparent hover:border-slate-200 transition-all cursor-pointer shadow-xs"
-                      title="Edit Item Details"
-                    >
-                      <Edit2 size={14} strokeWidth={2.5} />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteClick(item)}
-                      className="p-2.5 rounded-xl text-slate-400 hover:text-red-600 hover:bg-white border border-transparent hover:border-red-100 transition-all cursor-pointer shadow-xs"
-                      title="Delete Asset Item"
-                    >
-                      <Trash2 size={14} strokeWidth={2.5} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
+        {isModalOpen && (
+        <aside className="sticky top-4 max-h-[calc(100vh-6rem)] overflow-y-auto rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-base font-black text-slate-900">Item Details</h3>
+            <button type="button" onClick={closeAndResetModal} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100" aria-label="Close item details">
+              <X size={16} />
+            </button>
           </div>
-        )}
 
-        {/* Modal Form */}
-        <Modal
-          isOpen={isModalOpen}
-          onClose={closeAndResetModal}
-          title={editingItem ? "Modify Catalog Entry" : "Create New Menu Asset"}
-        >
           <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-6">
             <button
               type="button"
@@ -1151,7 +1067,7 @@ export default function MenuCatalog() {
                     imagePreview.startsWith("http") ||
                     imagePreview.startsWith("blob:")
                       ? imagePreview
-                      : `${import.meta.env.VITE_APP_API_BASE.replace("/api", "")}${imagePreview}`
+                      : resolveMediaUrl(imagePreview)
                   }
                   alt="Preview"
                   className="w-full h-full object-cover"
@@ -1171,6 +1087,17 @@ export default function MenuCatalog() {
                 className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm text-slate-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all resize-none shadow-xs"
               />
             </div>
+
+            <button
+              type="button"
+              onClick={() => setItemAvailable((current) => !current)}
+              className="flex w-full items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700"
+            >
+              Item Available
+              <span className={`relative h-6 w-11 rounded-full ${itemAvailable ? "bg-emerald-500" : "bg-slate-300"}`}>
+                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${itemAvailable ? "left-5" : "left-0.5"}`} />
+              </span>
+            </button>
 
             <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
               <button
@@ -1209,15 +1136,15 @@ export default function MenuCatalog() {
                   </>
                 ) : (
                   <>
-                    {editingItem
-                      ? `Update ${formMode === "COMBO" ? "Combo" : "Dish"}`
-                      : `Add ${formMode === "COMBO" ? "Combo" : "Dish"}`}
+                    {editingItem ? "Save Changes" : `Add ${formMode === "COMBO" ? "Combo" : "Dish"}`}
                   </>
                 )}
               </button>
             </div>
           </form>
-        </Modal>
+                </aside>
+        )}
+        </div>
 
         {/* AI Menu Upload Modal */}
         <Modal

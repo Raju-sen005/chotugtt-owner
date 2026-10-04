@@ -3,9 +3,6 @@ import { useQuery } from "@tanstack/react-query";
 import axios from "axios";
 import {
   Download,
-  Minus,
-  ArrowUpRight,
-  ArrowDownRight,
   Wallet,
   Smartphone,
   Receipt,
@@ -13,39 +10,28 @@ import {
   CheckCircle2,
   Printer,
   X,
+  Search,
+  CalendarDays,
+  IndianRupee,
+  ShoppingBag,
+  Clock,
 } from "lucide-react";
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts";
 import { getSelectedBillTemplate } from "../../constants/billTemplates";
 import { printOrderBill } from "../../utils/printOrderBill";
 import * as XLSX from "xlsx";
 import { useSocket } from "../../context/SocketContext";
 import { useAuth } from "../../context/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
-const PAYMENT_TABS = [
-  { key: "CASH", label: "Cash", icon: Wallet, accent: "emerald" },
-  { key: "UPI", label: "UPI", icon: Smartphone, accent: "indigo" },
-  { key: "DUE", label: "Due", icon: Receipt, accent: "amber" },
-];
-
-const ACCENT_MAP = {
-  emerald: {
-    active: "bg-emerald-600 text-white shadow-emerald-500/20",
-    ring: "ring-emerald-200",
-    text: "text-emerald-600",
-    bg: "bg-emerald-50",
-  },
-  indigo: {
-    active: "bg-indigo-600 text-white shadow-indigo-500/20",
-    ring: "ring-indigo-200",
-    text: "text-indigo-600",
-    bg: "bg-indigo-50",
-  },
-  amber: {
-    active: "bg-amber-500 text-white shadow-amber-500/20",
-    ring: "ring-amber-200",
-    text: "text-amber-600",
-    bg: "bg-amber-50",
-  },
-};
 
 function SkeletonRow() {
   return (
@@ -64,8 +50,9 @@ function SkeletonRow() {
 }
 
 export default function Payment() {
-  const [paymentMethod, setPaymentMethod] = React.useState("CASH");
+  const [paymentMethod, setPaymentMethod] = React.useState("ALL");
   const [filter, setFilter] = React.useState("today");
+  const [billSearch, setBillSearch] = React.useState("");
   const [currentPage, setCurrentPage] = React.useState(1);
   const socket = useSocket();
   const { user } = useAuth();
@@ -196,11 +183,11 @@ export default function Payment() {
     };
   }, [socket, queryClient]);
   const { data: billingData, isLoading } = useQuery({
-    queryKey: ["bills", restaurantId, filter, paymentMethod],
+    queryKey: ["bills", restaurantId, filter],
     queryFn: () =>
       axios
         .get(
-          `${API_BASE}/orders/billing?filter=${filter}&paymentMethod=${paymentMethod}`,
+          `${API_BASE}/orders/billing?filter=${filter}&paymentMethod=ALL`,
           { withCredentials: true },
         )
         .then((res) => res.data),
@@ -210,6 +197,18 @@ export default function Payment() {
 
   const bills = billingData?.data || [];
   const summary = billingData?.summary || {};
+  const visibleBills = React.useMemo(() => {
+    const query = billSearch.trim().toLowerCase();
+    return bills.filter((bill) => {
+      if (paymentMethod !== "ALL" && bill.paymentMethod !== paymentMethod) return false;
+      if (!query) return true;
+      return [bill.orderId, bill.customerName, bill.customerPhone, bill.tableNumber, bill.paymentMethod]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase()
+        .includes(query);
+    });
+  }, [bills, paymentMethod, billSearch]);
 
   const { data: prevData } = useQuery({
     queryKey: ["bills-prev", restaurantId, filter],
@@ -223,23 +222,28 @@ export default function Payment() {
     enabled: !!restaurantId,
   });
 
-  const totalBills = bills?.length || 0;
+  const totalBills = visibleBills.length;
   const totalPages = Math.ceil(totalBills / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const endIndex = startIndex + ITEMS_PER_PAGE;
-  const paginatedBills = bills?.slice(startIndex, endIndex) || [];
+  const paginatedBills = visibleBills.slice(startIndex, endIndex);
 
-  const totalRevenue =
-    bills?.reduce((acc, curr) => acc + (curr.total || 0), 0) || 0;
+  const collected = Number(summary.totalCollected || 0);
+  const pendingDue = Number(summary.due || 0);
+  const orderCount =
+    Number(summary.cashCount || 0) +
+    Number(summary.upiCount || 0) +
+    Number(summary.dueCount || 0);
+  const averageOrder = orderCount ? (collected + pendingDue) / orderCount : 0;
   const prevRevenue = prevData?.total || 0;
 
-  const revenueDifference = totalRevenue - prevRevenue;
+  const revenueDifference = collected - prevRevenue;
   const isProfit = revenueDifference > 0;
 
   const percentageChange =
     prevRevenue > 0
       ? ((Math.abs(revenueDifference) / prevRevenue) * 100).toFixed(1)
-      : totalRevenue > 0
+        : collected > 0
         ? "100"
         : "0";
 
@@ -331,8 +335,8 @@ export default function Payment() {
   };
 
   const handleDownload = () => {
-    if (!bills || bills.length === 0) return;
-    const formattedData = bills.map((bill) => ({
+    if (!visibleBills.length) return;
+    const formattedData = visibleBills.map((bill) => ({
       "Order ID": bill.orderId,
       Customer: bill.customerName,
       Phone: bill.customerPhone,
@@ -369,6 +373,29 @@ export default function Payment() {
     UPI: { amount: summary.upi || 0, count: summary.upiCount || 0 },
     DUE: { amount: summary.due || 0, count: summary.dueCount || 0 },
   };
+  const methodSlices = [
+    { name: "Cash", value: summaryValues.CASH.count, amount: summaryValues.CASH.amount, color: "#22C55E" },
+    { name: "UPI", value: summaryValues.UPI.count, amount: summaryValues.UPI.amount, color: "#8B5CF6" },
+    { name: "Due", value: summaryValues.DUE.count, amount: summaryValues.DUE.amount, color: "#FB923C" },
+  ].filter((slice) => slice.value > 0);
+  const paymentDays = React.useMemo(() => {
+    const names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+    const rows = names.map((day) => ({ day, total: 0, count: 0 }));
+    bills.forEach((bill) => {
+      const index = (new Date(bill.createdAt).getDay() + 6) % 7;
+      rows[index].total += Number(bill.total || 0);
+      rows[index].count += 1;
+    });
+    return rows;
+  }, [bills]);
+  const todayLabel = new Date().toLocaleDateString("en-IN", {
+    weekday: "short",
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+  const money = (value) =>
+    `₹${Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
   return (
     <>
@@ -569,348 +596,270 @@ export default function Payment() {
           </div>
         </div>
       )}
-      <div className="p-4 sm:p-6 lg:p-10 max-w-7xl mx-auto font-sans bg-[#F8F9FA] min-h-screen">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
-          <div>
-            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
-              Payment History
-            </h2>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-              Overview of your store's revenue and financial performance.
-            </p>
+      <div className="-m-4 bg-[var(--background)] p-4 font-sans md:-m-6 md:p-5 lg:-m-8 lg:p-5">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[var(--primary)] via-[var(--primary)] to-[var(--secondary)] p-5 text-white">
+          <div className="flex flex-wrap items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
+                <Wallet className="h-6 w-6" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black tracking-tight">Payments</h2>
+                <p className="mt-1 text-sm text-white/85">Manage all your bills, payments and due collection</p>
+              </div>
+            </div>
+            <div className="rounded-2xl bg-white/15 px-4 py-3 text-right">
+              <p className="flex items-center justify-end gap-2 text-sm font-bold">
+                <CalendarDays size={14} /> {todayLabel}
+              </p>
+              <p className="mt-1 text-[11px] font-semibold text-emerald-100">Today</p>
+            </div>
           </div>
-
-          <button
-            onClick={handleDownload}
-            disabled={!bills.length}
-            className="flex items-center gap-2 bg-gradient-to-r from-red-500 to-rose-600 text-white px-5 py-2.5 rounded-xl text-xs font-bold hover:opacity-95 active:scale-95 transition shadow-sm shadow-red-500/20 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100"
-          >
-            <Download className="w-4 h-4" /> Download Report
-          </button>
         </div>
 
-        {/* Date range filter */}
-        <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
-          {["today", "week", "month", "year"].map((f) => (
-            <button
-              key={f}
-              onClick={() => {
-                setFilter(f);
-                setCurrentPage(1);
-              }}
-              className={`px-4 py-2 rounded-xl text-xs font-bold capitalize transition cursor-pointer whitespace-nowrap ${
-                filter === f
-                  ? "bg-slate-900 text-white shadow-sm"
-                  : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
-              }`}
-            >
-              {f}
-            </button>
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          {[
+            ["Total Sales", money(collected), IndianRupee, "text-emerald-600 bg-emerald-50", true],
+            ["Total Orders", orderCount, ShoppingBag, "text-blue-600 bg-blue-50", false],
+            ["Average Order Value", money(averageOrder), Receipt, "text-violet-600 bg-violet-50", false],
+            ["Pending Dues", money(pendingDue), Clock, "text-amber-600 bg-amber-50", false],
+          ].map(([label, value, Icon, tint, showChange]) => (
+            <div key={label} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${tint}`}><Icon size={16} /></span>
+                <p className="text-[11px] font-bold text-slate-400">{label}</p>
+              </div>
+              <p className="mt-3 text-2xl font-black text-slate-900">{value}</p>
+              {showChange && (
+                <p className={`mt-1 text-[11px] font-bold ${isProfit ? "text-emerald-600" : "text-rose-500"}`}>
+                  {revenueDifference === 0 ? "No change vs previous period" : `${isProfit ? "+" : "-"}${percentageChange}% vs previous ${filter}`}
+                </p>
+              )}
+            </div>
           ))}
         </div>
 
-        {/* Payment method summary cards — always visible, active tab highlighted */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
-          {PAYMENT_TABS.map(({ key, label, icon: Icon, accent }) => {
-            const isActive = paymentMethod === key;
-            const colors = ACCENT_MAP[accent];
-            const { amount, count } = summaryValues[key];
-
-            return (
-              <button
-                key={key}
-                onClick={() => {
-                  setPaymentMethod(key);
-                  setCurrentPage(1);
-                }}
-                className={`text-left bg-white p-5 rounded-3xl border transition cursor-pointer ${
-                  isActive
-                    ? `border-transparent ring-2 ${colors.ring} shadow-sm`
-                    : "border-slate-200 hover:border-slate-300"
-                }`}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <span
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center ${colors.bg} ${colors.text}`}
-                  >
-                    <Icon size={16} strokeWidth={2.5} />
-                  </span>
-                  <span
-                    className={`text-[10px] uppercase font-black tracking-widest ${
-                      isActive ? colors.text : "text-slate-300"
-                    }`}
-                  >
-                    {isActive ? "Selected" : ""}
-                  </span>
-                </div>
-                <p className="text-[10px] uppercase font-black text-slate-400 tracking-widest">
-                  {label} Collection
-                </p>
-                <h3 className="text-2xl font-black text-slate-900 mt-1">
-                  ₹{Number(amount).toLocaleString("en-IN")}
-                </h3>
-                <p className="text-xs text-slate-400 mt-1">
-                  {count} {label.toLowerCase()} transaction
-                  {count === 1 ? "" : "s"}
-                </p>
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Revenue comparison card */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm mb-8">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div>
-              <p className="text-[10px] uppercase font-black text-slate-400 tracking-widest">
-                Total Revenue ({filter})
-              </p>
-              <h3 className="text-3xl font-black text-slate-900 mt-1">
-                ₹{totalRevenue.toLocaleString("en-IN")}
-              </h3>
-              <p className="text-xs text-slate-400 mt-1">
-                vs previous {filter}:{" "}
-                <span className="font-bold text-slate-600">
-                  ₹{prevRevenue.toLocaleString("en-IN")}
-                </span>
-              </p>
-            </div>
-
-            {revenueDifference !== 0 ? (
-              <span
-                className={`self-start sm:self-auto inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-black uppercase ${
-                  isProfit
-                    ? "bg-emerald-50 text-emerald-600 border border-emerald-100"
-                    : "bg-rose-50 text-rose-600 border border-rose-100"
-                }`}
-              >
-                {isProfit ? (
-                  <ArrowUpRight size={14} />
-                ) : (
-                  <ArrowDownRight size={14} />
-                )}
-                {percentageChange}% {isProfit ? "Profit" : "Loss"}
-              </span>
-            ) : (
-              <span className="self-start sm:self-auto inline-flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-black uppercase bg-slate-100 text-slate-500">
-                <Minus size={14} /> No Change
-              </span>
-            )}
-          </div>
-        </div>
-
-        {/* Table */}
-        <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-            <h3 className="font-black text-slate-800 text-sm">
-              Transaction Logs
-            </h3>
-            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wide">
-              {totalBills} total
-            </span>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs sm:text-sm">
-              <thead className="bg-slate-50 border-b border-slate-100">
-                <tr className="text-slate-400 text-left uppercase text-[10px] font-black tracking-wider">
-                  <th className="p-4 sm:p-5">Order ID</th>
-
-                  <th className="p-4 sm:p-5">Customer</th>
-
-                  {paymentMethod === "DUE" && (
-                    <th className="p-4 sm:p-5">Mobile</th>
-                  )}
-
-                  <th className="p-4 sm:p-5">Date & Time</th>
-
-                  <th className="p-4 sm:p-5">Table / Type</th>
-
-                  <th className="p-4 sm:p-5 text-right">
-                    {paymentMethod === "DUE" ? "Due Amount" : "Amount"}
-                  </th>
-
-                  <th className="p-4 sm:p-5 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {isLoading ? (
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <SkeletonRow key={i} />
-                  ))
-                ) : bills?.length > 0 ? (
-                  paginatedBills.map((bill) => (
-                    <tr
-                      key={bill._id}
-                      className="hover:bg-slate-50 transition-colors"
-                    >
-                      <td className="p-4 sm:p-5 text-slate-600 font-semibold">
-                        {bill.orderId}
-                      </td>
-
-                      <td className="p-4 sm:p-5 text-slate-700 font-semibold">
-                        {bill.customerName || "Walk-in Customer"}
-                        {bill.isSplitBill && (
-                          <span className="ml-2 text-[9px] font-black bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-md uppercase align-middle">
-                            Split
-                          </span>
-                        )}
-                      </td>
-
-                      {paymentMethod === "DUE" && (
-                        <td className="p-4 sm:p-5 text-slate-600">
-                          {bill.customerPhone || "—"}
-                        </td>
-                      )}
-
-                      <td className="p-4 sm:p-5 text-slate-600">
-                        {new Date(bill.createdAt).toLocaleString()}
-                      </td>
-
-                      <td className="p-4 sm:p-5 font-bold text-slate-800">
-                        Table {bill.tableNumber}{" "}
-                        <span className="text-xs font-normal text-slate-400">
-                          ({bill.orderType || "Dine-in"})
-                        </span>
-                      </td>
-
-                      <td
-                        className={`p-4 sm:p-5 text-right font-black ${
-                          paymentMethod === "DUE"
-                            ? "text-amber-600"
-                            : "text-slate-900"
-                        }`}
-                      >
-                        ₹
-                        {Number(
-                          paymentMethod === "DUE"
-                            ? bill.dueAmount || bill.total || 0
-                            : bill.total || 0,
-                        ).toFixed(2)}
-                      </td>
-
-                      <td className="p-4 sm:p-5">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            type="button"
-                            onClick={() => reprintBill(bill)}
-                            disabled={reprintingId === String(bill._id)}
-                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-bold hover:bg-slate-50 transition disabled:opacity-50"
-                          >
-                            <Printer size={13} />
-                            {reprintingId === String(bill._id)
-                              ? "Printing..."
-                              : "Reprint"}
-                          </button>
-                          {paymentMethod === "DUE" && (
-                            <>
-                            <button
-                              type="button"
-                              onClick={() => openCustomerEdit(bill)}
-                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-bold hover:bg-slate-50 transition"
-                            >
-                              <Pencil size={13} />
-                              Edit
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => openSettleDue(bill)}
-                              className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition"
-                            >
-                              <CheckCircle2 size={13} />
-                              Settle
-                            </button>
-                            </>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan="3" className="p-12 text-center">
-                      <div className="flex flex-col items-center gap-2 text-slate-300">
-                        <Receipt size={32} strokeWidth={1.5} />
-                        <p className="text-sm text-slate-400 italic">
-                          No payment records found
-                        </p>
-                      </div>
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-          {totalPages > 1 && (
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-5 py-4 border-t border-slate-100">
-              <p className="text-xs text-slate-500 font-medium">
-                Showing{" "}
-                <span className="font-bold text-slate-700">
-                  {startIndex + 1}
-                </span>{" "}
-                to{" "}
-                <span className="font-bold text-slate-700">
-                  {Math.min(endIndex, totalBills)}
-                </span>{" "}
-                of{" "}
-                <span className="font-bold text-slate-700">{totalBills}</span>{" "}
-                transactions
-              </p>
-
-              <div className="flex items-center gap-2">
+        <div className="mt-4 grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
+          <div className="min-w-0 rounded-3xl border border-slate-100 bg-white shadow-sm">
+            <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-3 py-3">
+              {[
+                ["ALL", "All Payments"],
+                ["CASH", "Cash"],
+                ["UPI", "UPI"],
+                ["DUE", "Due"],
+              ].map(([key, label]) => (
                 <button
+                  key={key}
                   type="button"
-                  disabled={currentPage === 1}
-                  onClick={() => setCurrentPage((prev) => prev - 1)}
-                  className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
+                  onClick={() => {
+                    setPaymentMethod(key);
+                    setCurrentPage(1);
+                  }}
+                  className={`rounded-xl px-3 py-2 text-xs font-black ${paymentMethod === key ? "bg-rose-500 text-white" : "bg-slate-50 text-slate-600"}`}
                 >
-                  Previous
+                  {label}
                 </button>
-
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: totalPages }, (_, index) => index + 1)
-                    .filter(
-                      (page) =>
-                        page === 1 ||
-                        page === totalPages ||
-                        Math.abs(page - currentPage) <= 1,
-                    )
-                    .map((page, index, pages) => (
-                      <React.Fragment key={page}>
-                        {index > 0 && pages[index - 1] !== page - 1 && (
-                          <span className="px-1 text-slate-400 text-xs">
-                            ...
-                          </span>
-                        )}
-                        <button
-                          type="button"
-                          onClick={() => setCurrentPage(page)}
-                          className={`w-9 h-9 rounded-xl text-xs font-bold transition ${
-                            currentPage === page
-                              ? "bg-slate-900 text-white shadow-sm"
-                              : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      </React.Fragment>
-                    ))}
-                </div>
-
-                <button
-                  type="button"
-                  disabled={currentPage === totalPages}
-                  onClick={() => setCurrentPage((prev) => prev + 1)}
-                  className="px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
-                >
-                  Next
-                </button>
+              ))}
+              <div className="ml-auto flex gap-1">
+                {[
+                  ["today", "Today"],
+                  ["week", "This Week"],
+                  ["month", "This Month"],
+                  ["year", "This Year"],
+                ].map(([key, label]) => (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => {
+                      setFilter(key);
+                      setCurrentPage(1);
+                    }}
+                    className={`rounded-xl px-3 py-2 text-[11px] font-bold ${filter === key ? "bg-slate-900 text-white" : "text-slate-500"}`}
+                  >
+                    {label}
+                  </button>
+                ))}
               </div>
             </div>
-          )}
+
+            <div className="flex flex-wrap items-center gap-2 px-3 py-3">
+              <h3 className="text-sm font-black text-slate-900">Recent Payments</h3>
+              <div className="relative ml-auto min-w-[180px] flex-1 sm:max-w-xs">
+                <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                <input
+                  value={billSearch}
+                  onChange={(event) => {
+                    setBillSearch(event.target.value);
+                    setCurrentPage(1);
+                  }}
+                  placeholder="Search orders..."
+                  className="w-full rounded-xl border border-slate-200 py-2 pl-8 pr-3 text-xs font-semibold outline-none focus:border-rose-300"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={handleDownload}
+                disabled={!visibleBills.length}
+                className="inline-flex items-center gap-1 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 disabled:opacity-40"
+              >
+                <Download size={14} /> Export
+              </button>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[860px] text-left text-xs">
+                <thead className="text-[10px] font-bold uppercase text-slate-400">
+                  <tr>
+                    <th className="px-3 py-2">#</th>
+                    <th className="px-3 py-2">Order ID</th>
+                    <th className="px-3 py-2">Date & Time</th>
+                    <th className="px-3 py-2">Table / Type</th>
+                    <th className="px-3 py-2">Customer</th>
+                    <th className="px-3 py-2">Items</th>
+                    <th className="px-3 py-2">Amount</th>
+                    <th className="px-3 py-2">Payment</th>
+                    <th className="px-3 py-2">Status</th>
+                    <th className="px-3 py-2">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {isLoading ? (
+                    Array.from({ length: 4 }).map((_, index) => <SkeletonRow key={index} />)
+                  ) : paginatedBills.length > 0 ? (
+                    paginatedBills.map((bill, index) => {
+                      const when = new Date(bill.createdAt);
+                      const itemCount = Array.isArray(bill.items)
+                        ? bill.items.filter((item) => item?.status !== "REJECTED").length
+                        : 0;
+                      const amount = paymentMethod === "DUE" || bill.paymentMethod === "DUE"
+                        ? bill.dueAmount || bill.total || 0
+                        : bill.total || 0;
+                      const place = String(bill.tableNumber || "").toUpperCase() === "PARCEL"
+                        ? "Parcel"
+                        : `Table ${bill.tableNumber || "—"}`;
+                      return (
+                        <tr key={bill._id} className="border-t border-slate-50">
+                          <td className="px-3 py-3 font-black text-rose-500">{startIndex + index + 1}</td>
+                          <td className="px-3 py-3 font-bold text-slate-800">#{bill.orderId}</td>
+                          <td className="px-3 py-3 text-slate-500">
+                            <p>{when.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                            <p className="text-[10px]">{when.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</p>
+                          </td>
+                          <td className="px-3 py-3 font-bold text-slate-700">{place}</td>
+                          <td className="px-3 py-3">
+                            <p className="font-bold text-slate-800">{bill.customerName || "Walk-in"}</p>
+                            {bill.customerPhone && <p className="text-[10px] text-slate-400">{bill.customerPhone}</p>}
+                            {bill.isSplitBill && <span className="text-[9px] font-black text-violet-600">Split</span>}
+                          </td>
+                          <td className="px-3 py-3 text-slate-600">{itemCount}</td>
+                          <td className="px-3 py-3 font-black text-slate-900">{money(amount)}</td>
+                          <td className="px-3 py-3">
+                            <span className={`rounded-full px-2 py-1 text-[10px] font-black ${bill.paymentMethod === "DUE" ? "bg-amber-50 text-amber-700" : bill.paymentMethod === "UPI" ? "bg-violet-50 text-violet-700" : "bg-emerald-50 text-emerald-700"}`}>
+                              {bill.paymentMethod || "—"}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3">
+                            <span className="rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-black text-emerald-700">{bill.status || "COMPLETED"}</span>
+                          </td>
+                          <td className="px-3 py-3">
+                            <div className="flex items-center gap-1">
+                              <button type="button" onClick={() => reprintBill(bill)} disabled={reprintingId === String(bill._id)} className="rounded-lg border border-slate-200 p-1.5 text-slate-600 disabled:opacity-50" title="Reprint bill">
+                                <Printer size={13} />
+                              </button>
+                              {bill.paymentMethod === "DUE" && (
+                                <>
+                                  <button type="button" onClick={() => openCustomerEdit(bill)} className="rounded-lg border border-slate-200 p-1.5 text-slate-600" title="Edit customer">
+                                    <Pencil size={13} />
+                                  </button>
+                                  <button type="button" onClick={() => openSettleDue(bill)} className="rounded-lg bg-emerald-600 p-1.5 text-white" title="Settle due">
+                                    <CheckCircle2 size={13} />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan="10" className="px-3 py-12 text-center text-sm text-slate-400">No payment records found</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-slate-100 px-3 py-3 text-xs">
+                <p className="text-slate-500">Showing {startIndex + 1} to {Math.min(endIndex, totalBills)} of {totalBills}</p>
+                <div className="flex gap-2">
+                  <button type="button" disabled={currentPage === 1} onClick={() => setCurrentPage((page) => page - 1)} className="rounded-xl border border-slate-200 px-3 py-2 font-bold disabled:opacity-40">Previous</button>
+                  <button type="button" disabled={currentPage === totalPages} onClick={() => setCurrentPage((page) => page + 1)} className="rounded-xl border border-slate-200 px-3 py-2 font-bold disabled:opacity-40">Next</button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-3">
+            <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+              <h3 className="mb-3 text-sm font-black text-slate-900">Payment Methods</h3>
+              {orderCount === 0 ? (
+                <p className="py-10 text-center text-xs text-slate-400">No payments in this range</p>
+              ) : (
+                <div className="flex items-center gap-3">
+                  <div className="relative h-36 w-36 shrink-0">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie data={methodSlices} dataKey="value" innerRadius={42} outerRadius={60} stroke="none">
+                          {methodSlices.map((slice) => <Cell key={slice.name} fill={slice.color} />)}
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                      <p className="text-lg font-black text-slate-900">{orderCount}</p>
+                      <p className="text-[10px] text-slate-400">Orders</p>
+                    </div>
+                  </div>
+                  <div className="space-y-2 text-xs">
+                    {methodSlices.map((slice) => (
+                      <div key={slice.name}>
+                        <p className="font-bold text-slate-800">{slice.name}</p>
+                        <p className="text-slate-500">{slice.value} · {orderCount ? Math.round((slice.value / orderCount) * 100) : 0}%</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+              <h3 className="mb-2 text-sm font-black text-slate-900">Payments By Day</h3>
+              <p className="mb-2 text-[10px] font-bold uppercase text-slate-400">{filter}</p>
+              <ResponsiveContainer width="100%" height={160}>
+                <BarChart data={paymentDays}>
+                  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: "#94A3B8" }} />
+                  <Tooltip formatter={(value) => [money(value), "Amount"]} contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0" }} />
+                  <Bar dataKey="total" fill="#FB7185" radius={[6, 6, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={!visibleBills.length}
+              className="flex w-full items-center gap-3 rounded-3xl border border-slate-100 bg-white p-4 text-left shadow-sm disabled:opacity-50"
+            >
+              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600"><Download size={18} /></span>
+              <span>
+                <span className="block text-sm font-black text-slate-900">Export to Excel</span>
+                <span className="block text-[11px] text-slate-400">Download the payments in this view</span>
+              </span>
+            </button>
+          </div>
         </div>
       </div>
+
     </>
   );
 }
