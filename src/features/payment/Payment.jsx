@@ -11,8 +11,11 @@ import {
   Receipt,
   Pencil,
   CheckCircle2,
+  Printer,
   X,
 } from "lucide-react";
+import { getSelectedBillTemplate } from "../../constants/billTemplates";
+import { printOrderBill } from "../../utils/printOrderBill";
 import * as XLSX from "xlsx";
 import { useSocket } from "../../context/SocketContext";
 import { useAuth } from "../../context/AuthContext";
@@ -74,6 +77,21 @@ export default function Payment() {
   const [showSettleModal, setShowSettleModal] = React.useState(false);
 
   const [selectedDueBill, setSelectedDueBill] = React.useState(null);
+  const [reprintingId, setReprintingId] = React.useState("");
+  const [storeDetails, setStoreDetails] = React.useState({
+    name: "",
+    logo: "",
+    address: "",
+    contact: "",
+    fssaiNumber: "",
+    gstin: "",
+    upiId: "",
+    upiQrCode: "",
+    googleReviewQrCode: "",
+  });
+  const [selectedBillTemplate, setSelectedBillTemplate] = React.useState(() =>
+    getSelectedBillTemplate(restaurantId),
+  );
 
   const [customerName, setCustomerName] = React.useState("");
   const [customerPhone, setCustomerPhone] = React.useState("");
@@ -83,6 +101,79 @@ export default function Payment() {
   const [isUpdatingCustomer, setIsUpdatingCustomer] = React.useState(false);
 
   const [isSettlingDue, setIsSettlingDue] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!restaurantId) return;
+
+    let ignore = false;
+
+    axios
+      .get(`${API_BASE}/restaurant/profile`, { withCredentials: true })
+      .then((res) => {
+        const profile = res.data?.data;
+        if (!profile || ignore) return;
+
+        const formattedAddress = profile.address
+          ? [
+              profile.address.street,
+              profile.address.city,
+              profile.address.state,
+              profile.address.zip,
+            ]
+              .filter(Boolean)
+              .join(", ")
+          : "";
+
+        setStoreDetails({
+          name: profile.name || "",
+          logo: profile.logo || "",
+          address: formattedAddress,
+          contact: profile.phone || profile.contactNumber || profile.contact || "",
+          fssaiNumber: profile.fssaiNumber || "",
+          gstin: profile.gstin || profile.gstNumber || "",
+          upiId: profile.upiId || "",
+          upiQrCode: profile.upiQrCode || profile.qrCodeUrl || "",
+          googleReviewQrCode: profile.googleReviewQrCode || "",
+        });
+
+        if (profile.billTemplate) {
+          setSelectedBillTemplate(profile.billTemplate);
+        }
+      })
+      .catch(() => {});
+
+    return () => {
+      ignore = true;
+    };
+  }, [API_BASE, restaurantId]);
+
+  const reprintBill = async (bill) => {
+    if (!bill?._id || reprintingId) return;
+
+    setReprintingId(String(bill._id));
+
+    try {
+      const res = await axios.post(
+        `${API_BASE}/orders/${bill._id}/bill/reprint`,
+        {},
+        { withCredentials: true },
+      );
+
+      await printOrderBill({
+        order: res.data?.data || bill,
+        storeDetails,
+        user,
+        selectedBillTemplate,
+        duplicate: true,
+        onError: (message) => alert(message),
+      });
+    } catch (error) {
+      alert(error.response?.data?.message || "Could not reprint this bill");
+    } finally {
+      setReprintingId("");
+    }
+  };
+
   React.useEffect(() => {
     if (!socket) return;
 
@@ -639,9 +730,7 @@ export default function Payment() {
                     {paymentMethod === "DUE" ? "Due Amount" : "Amount"}
                   </th>
 
-                  {paymentMethod === "DUE" && (
-                    <th className="p-4 sm:p-5 text-right">Action</th>
-                  )}
+                  <th className="p-4 sm:p-5 text-right">Action</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
@@ -700,9 +789,21 @@ export default function Payment() {
                         ).toFixed(2)}
                       </td>
 
-                      {paymentMethod === "DUE" && (
-                        <td className="p-4 sm:p-5">
-                          <div className="flex items-center justify-end gap-2">
+                      <td className="p-4 sm:p-5">
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => reprintBill(bill)}
+                            disabled={reprintingId === String(bill._id)}
+                            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 text-xs font-bold hover:bg-slate-50 transition disabled:opacity-50"
+                          >
+                            <Printer size={13} />
+                            {reprintingId === String(bill._id)
+                              ? "Printing..."
+                              : "Reprint"}
+                          </button>
+                          {paymentMethod === "DUE" && (
+                            <>
                             <button
                               type="button"
                               onClick={() => openCustomerEdit(bill)}
@@ -720,9 +821,10 @@ export default function Payment() {
                               <CheckCircle2 size={13} />
                               Settle
                             </button>
-                          </div>
-                        </td>
-                      )}
+                            </>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))
                 ) : (

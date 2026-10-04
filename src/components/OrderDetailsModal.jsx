@@ -12,6 +12,7 @@ export default function OrderDetailsModal({
   order,
   onClose,
   kotItems = [],
+  cancelledItems = [],
   onPrintKOT,
   kotType = "NEW",
 }) {
@@ -23,9 +24,10 @@ export default function OrderDetailsModal({
   // 🔒 Normalize KOT type
   // ----------------------------------------------------------
   const normalizedKotType =
-    kotType === "RUNNING" ? "RUNNING" : "NEW";
+    kotType === "REVISED" ? "REVISED" : kotType === "RUNNING" ? "RUNNING" : "NEW";
 
   const isRunningOrder = normalizedKotType === "RUNNING";
+  const isRevisedOrder = normalizedKotType === "REVISED";
 
   // ----------------------------------------------------------
   // 🧾 Only display active KOT items
@@ -63,6 +65,7 @@ export default function OrderDetailsModal({
     onPrintKOT({
       order,
       items: activeKotItems,
+      cancelledItems,
       kotType: normalizedKotType,
     });
   };
@@ -101,9 +104,11 @@ export default function OrderDetailsModal({
             <p className="text-sm text-slate-500 mt-2 leading-relaxed">
               Are you sure you want to print the{" "}
               <span className="font-bold text-slate-700">
-                {isRunningOrder
-                  ? "Running Order KOT"
-                  : "New Order KOT"}
+                {isRevisedOrder
+                  ? "Updated KOT"
+                  : isRunningOrder
+                    ? "Running Order KOT"
+                    : "New Order KOT"}
               </span>{" "}
               for{" "}
               <span className="font-bold text-slate-700">
@@ -161,14 +166,18 @@ export default function OrderDetailsModal({
               {/* KOT TYPE */}
               <span
                 className={`inline-flex mt-2 px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${
-                  isRunningOrder
+                  isRevisedOrder
                     ? "bg-amber-50 text-amber-700 border-amber-200"
-                    : "bg-rose-50 text-rose-600 border-rose-200"
+                    : isRunningOrder
+                      ? "bg-amber-50 text-amber-700 border-amber-200"
+                      : "bg-rose-50 text-rose-600 border-rose-200"
                 }`}
               >
-                {isRunningOrder
-                  ? "Running Order KOT"
-                  : "New Order KOT"}
+                {isRevisedOrder
+                  ? "Updated KOT"
+                  : isRunningOrder
+                    ? "Running Order KOT"
+                    : "New Order KOT"}
               </span>
             </div>
 
@@ -265,9 +274,11 @@ export default function OrderDetailsModal({
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
-                {isRunningOrder
-                  ? "Additional KOT Items"
-                  : "KOT Items"}
+                {isRevisedOrder
+                  ? "Updated KOT Items"
+                  : isRunningOrder
+                    ? "Additional KOT Items"
+                    : "KOT Items"}
               </p>
 
               <span className="text-[10px] font-black text-slate-400">
@@ -325,6 +336,21 @@ export default function OrderDetailsModal({
                 ))}
               </div>
             )}
+            {isRevisedOrder && cancelledItems.length > 0 && (
+              <div className="rounded-2xl border border-rose-100 bg-rose-50 p-3 space-y-1">
+                <p className="text-[10px] font-black uppercase tracking-wider text-rose-500">
+                  Cancelled
+                </p>
+                {cancelledItems.map((item, idx) => (
+                  <p
+                    key={item?._id || idx}
+                    className="text-xs font-semibold text-rose-700 line-through"
+                  >
+                    {Number(item?.quantity || 0)} x {item?.name || "Item"}
+                  </p>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* ==================================================
@@ -371,9 +397,11 @@ export default function OrderDetailsModal({
           >
             <Printer size={16} />
 
-            {isRunningOrder
-              ? "Print Running Order KOT"
-              : "Print New Order KOT"}
+            {isRevisedOrder
+              ? "Print Updated KOT"
+              : isRunningOrder
+                ? "Print Running Order KOT"
+                : "Print New Order KOT"}
           </button>
         </div>
       </div>
