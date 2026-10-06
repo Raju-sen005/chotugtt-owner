@@ -9,7 +9,7 @@ import { useAuth } from "../context/AuthContext";
 import {
   ArrowRight,
   Check,
-  ChefHat,
+  // ChefHat,
   CircleCheck,
   Clock3,
   Loader2,
@@ -1022,7 +1022,13 @@ export default function SubscriptionCheckout() {
         <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[var(--primary)] shadow-sm">
-              <ChefHat size={20} strokeWidth={2.25} />
+              {/* <ChefHat size={20} strokeWidth={2.25} /> */}
+               <img
+                src="/ChotuGTT__1_-removebg-preview.png"
+                alt="ChotuGTT Logo"
+                className="h-6 w-6"
+              />
+
             </span>
 
             <div className="min-w-0 leading-tight">

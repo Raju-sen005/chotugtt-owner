@@ -56,7 +56,8 @@ function kitchenLabel(order) {
   const items = activeOrderItems(order);
   if (!items.length) return "ACCEPTED";
   const pendingPrep = items.some(
-    (item) => item.itemReadyStatus !== "READY" && item.itemReadyStatus !== "SERVED",
+    (item) =>
+      item.itemReadyStatus !== "READY" && item.itemReadyStatus !== "SERVED",
   );
   if (pendingPrep) return "PREPARING";
   if (items.some((item) => item.itemReadyStatus === "READY")) return "READY";
@@ -109,11 +110,17 @@ const OrderRow = memo(function OrderRow({
       className={`cursor-pointer transition-colors ${isSelected ? "bg-rose-50/60" : "hover:bg-slate-50"}`}
     >
       <td className="px-4 py-3 whitespace-nowrap">
-        <p className="font-mono text-sm font-black text-rose-500">#{order.orderId}</p>
-        <p className="mt-0.5 text-[11px] text-slate-400">{timeAgo(order.createdAt)}</p>
+        <p className="font-mono text-sm font-black text-rose-500">
+          #{order.orderId}
+        </p>
+        <p className="mt-0.5 text-[11px] text-slate-400">
+          {timeAgo(order.createdAt)}
+        </p>
       </td>
       <td className="px-4 py-3 whitespace-nowrap">
-        <p className="text-xs font-black text-slate-800">{orderPlaceLabel(order)}</p>
+        <p className="text-xs font-black text-slate-800">
+          {orderPlaceLabel(order)}
+        </p>
         <p className="text-[11px] text-slate-400">{orderTypeLabel(order)}</p>
         {hasMergedTables && (
           <p className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-amber-700">
@@ -122,7 +129,9 @@ const OrderRow = memo(function OrderRow({
         )}
       </td>
       <td className="px-4 py-3 whitespace-nowrap">
-        <p className="text-sm font-bold text-slate-800">{order.customerName || "Guest"}</p>
+        <p className="text-sm font-bold text-slate-800">
+          {order.customerName || "Guest"}
+        </p>
         {phone && <p className="text-[11px] text-slate-400">{phone}</p>}
       </td>
       <td className="px-4 py-3">
@@ -136,18 +145,23 @@ const OrderRow = memo(function OrderRow({
             </span>
           ))}
           {extra > 0 && (
-            <span className="text-[11px] font-bold text-slate-400">+{extra} more</span>
+            <span className="text-[11px] font-bold text-slate-400">
+              +{extra} more
+            </span>
           )}
         </div>
         <p className="mt-1 text-[11px] text-slate-400">
-          {activeOrderItems(order).length} item{activeOrderItems(order).length === 1 ? "" : "s"}
+          {activeOrderItems(order).length} item
+          {activeOrderItems(order).length === 1 ? "" : "s"}
         </p>
       </td>
       <td className="px-4 py-3 text-sm font-black text-slate-900 whitespace-nowrap">
         ₹{Number(order.total || 0).toLocaleString("en-IN")}
       </td>
       <td className="px-4 py-3 whitespace-nowrap">
-        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black ${KITCHEN_PILL[label] || "bg-slate-100 text-slate-600"}`}>
+        <span
+          className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black ${KITCHEN_PILL[label] || "bg-slate-100 text-slate-600"}`}
+        >
           {label === "PREPARING" && <Flame size={11} />}
           {label}
         </span>
@@ -197,11 +211,16 @@ const OrderRow = memo(function OrderRow({
                   : "Generate Bill & Clear Table"
               }
             >
-              <Check size={12} /> {hasUnservedItems ? "Serve first" : "Complete"}
+              <Check size={12} />{" "}
+              {hasUnservedItems ? "Serve first" : "Complete"}
             </button>
           )}
           {order.status === "ACCEPTED" && (
-            <ItemReadyShortcuts order={order} onItemReadyStatus={onItemReadyStatus} onCancelItem={onCancelItem} />
+            <ItemReadyShortcuts
+              order={order}
+              onItemReadyStatus={onItemReadyStatus}
+              onCancelItem={onCancelItem}
+            />
           )}
         </div>
       </td>
@@ -211,7 +230,10 @@ const OrderRow = memo(function OrderRow({
 
 function ItemReadyShortcuts({ order, onItemReadyStatus, onCancelItem }) {
   const next = activeOrderItems(order).find(
-    (item) => item?._id && item.itemReadyStatus !== "READY" && item.itemReadyStatus !== "SERVED",
+    (item) =>
+      item?._id &&
+      item.itemReadyStatus !== "READY" &&
+      item.itemReadyStatus !== "SERVED",
   );
   const ready = activeOrderItems(order).find(
     (item) => item?._id && item.itemReadyStatus === "READY",
@@ -229,7 +251,7 @@ function ItemReadyShortcuts({ order, onItemReadyStatus, onCancelItem }) {
       >
         {next ? "Mark ready" : "Mark served"}
       </button>
-      {/* {next && (
+      {next && (
         <button
           type="button"
           onClick={() => onCancelItem(order._id, next._id)}
@@ -237,11 +259,10 @@ function ItemReadyShortcuts({ order, onItemReadyStatus, onCancelItem }) {
         >
           Cancel item
         </button>
-      )} */}
+      )}
     </>
   );
 }
-
 
 // OrderRow — tables scroll poorly on phones, so below the `lg` breakpoint
 // orders render as cards instead of a horizontally-scrolling table.
@@ -539,6 +560,12 @@ export default function LiveOrderMonitor() {
   const [billOrder, setBillOrder] = useState(null);
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState(null);
   const [splitMode, setSplitMode] = useState(false);
+  // ============================================================
+  // OWNER MANUAL BILL DISCOUNT
+  // ============================================================
+
+  const [manualDiscountType, setManualDiscountType] = useState("");
+  const [manualDiscountValue, setManualDiscountValue] = useState("");
   const [splitCollectMethod, setSplitCollectMethod] = useState("CASH");
   const [splitAmount, setSplitAmount] = useState("");
   const [isSplitSubmitting, setIsSplitSubmitting] = useState(false);
@@ -572,6 +599,179 @@ export default function LiveOrderMonitor() {
   };
 
   const apiBase = import.meta.env.VITE_APP_API_BASE;
+  // ============================================================
+  // OWNER MANUAL BILL DISCOUNT
+  // Frontend calculation is ONLY for preview.
+  // Backend remains the final authority.
+  // ============================================================
+
+  const isOwner = user?.role === "OWNER";
+
+  const manualDiscountPreview = useMemo(() => {
+    const baseTotal = Number(billOrder?.total || 0);
+
+    if (!Number.isFinite(baseTotal) || baseTotal <= 0) {
+      return {
+        baseTotal: 0,
+        discountAmount: 0,
+        finalTotal: 0,
+        isValid: false,
+        error: "Invalid bill total.",
+      };
+    }
+
+    // No manual discount selected
+    if (!manualDiscountType) {
+      return {
+        baseTotal,
+        discountAmount: 0,
+        finalTotal: Number(baseTotal.toFixed(2)),
+        isValid: true,
+        error: "",
+      };
+    }
+
+    const value = Number(manualDiscountValue);
+
+    if (!Number.isFinite(value) || value < 0) {
+      return {
+        baseTotal,
+        discountAmount: 0,
+        finalTotal: baseTotal,
+        isValid: false,
+        error: "Enter a valid non-negative discount.",
+      };
+    }
+
+    // Percentage
+    if (manualDiscountType === "PERCENTAGE") {
+      if (value > 100) {
+        return {
+          baseTotal,
+          discountAmount: 0,
+          finalTotal: baseTotal,
+          isValid: false,
+          error: "Percentage discount cannot exceed 100%.",
+        };
+      }
+
+      const discountAmount = Number(((baseTotal * value) / 100).toFixed(2));
+
+      const finalTotal = Number((baseTotal - discountAmount).toFixed(2));
+
+      if (finalTotal <= 0) {
+        return {
+          baseTotal,
+          discountAmount,
+          finalTotal,
+          isValid: false,
+          error: "Discount cannot make the final bill total zero.",
+        };
+      }
+
+      return {
+        baseTotal,
+        discountAmount,
+        finalTotal,
+        isValid: true,
+        error: "",
+      };
+    }
+
+    // Flat
+    if (manualDiscountType === "FLAT") {
+      if (value > baseTotal) {
+        return {
+          baseTotal,
+          discountAmount: 0,
+          finalTotal: baseTotal,
+          isValid: false,
+          error: "Flat discount cannot exceed the bill total.",
+        };
+      }
+
+      const discountAmount = Number(value.toFixed(2));
+
+      const finalTotal = Number((baseTotal - discountAmount).toFixed(2));
+
+      if (finalTotal <= 0) {
+        return {
+          baseTotal,
+          discountAmount,
+          finalTotal,
+          isValid: false,
+          error: "Discount cannot make the final bill total zero.",
+        };
+      }
+
+      return {
+        baseTotal,
+        discountAmount,
+        finalTotal,
+        isValid: true,
+        error: "",
+      };
+    }
+
+    return {
+      baseTotal,
+      discountAmount: 0,
+      finalTotal: baseTotal,
+      isValid: false,
+      error: "Invalid discount type.",
+    };
+  }, [billOrder?.total, manualDiscountType, manualDiscountValue]);
+
+  useEffect(() => {
+    if (
+      selectedPaymentMethod !== "MIXED" ||
+      !billOrder ||
+      !manualDiscountPreview.isValid
+    ) {
+      return;
+    }
+
+    const finalTotal = Number(manualDiscountPreview.finalTotal || 0);
+
+    if (!Number.isFinite(finalTotal) || finalTotal <= 0) {
+      setMixedCashAmount("");
+      setMixedUpiAmount("");
+      return;
+    }
+
+    // If current payment split is empty, initialize 50/50.
+    if (!mixedCashAmount && !mixedUpiAmount) {
+      const half = (finalTotal / 2).toFixed(2);
+
+      setMixedCashAmount(half);
+      setMixedUpiAmount((finalTotal - Number(half)).toFixed(2));
+
+      return;
+    }
+
+    const currentCash = Number(mixedCashAmount);
+
+    if (
+      !Number.isFinite(currentCash) ||
+      currentCash < 0 ||
+      currentCash > finalTotal
+    ) {
+      const half = (finalTotal / 2).toFixed(2);
+
+      setMixedCashAmount(half);
+      setMixedUpiAmount((finalTotal - Number(half)).toFixed(2));
+
+      return;
+    }
+
+    setMixedUpiAmount(Math.max(0, finalTotal - currentCash).toFixed(2));
+  }, [
+    selectedPaymentMethod,
+    billOrder,
+    manualDiscountPreview.finalTotal,
+    manualDiscountPreview.isValid,
+  ]);
+
   const showSuccess = useCallback((message) => {
     setSuccessMessage(message);
     setShowSuccessPopup(true);
@@ -615,7 +815,11 @@ export default function LiveOrderMonitor() {
       }
 
       const normalizedKotType =
-        kotType === "REVISED" ? "REVISED" : kotType === "RUNNING" ? "RUNNING" : "NEW";
+        kotType === "REVISED"
+          ? "REVISED"
+          : kotType === "RUNNING"
+            ? "RUNNING"
+            : "NEW";
 
       const activeItems = items.filter(
         (item) => item && item.status !== "REJECTED",
@@ -1478,7 +1682,8 @@ export default function LiveOrderMonitor() {
   const visibleOrders = useMemo(() => {
     const query = listSearch.trim().toLowerCase();
     return orders.filter((order) => {
-      if (listFilter === "READY" && kitchenLabel(order) !== "READY") return false;
+      if (listFilter === "READY" && kitchenLabel(order) !== "READY")
+        return false;
       if (
         listFilter !== "ALL" &&
         listFilter !== "READY" &&
@@ -1503,7 +1708,10 @@ export default function LiveOrderMonitor() {
 
   const indexOfLastOrder = currentPage * itemsPerPage;
   const indexOfFirstOrder = indexOfLastOrder - itemsPerPage;
-  const currentOrders = visibleOrders.slice(indexOfFirstOrder, indexOfLastOrder);
+  const currentOrders = visibleOrders.slice(
+    indexOfFirstOrder,
+    indexOfLastOrder,
+  );
   const totalPages = Math.ceil(visibleOrders.length / itemsPerPage);
   const detailOrder = detailClosed
     ? null
@@ -1512,14 +1720,11 @@ export default function LiveOrderMonitor() {
       visibleOrders[0] ||
       null;
 
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [listFilter, listSearch]);
-
   const kitchenCounts = useMemo(() => {
     return {
       total: orders.length,
-      preparing: orders.filter((order) => kitchenLabel(order) === "PREPARING").length,
+      preparing: orders.filter((order) => kitchenLabel(order) === "PREPARING")
+        .length,
       ready: orders.filter((order) => kitchenLabel(order) === "READY").length,
       completed: orders.filter((order) => order.status === "COMPLETED").length,
       rejected: orders.filter((order) => order.status === "REJECTED").length,
@@ -1670,6 +1875,42 @@ export default function LiveOrderMonitor() {
       setCurrentPage(1);
     };
 
+    const handleItemReadyStatusUpdated = (payload) => {
+      const orderId = payload?.orderId;
+      const itemId = payload?.itemId;
+
+      if (!orderId || !itemId) {
+        return;
+      }
+
+      queryClient.setQueryData(
+        ["live-orders", restaurantId],
+        (oldOrders = []) =>
+          oldOrders.map((order) => {
+            if (String(order?._id) !== String(orderId)) {
+              return order;
+            }
+
+            return {
+              ...order,
+              items: (order.items || []).map((item) =>
+                String(item?._id) === String(itemId)
+                  ? {
+                      ...item,
+                      itemReadyStatus:
+                        payload.itemReadyStatus || item.itemReadyStatus,
+                      readyAt: payload.readyAt ?? item.readyAt ?? null,
+                      readyBy: payload.readyBy ?? item.readyBy ?? null,
+                      servedAt: payload.servedAt ?? item.servedAt ?? null,
+                      servedBy: payload.servedBy ?? item.servedBy ?? null,
+                    }
+                  : item,
+              ),
+            };
+          }),
+      );
+    };
+
     // ==========================================
     // SOCKET LISTENERS
     // ==========================================
@@ -1707,43 +1948,6 @@ export default function LiveOrderMonitor() {
       socket.io.off("reconnect", handleReconnect);
     };
   }, [socket, restaurantId, queryClient]);
-
-  // ==========================================
-  // ITEM READY / SERVED UPDATE
-  // ==========================================
-  const handleItemReadyStatusUpdated = (payload) => {
-    const orderId = payload?.orderId;
-    const itemId = payload?.itemId;
-
-    if (!orderId || !itemId) {
-      return;
-    }
-
-    queryClient.setQueryData(["live-orders", restaurantId], (oldOrders = []) =>
-      oldOrders.map((order) => {
-        if (String(order?._id) !== String(orderId)) {
-          return order;
-        }
-
-        return {
-          ...order,
-          items: (order.items || []).map((item) =>
-            String(item?._id) === String(itemId)
-              ? {
-                  ...item,
-                  itemReadyStatus:
-                    payload.itemReadyStatus || item.itemReadyStatus,
-                  readyAt: payload.readyAt ?? item.readyAt ?? null,
-                  readyBy: payload.readyBy ?? item.readyBy ?? null,
-                  servedAt: payload.servedAt ?? item.servedAt ?? null,
-                  servedBy: payload.servedBy ?? item.servedBy ?? null,
-                }
-              : item,
-          ),
-        };
-      }),
-    );
-  };
 
   // ==========================================================
   // ITEM READY / SERVED STATUS
@@ -2084,7 +2288,7 @@ export default function LiveOrderMonitor() {
   }, [socket, restaurantId, apiBase]);
 
   const initializeMixedPayment = useCallback(() => {
-    const total = Number(billOrder?.total || 0);
+    const total = Number(manualDiscountPreview.finalTotal || 0);
 
     if (!Number.isFinite(total) || total <= 0) {
       setMixedCashAmount("");
@@ -2092,11 +2296,12 @@ export default function LiveOrderMonitor() {
       return;
     }
 
-    const half = (total / 2).toFixed(2);
+    const cash = Math.floor((total / 2) * 100) / 100;
+    const upi = Number((total - cash).toFixed(2));
 
-    setMixedCashAmount(half);
-    setMixedUpiAmount(half);
-  }, [billOrder]);
+    setMixedCashAmount(cash.toFixed(2));
+    setMixedUpiAmount(upi.toFixed(2));
+  }, [manualDiscountPreview.finalTotal]);
 
   // Bill & WhatsApp clear table handler added from TableMonitor
   const handleBillAndWhatsApp = useCallback((order) => {
@@ -2108,39 +2313,93 @@ export default function LiveOrderMonitor() {
     setSplitMode(false);
     setSplitCollectMethod("CASH");
     setSplitAmount("");
+    setIsSplitSubmitting(false);
 
-    // Mixed payment state
+    // Existing mixed payment state
     setMixedCashAmount("");
     setMixedUpiAmount("");
     setIsMixedSubmitting(false);
+
+    // Manual owner discount
+    setManualDiscountType("");
+    setManualDiscountValue("");
   }, []);
 
   const confirmSplitBill = useCallback(async () => {
     if (!billOrder) return;
 
-    const total = Number(billOrder.total || 0);
+    if (isSplitSubmitting) return;
+
+    const finalTotal = Number(manualDiscountPreview.finalTotal || 0);
+
     const amount = Number(splitAmount);
+
+    // ------------------------------------------------------------
+    // BILL VALIDATION
+    // ------------------------------------------------------------
+
+    if (!Number.isFinite(finalTotal) || finalTotal <= 0) {
+      showError("Invalid final bill total.");
+      return;
+    }
+
+    // ------------------------------------------------------------
+    // DISCOUNT VALIDATION
+    // ------------------------------------------------------------
+
+    if (manualDiscountType) {
+      if (!isOwner) {
+        showError(
+          "Only the restaurant owner can apply a manual bill discount.",
+        );
+        return;
+      }
+
+      if (
+        manualDiscountValue === "" ||
+        manualDiscountValue === null ||
+        manualDiscountValue === undefined
+      ) {
+        showError("Please enter a discount value.");
+        return;
+      }
+
+      if (!manualDiscountPreview.isValid) {
+        showError(manualDiscountPreview.error);
+        return;
+      }
+    }
+
+    // ------------------------------------------------------------
+    // SPLIT PAYMENT VALIDATION
+    // ------------------------------------------------------------
 
     if (!Number.isFinite(amount) || amount <= 0) {
       showError("Enter a valid amount to collect now.");
       return;
     }
 
-    if (amount >= total) {
+    if (amount >= finalTotal) {
       showError("Split amount must be less than the total bill.");
       return;
     }
 
-    if (isSplitSubmitting) return;
     setIsSplitSubmitting(true);
 
     try {
+      const payload = {
+        paymentMethod: splitCollectMethod,
+        paidAmount: Number(amount.toFixed(2)),
+      };
+
+      if (isOwner && manualDiscountType) {
+        payload.manualDiscountType = manualDiscountType;
+        payload.manualDiscountValue = Number(manualDiscountValue);
+      }
+
       const res = await axios.patch(
         `${apiBase}/orders/${billOrder._id}/split-complete`,
-        {
-          paymentMethod: splitCollectMethod,
-          paidAmount: amount,
-        },
+        payload,
         {
           withCredentials: true,
           headers: {
@@ -2150,34 +2409,86 @@ export default function LiveOrderMonitor() {
       );
 
       const completedOrder = res.data?.data;
+
+      if (!completedOrder?._id) {
+        throw new Error(
+          "Split payment processed but bill data was not returned.",
+        );
+      }
+
       const billedId = billOrder._id;
+
+      // ------------------------------------------------------------
+      // RESET
+      // ------------------------------------------------------------
 
       setBillOrder(null);
       setSelectedPaymentMethod(null);
+
       setSplitMode(false);
       setSplitAmount("");
 
-      await printBillReceipt(completedOrder || billOrder);
+      setManualDiscountType("");
+      setManualDiscountValue("");
+
+      // ------------------------------------------------------------
+      // PRINT
+      // ------------------------------------------------------------
+
+      await printBillReceipt(completedOrder);
+
+      // ------------------------------------------------------------
+      // REMOVE FROM LIVE ORDERS
+      // ------------------------------------------------------------
 
       queryClient.setQueryData(["live-orders", restaurantId], (prev) =>
-        (prev || []).filter((o) => o._id !== billedId),
+        (prev || []).filter((o) => String(o?._id) !== String(billedId)),
       );
+
+      // ------------------------------------------------------------
+      // EXISTING INVALIDATIONS
+      // ------------------------------------------------------------
 
       queryClient.invalidateQueries({
         queryKey: ["table-status", restaurantId],
       });
-      queryClient.invalidateQueries({ queryKey: ["table-monitor-orders"] });
-      queryClient.invalidateQueries({ queryKey: ["bills"] });
-      queryClient.invalidateQueries({ queryKey: ["bills-prev"] });
+
+      queryClient.invalidateQueries({
+        queryKey: ["table-monitor-orders"],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["bills"],
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: ["bills-prev"],
+      });
+
+      const paid = Number(completedOrder.paidAmount ?? amount);
+
+      const due = Number(
+        completedOrder.dueAmount ??
+          Math.max(0, Number(completedOrder.total || finalTotal) - paid),
+      );
+
+      const discountMessage =
+        completedOrder.manualDiscount > 0
+          ? ` ₹${Number(completedOrder.manualDiscount).toFixed(
+              2,
+            )} discount applied.`
+          : "";
 
       showSuccess(
-        `₹${amount.toFixed(2)} collected via ${splitCollectMethod}. Remaining ₹${(total - amount).toFixed(2)} saved as Due.`,
+        `₹${paid.toFixed(2)} collected via ${splitCollectMethod}. Remaining ₹${due.toFixed(2)} saved as Due.${discountMessage}`,
       );
     } catch (err) {
       console.error("Failed to split bill:", err);
+
       showError(
         err.response?.data?.message || "Failed to process split payment.",
       );
+
       queryClient.invalidateQueries({
         queryKey: ["live-orders", restaurantId],
       });
@@ -2195,6 +2506,10 @@ export default function LiveOrderMonitor() {
     restaurantId,
     showSuccess,
     showError,
+    isOwner,
+    manualDiscountType,
+    manualDiscountValue,
+    manualDiscountPreview,
   ]);
 
   const confirmMixedPayment = useCallback(async () => {
@@ -2202,14 +2517,50 @@ export default function LiveOrderMonitor() {
 
     if (isMixedSubmitting) return;
 
-    const total = Number(billOrder.total || 0);
+    const finalTotal = Number(manualDiscountPreview.finalTotal || 0);
+
     const cash = Number(mixedCashAmount);
     const upi = Number(mixedUpiAmount);
 
-    if (!Number.isFinite(total) || total <= 0) {
-      showError("Invalid bill total.");
+    // ------------------------------------------------------------
+    // BILL VALIDATION
+    // ------------------------------------------------------------
+
+    if (!Number.isFinite(finalTotal) || finalTotal <= 0) {
+      showError("Invalid final bill total.");
       return;
     }
+
+    // ------------------------------------------------------------
+    // DISCOUNT VALIDATION
+    // ------------------------------------------------------------
+
+    if (manualDiscountType) {
+      if (!isOwner) {
+        showError(
+          "Only the restaurant owner can apply a manual bill discount.",
+        );
+        return;
+      }
+
+      if (
+        manualDiscountValue === "" ||
+        manualDiscountValue === null ||
+        manualDiscountValue === undefined
+      ) {
+        showError("Please enter a discount value.");
+        return;
+      }
+
+      if (!manualDiscountPreview.isValid) {
+        showError(manualDiscountPreview.error);
+        return;
+      }
+    }
+
+    // ------------------------------------------------------------
+    // PAYMENT VALIDATION
+    // ------------------------------------------------------------
 
     if (!Number.isFinite(cash) || !Number.isFinite(upi)) {
       showError("Enter valid Cash and UPI amounts.");
@@ -2223,20 +2574,27 @@ export default function LiveOrderMonitor() {
 
     const collected = Number((cash + upi).toFixed(2));
 
-    if (collected !== Number(total.toFixed(2))) {
-      showError(`Cash + UPI must exactly equal ₹${total.toFixed(2)}.`);
+    if (collected !== Number(finalTotal.toFixed(2))) {
+      showError(`Cash + UPI must exactly equal ₹${finalTotal.toFixed(2)}.`);
       return;
     }
 
     setIsMixedSubmitting(true);
 
     try {
+      const payload = {
+        cashAmount: Number(cash.toFixed(2)),
+        upiAmount: Number(upi.toFixed(2)),
+      };
+
+      if (isOwner && manualDiscountType) {
+        payload.manualDiscountType = manualDiscountType;
+        payload.manualDiscountValue = Number(manualDiscountValue);
+      }
+
       const res = await axios.patch(
         `${apiBase}/orders/${billOrder._id}/mixed-payment`,
-        {
-          cashAmount: Number(cash.toFixed(2)),
-          upiAmount: Number(upi.toFixed(2)),
-        },
+        payload,
         {
           withCredentials: true,
           headers: {
@@ -2247,28 +2605,46 @@ export default function LiveOrderMonitor() {
 
       const completedOrder = res.data?.data;
 
-      if (!completedOrder) {
+      if (!completedOrder?._id) {
         throw new Error("Payment completed but bill data was not returned.");
       }
 
       const billedId = billOrder._id;
 
+      // ------------------------------------------------------------
+      // RESET
+      // ------------------------------------------------------------
+
       setBillOrder(null);
       setSelectedPaymentMethod(null);
+
       setSplitMode(false);
       setSplitAmount("");
+
       setMixedCashAmount("");
       setMixedUpiAmount("");
 
-      // Print ONLY after server confirms payment.
+      setManualDiscountType("");
+      setManualDiscountValue("");
+
+      // ------------------------------------------------------------
+      // PRINT SERVER CONFIRMED BILL
+      // ------------------------------------------------------------
+
       await printBillReceipt(completedOrder);
 
-      // Remove from local live orders immediately.
+      // ------------------------------------------------------------
+      // REMOVE LIVE ORDER
+      // ------------------------------------------------------------
+
       queryClient.setQueryData(["live-orders", restaurantId], (prev) =>
-        (prev || []).filter((o) => o._id !== billedId),
+        (prev || []).filter((o) => String(o?._id) !== String(billedId)),
       );
 
-      // Refresh related data.
+      // ------------------------------------------------------------
+      // REFRESH EXISTING DATA
+      // ------------------------------------------------------------
+
       queryClient.invalidateQueries({
         queryKey: ["table-status", restaurantId],
       });
@@ -2285,10 +2661,17 @@ export default function LiveOrderMonitor() {
         queryKey: ["bills-prev"],
       });
 
+      const discountMessage =
+        completedOrder.manualDiscount > 0
+          ? ` ₹${Number(completedOrder.manualDiscount).toFixed(
+              2,
+            )} discount applied.`
+          : "";
+
       showSuccess(
-        `₹${cash.toFixed(2)} Cash + ₹${upi.toFixed(
+        `₹${Number(cash).toFixed(2)} Cash + ₹${Number(upi).toFixed(
           2,
-        )} UPI collected successfully.`,
+        )} UPI collected successfully.${discountMessage}`,
       );
     } catch (err) {
       console.error("Failed to process mixed payment:", err);
@@ -2297,7 +2680,6 @@ export default function LiveOrderMonitor() {
         err.response?.data?.message || "Failed to process mixed payment.",
       );
 
-      // Re-sync live state from server.
       queryClient.invalidateQueries({
         queryKey: ["live-orders", restaurantId],
       });
@@ -2315,7 +2697,69 @@ export default function LiveOrderMonitor() {
     restaurantId,
     showSuccess,
     showError,
+    isOwner,
+    manualDiscountType,
+    manualDiscountValue,
+    manualDiscountPreview,
   ]);
+
+  useEffect(() => {
+    if (selectedPaymentMethod !== "MIXED") return;
+
+    const total = Number(manualDiscountPreview.finalTotal || 0);
+
+    if (!Number.isFinite(total) || total <= 0) {
+      setMixedCashAmount("");
+      setMixedUpiAmount("");
+      return;
+    }
+
+    const cash = Number(mixedCashAmount);
+    const upi = Number(mixedUpiAmount);
+
+    const currentTotal =
+      Number.isFinite(cash) && Number.isFinite(upi)
+        ? Number((cash + upi).toFixed(2))
+        : 0;
+
+    // Existing payment distribution is still valid.
+    if (cash > 0 && upi > 0 && Math.abs(currentTotal - total) < 0.01) {
+      return;
+    }
+
+    const half = Math.floor((total / 2) * 100) / 100;
+    const remaining = Number((total - half).toFixed(2));
+
+    setMixedCashAmount(half.toFixed(2));
+    setMixedUpiAmount(remaining.toFixed(2));
+  }, [selectedPaymentMethod, manualDiscountPreview.finalTotal]);
+
+  useEffect(() => {
+    if (selectedPaymentMethod !== "SPLIT") return;
+
+    const total = Number(manualDiscountPreview.finalTotal || 0);
+
+    if (!Number.isFinite(total) || total <= 0) {
+      setSplitAmount("");
+      return;
+    }
+
+    const current = Number(splitAmount);
+
+    // User's current split amount is still valid.
+    if (Number.isFinite(current) && current > 0 && current < total) {
+      return;
+    }
+
+    // Default to half of final discounted total.
+    const half = Math.floor((total / 2) * 100) / 100;
+
+    if (half > 0 && half < total) {
+      setSplitAmount(half.toFixed(2));
+    } else {
+      setSplitAmount("");
+    }
+  }, [selectedPaymentMethod, manualDiscountPreview.finalTotal]);
 
   const confirmGenerateBill = useCallback(async () => {
     if (!billOrder || !selectedPaymentMethod) {
@@ -2323,20 +2767,65 @@ export default function LiveOrderMonitor() {
       return;
     }
 
+    // Mixed payment has its own complete handler.
     if (selectedPaymentMethod === "MIXED") {
       await confirmMixedPayment();
       return;
     }
+
+    // Split payment has its own complete handler.
+    if (selectedPaymentMethod === "SPLIT") {
+      await confirmSplitBill();
+      return;
+    }
+
     if (isGeneratingBill) return;
+
+    // ------------------------------------------------------------
+    // MANUAL DISCOUNT VALIDATION
+    // ------------------------------------------------------------
+
+    if (manualDiscountType) {
+      if (!isOwner) {
+        showError(
+          "Only the restaurant owner can apply a manual bill discount.",
+        );
+        return;
+      }
+
+      if (
+        manualDiscountValue === "" ||
+        manualDiscountValue === null ||
+        manualDiscountValue === undefined
+      ) {
+        showError("Please enter a discount value.");
+        return;
+      }
+
+      if (!manualDiscountPreview.isValid) {
+        showError(manualDiscountPreview.error);
+        return;
+      }
+    }
 
     setIsGeneratingBill(true);
 
     try {
+      const payload = {
+        paymentMethod: selectedPaymentMethod,
+      };
+
+      // IMPORTANT:
+      // Never send finalTotal from frontend.
+      // Backend calculates the authoritative final total.
+      if (isOwner && manualDiscountType) {
+        payload.manualDiscountType = manualDiscountType;
+        payload.manualDiscountValue = Number(manualDiscountValue);
+      }
+
       const res = await axios.patch(
         `${apiBase}/orders/${billOrder._id}/complete`,
-        {
-          paymentMethod: selectedPaymentMethod,
-        },
+        payload,
         {
           withCredentials: true,
           headers: {
@@ -2346,21 +2835,50 @@ export default function LiveOrderMonitor() {
       );
 
       const completedOrder = res.data?.data;
+
+      if (!completedOrder?._id) {
+        throw new Error(
+          "Bill was processed but updated order data was not returned.",
+        );
+      }
+
       const billedId = billOrder._id;
       const paymentLabel = selectedPaymentMethod;
+
+      // ------------------------------------------------------------
+      // RESET MODAL
+      // ------------------------------------------------------------
 
       setBillOrder(null);
       setSelectedPaymentMethod(null);
 
-      // Print bill with payment information
-      await printBillReceipt(completedOrder || billOrder);
+      setManualDiscountType("");
+      setManualDiscountValue("");
 
-      // Remove completed order from live monitor
+      setSplitMode(false);
+      setSplitAmount("");
+
+      setMixedCashAmount("");
+      setMixedUpiAmount("");
+
+      // ------------------------------------------------------------
+      // PRINT SERVER-CONFIRMED BILL
+      // ------------------------------------------------------------
+
+      await printBillReceipt(completedOrder);
+
+      // ------------------------------------------------------------
+      // OPTIMISTIC LIVE ORDER REMOVE
+      // ------------------------------------------------------------
+
       queryClient.setQueryData(["live-orders", restaurantId], (prev) =>
-        (prev || []).filter((o) => o._id !== billedId),
+        (prev || []).filter((o) => String(o?._id) !== String(billedId)),
       );
 
-      // Refresh table status
+      // ------------------------------------------------------------
+      // EXISTING INVALIDATIONS
+      // ------------------------------------------------------------
+
       queryClient.invalidateQueries({
         queryKey: ["table-status", restaurantId],
       });
@@ -2369,7 +2887,6 @@ export default function LiveOrderMonitor() {
         queryKey: ["table-monitor-orders"],
       });
 
-      // Refresh payment page data if cached
       queryClient.invalidateQueries({
         queryKey: ["bills"],
       });
@@ -2378,10 +2895,17 @@ export default function LiveOrderMonitor() {
         queryKey: ["bills-prev"],
       });
 
+      const discountMessage =
+        completedOrder.manualDiscount > 0
+          ? ` ₹${Number(completedOrder.manualDiscount).toFixed(
+              2,
+            )} discount applied.`
+          : "";
+
       showSuccess(
         paymentLabel === "DUE"
-          ? "Bill generated and marked as Due"
-          : `Bill generated via ${paymentLabel}`,
+          ? `Bill generated and marked as Due.${discountMessage}`
+          : `Bill generated via ${paymentLabel}.${discountMessage}`,
       );
     } catch (err) {
       console.error("Failed to complete order:", err);
@@ -2395,18 +2919,22 @@ export default function LiveOrderMonitor() {
       setIsGeneratingBill(false);
     }
   }, [
-    restaurantId,
     billOrder,
     selectedPaymentMethod,
     isGeneratingBill,
     apiBase,
     printBillReceipt,
     queryClient,
+    restaurantId,
     showSuccess,
     showError,
     confirmMixedPayment,
+    confirmSplitBill,
+    isOwner,
+    manualDiscountType,
+    manualDiscountValue,
+    manualDiscountPreview,
   ]);
-
   const handleView = useCallback(
     async (order) => {
       if (!order?._id) {
@@ -2653,18 +3181,178 @@ export default function LiveOrderMonitor() {
                     </div>
 
                     {/* Amount */}
-                    <div className="border-t border-slate-200 mt-4 pt-4 flex justify-between items-center">
-                      <span className="text-xs font-bold text-slate-500">
+                    <div>
+                      <p className="text-xs font-semibold text-slate-500">
                         Amount Payable
-                      </span>
+                      </p>
 
-                      <span className="text-xl font-black text-slate-900 font-mono">
-                        ₹{Number(billOrder.total || 0).toLocaleString("en-IN")}
-                      </span>
+                      <p className="mt-1 text-2xl font-black text-slate-950">
+                        ₹
+                        {Number(manualDiscountPreview.finalTotal || 0).toFixed(
+                          2,
+                        )}
+                      </p>
+
+                      {manualDiscountPreview.discountAmount > 0 && (
+                        <p className="mt-1 text-[11px] font-bold text-rose-600">
+                          ₹{manualDiscountPreview.discountAmount.toFixed(2)}{" "}
+                          owner discount applied
+                        </p>
+                      )}
                     </div>
                   </div>
                 </div>
 
+                {/* =======================================================
+    OWNER MANUAL DISCOUNT
+======================================================== */}
+                {isOwner && (
+                  <div className="px-5 pt-5 sm:px-6">
+                    <div className="rounded-2xl border border-rose-100 bg-rose-50/50 p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-black text-slate-900">
+                            Owner Discount
+                          </p>
+
+                          <p className="mt-0.5 text-[11px] font-medium text-slate-500">
+                            Apply an additional discount on the final bill.
+                          </p>
+                        </div>
+
+                        {manualDiscountPreview.discountAmount > 0 && (
+                          <span className="rounded-full bg-rose-100 px-2.5 py-1 text-[10px] font-black text-rose-700">
+                            Discount Applied
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[140px_1fr]">
+                        {/* Discount Type */}
+                        <div className="grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-white p-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setManualDiscountType("PERCENTAGE");
+                              setManualDiscountValue("");
+                            }}
+                            className={`rounded-lg px-3 py-2.5 text-xs font-black transition ${
+                              manualDiscountType === "PERCENTAGE"
+                                ? "bg-rose-500 text-white shadow-sm"
+                                : "text-slate-500 hover:bg-slate-50"
+                            }`}
+                          >
+                            %
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setManualDiscountType("FLAT");
+                              setManualDiscountValue("");
+                            }}
+                            className={`rounded-lg px-3 py-2.5 text-xs font-black transition ${
+                              manualDiscountType === "FLAT"
+                                ? "bg-rose-500 text-white shadow-sm"
+                                : "text-slate-500 hover:bg-slate-50"
+                            }`}
+                          >
+                            ₹
+                          </button>
+                        </div>
+
+                        {/* Discount Value */}
+                        <div className="relative">
+                          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">
+                            {manualDiscountType === "PERCENTAGE" ? "%" : "₹"}
+                          </span>
+
+                          <input
+                            type="number"
+                            min="0"
+                            max={
+                              manualDiscountType === "PERCENTAGE"
+                                ? 100
+                                : manualDiscountPreview.baseTotal || undefined
+                            }
+                            step="0.01"
+                            value={manualDiscountValue}
+                            onChange={(event) => {
+                              const value = event.target.value;
+
+                              if (value === "") {
+                                setManualDiscountValue("");
+                                return;
+                              }
+
+                              if (!/^\d*\.?\d{0,2}$/.test(value)) {
+                                return;
+                              }
+
+                              setManualDiscountValue(value);
+                            }}
+                            disabled={!manualDiscountType}
+                            placeholder={
+                              manualDiscountType
+                                ? manualDiscountType === "PERCENTAGE"
+                                  ? "Enter percentage"
+                                  : "Enter amount"
+                                : "Select % or ₹ first"
+                            }
+                            className={`h-11 w-full rounded-xl border bg-white pl-9 pr-3 text-sm font-bold text-slate-900 outline-none transition ${
+                              manualDiscountPreview.isValid
+                                ? "border-slate-200 focus:border-rose-400 focus:ring-4 focus:ring-rose-100"
+                                : "border-rose-300 focus:border-rose-500 focus:ring-4 focus:ring-rose-100"
+                            } disabled:cursor-not-allowed disabled:bg-slate-100`}
+                          />
+                        </div>
+                      </div>
+
+                      {manualDiscountType && (
+                        <div className="mt-4 rounded-xl border border-slate-200 bg-white">
+                          <div className="flex items-center justify-between border-b border-slate-100 px-3.5 py-2.5">
+                            <span className="text-xs font-semibold text-slate-500">
+                              Current Bill
+                            </span>
+
+                            <span className="text-sm font-black text-slate-800">
+                              ₹{manualDiscountPreview.baseTotal.toFixed(2)}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between border-b border-slate-100 px-3.5 py-2.5">
+                            <span className="text-xs font-semibold text-slate-500">
+                              Owner Discount
+                            </span>
+
+                            <span className="text-sm font-black text-rose-600">
+                              - ₹
+                              {manualDiscountPreview.discountAmount.toFixed(2)}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center justify-between px-3.5 py-3">
+                            <span className="text-xs font-black text-slate-700">
+                              Final Payable
+                            </span>
+
+                            <span className="text-lg font-black text-slate-950">
+                              ₹{manualDiscountPreview.finalTotal.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {!manualDiscountPreview.isValid &&
+                        manualDiscountType &&
+                        manualDiscountValue !== "" && (
+                          <p className="mt-2 text-[11px] font-bold text-rose-600">
+                            {manualDiscountPreview.error}
+                          </p>
+                        )}
+                    </div>
+                  </div>
+                )}
                 {/* =======================================================
               PAYMENT METHODS
           ======================================================== */}
@@ -2683,23 +3371,27 @@ export default function LiveOrderMonitor() {
                       onClick={() => {
                         setSplitMode(false);
 
-                        if (
-                          selectedPaymentMethod === "UPI" ||
-                          selectedPaymentMethod === "MIXED"
-                        ) {
-                          setSelectedPaymentMethod("MIXED");
-
-                          const total = Number(billOrder?.total || 0);
-
-                          if (total > 0) {
-                            const half = (total / 2).toFixed(2);
-
-                            setMixedCashAmount(half);
-                            setMixedUpiAmount(half);
-                          }
-                        } else {
-                          setSelectedPaymentMethod("CASH");
+                        // CASH already selected → unselect
+                        if (selectedPaymentMethod === "CASH") {
+                          setSelectedPaymentMethod(null);
+                          return;
                         }
+
+                        // UPI already selected → CASH + UPI
+                        if (selectedPaymentMethod === "UPI") {
+                          setSelectedPaymentMethod("MIXED");
+                          initializeMixedPayment();
+                          return;
+                        }
+
+                        // MIXED → remove CASH, keep UPI
+                        if (selectedPaymentMethod === "MIXED") {
+                          setSelectedPaymentMethod("UPI");
+                          return;
+                        }
+
+                        // DUE / SPLIT / nothing → CASH
+                        setSelectedPaymentMethod("CASH");
                       }}
                       className={`
                   p-2 rounded-2xl border-2 transition-all
@@ -2726,23 +3418,27 @@ export default function LiveOrderMonitor() {
                       onClick={() => {
                         setSplitMode(false);
 
-                        if (
-                          selectedPaymentMethod === "CASH" ||
-                          selectedPaymentMethod === "MIXED"
-                        ) {
-                          setSelectedPaymentMethod("MIXED");
-
-                          const total = Number(billOrder?.total || 0);
-
-                          if (total > 0) {
-                            const half = (total / 2).toFixed(2);
-
-                            setMixedCashAmount(half);
-                            setMixedUpiAmount(half);
-                          }
-                        } else {
-                          setSelectedPaymentMethod("UPI");
+                        // UPI already selected → unselect
+                        if (selectedPaymentMethod === "UPI") {
+                          setSelectedPaymentMethod(null);
+                          return;
                         }
+
+                        // CASH already selected → CASH + UPI
+                        if (selectedPaymentMethod === "CASH") {
+                          setSelectedPaymentMethod("MIXED");
+                          initializeMixedPayment();
+                          return;
+                        }
+
+                        // MIXED → remove UPI, keep CASH
+                        if (selectedPaymentMethod === "MIXED") {
+                          setSelectedPaymentMethod("CASH");
+                          return;
+                        }
+
+                        // DUE / SPLIT / nothing → UPI
+                        setSelectedPaymentMethod("UPI");
                       }}
                       className={`
                   p-2 rounded-2xl border-2 transition-all
@@ -2797,8 +3493,11 @@ export default function LiveOrderMonitor() {
                         setSplitMode(true);
 
                         setSplitAmount(
-                          billOrder
-                            ? (Number(billOrder.total || 0) / 2).toFixed(2)
+                          manualDiscountPreview.isValid
+                            ? (
+                                Number(manualDiscountPreview.finalTotal || 0) /
+                                2
+                              ).toFixed(2)
                             : "",
                         );
                       }}
@@ -2830,7 +3529,9 @@ export default function LiveOrderMonitor() {
 
                         <p className="text-xs text-amber-700 font-semibold leading-relaxed">
                           ₹
-                          {Number(billOrder.total || 0).toLocaleString("en-IN")}{" "}
+                          {Number(
+                            manualDiscountPreview.finalTotal || 0,
+                          ).toLocaleString("en-IN")}{" "}
                           will be recorded as customer due.
                         </p>
                       </div>
@@ -2866,7 +3567,12 @@ export default function LiveOrderMonitor() {
                         </span>
 
                         <span className="text-base font-black text-slate-900">
-                          ₹{Number(billOrder?.total || 0).toFixed(2)}
+                          ₹
+                          {Number(
+                            manualDiscountPreview.finalTotal ||
+                              billOrder?.total ||
+                              0,
+                          ).toFixed(2)}
                         </span>
                       </div>
 
@@ -2892,7 +3598,9 @@ export default function LiveOrderMonitor() {
 
                               setMixedCashAmount(value);
 
-                              const total = Number(billOrder?.total || 0);
+                              const total = Number(
+                                manualDiscountPreview.finalTotal || 0,
+                              );
                               const cash = Number(value);
 
                               if (
@@ -2949,7 +3657,9 @@ export default function LiveOrderMonitor() {
 
                               setMixedUpiAmount(value);
 
-                              const total = Number(billOrder?.total || 0);
+                              const total = Number(
+                                manualDiscountPreview.finalTotal || 0,
+                              );
                               const upi = Number(value);
 
                               if (
@@ -3128,7 +3838,7 @@ export default function LiveOrderMonitor() {
                             type="number"
                             min="0.01"
                             step="0.01"
-                            max={Number(billOrder.total || 0)}
+                            max={Number(manualDiscountPreview.finalTotal || 0)}
                             value={splitAmount}
                             onChange={(e) => setSplitAmount(e.target.value)}
                             className="
@@ -3156,7 +3866,10 @@ export default function LiveOrderMonitor() {
                           type="button"
                           onClick={() =>
                             setSplitAmount(
-                              (Number(billOrder.total || 0) / 2).toFixed(2),
+                              (
+                                Number(manualDiscountPreview.finalTotal || 0) /
+                                2
+                              ).toFixed(2),
                             )
                           }
                           className="mt-2 text-[10px] font-bold text-purple-600 hover:text-purple-800 hover:underline"
@@ -3175,7 +3888,10 @@ export default function LiveOrderMonitor() {
                           </span>
 
                           <span className="font-black text-slate-800">
-                            ₹{Number(billOrder.total || 0).toFixed(2)}
+                            ₹
+                            {Number(
+                              manualDiscountPreview.finalTotal || 0,
+                            ).toFixed(2)}
                           </span>
                         </div>
 
@@ -3195,12 +3911,9 @@ export default function LiveOrderMonitor() {
                           </span>
 
                           <span className="text-sm font-black text-purple-700">
-                            ₹
-                            {Math.max(
-                              0,
-                              Number(billOrder.total || 0) -
-                                Number(splitAmount || 0),
-                            ).toFixed(2)}
+                            ₹ Math.max( 0,
+                            Number(manualDiscountPreview.finalTotal || 0) -
+                            Number(splitAmount || 0), ).toFixed(2)
                           </span>
                         </div>
                       </div>
@@ -3225,6 +3938,10 @@ export default function LiveOrderMonitor() {
 
                     setMixedCashAmount("");
                     setMixedUpiAmount("");
+
+                    // Reset owner manual discount
+                    setManualDiscountType("");
+                    setManualDiscountValue("");
                   }}
                   disabled={isGeneratingBill || isSplitSubmitting}
                   className="
@@ -3253,7 +3970,8 @@ export default function LiveOrderMonitor() {
                       ? isSplitSubmitting ||
                         !splitAmount ||
                         Number(splitAmount) <= 0 ||
-                        Number(splitAmount) >= Number(billOrder.total || 0)
+                        Number(splitAmount) >=
+                          Number(manualDiscountPreview.finalTotal || 0)
                       : selectedPaymentMethod === "MIXED"
                         ? isMixedSubmitting ||
                           !mixedCashAmount ||
@@ -3265,8 +3983,18 @@ export default function LiveOrderMonitor() {
                               Number(mixedCashAmount || 0) +
                               Number(mixedUpiAmount || 0)
                             ).toFixed(2),
-                          ) !== Number(Number(billOrder.total || 0).toFixed(2))
-                        : !selectedPaymentMethod || isGeneratingBill
+                          ) !==
+                            Number(
+                              Number(
+                                manualDiscountPreview.finalTotal || 0,
+                              ).toFixed(2),
+                            )
+                        : !selectedPaymentMethod ||
+                          isGeneratingBill ||
+                          (isOwner &&
+                            manualDiscountType &&
+                            (!manualDiscountValue ||
+                              !manualDiscountPreview.isValid))
                   }
                   onClick={
                     selectedPaymentMethod === "SPLIT"
@@ -3352,13 +4080,23 @@ export default function LiveOrderMonitor() {
               </div>
               <div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl font-black tracking-tight">Live Kitchen Monitor</h1>
+                  <h1 className="text-2xl font-black tracking-tight">
+                    Live Kitchen Monitor
+                  </h1>
                   <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-black">
-                    {orders.filter((order) => order.status === "PENDING" || order.status === "ACCEPTED").length} LIVE
+                    {
+                      orders.filter(
+                        (order) =>
+                          order.status === "PENDING" ||
+                          order.status === "ACCEPTED",
+                      ).length
+                    }{" "}
+                    LIVE
                   </span>
                 </div>
                 <p className="mt-1 max-w-xl text-sm text-white/85">
-                  Manage incoming orders, table occupancy statuses, and kitchen execution queue.
+                  Manage incoming orders, table occupancy statuses, and kitchen
+                  execution queue.
                 </p>
               </div>
             </div>
@@ -3382,18 +4120,45 @@ export default function LiveOrderMonitor() {
 
         <div className="mt-4 grid grid-cols-2 gap-3 xl:grid-cols-5">
           {[
-            ["Total Orders", kitchenCounts.total, "bg-rose-50 text-rose-500", ClipboardList],
-            ["Preparing", kitchenCounts.preparing, "bg-orange-50 text-orange-500", ChefHat],
+            [
+              "Total Orders",
+              kitchenCounts.total,
+              "bg-rose-50 text-rose-500",
+              ClipboardList,
+            ],
+            [
+              "Preparing",
+              kitchenCounts.preparing,
+              "bg-orange-50 text-orange-500",
+              ChefHat,
+            ],
             ["Ready", kitchenCounts.ready, "bg-sky-50 text-sky-500", Check],
-            ["Completed", kitchenCounts.completed, "bg-emerald-50 text-emerald-500", Check],
-            ["Cancelled", kitchenCounts.rejected, "bg-rose-50 text-rose-500", X],
+            [
+              "Completed",
+              kitchenCounts.completed,
+              "bg-emerald-50 text-emerald-500",
+              Check,
+            ],
+            [
+              "Cancelled",
+              kitchenCounts.rejected,
+              "bg-rose-50 text-rose-500",
+              X,
+            ],
           ].map(([label, count, tint, Icon]) => (
-            <div key={label} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+            <div
+              key={label}
+              className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
+            >
               <div className="flex items-center justify-between">
-                <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${tint}`}>
+                <span
+                  className={`flex h-9 w-9 items-center justify-center rounded-xl ${tint}`}
+                >
                   <Icon size={16} />
                 </span>
-                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</span>
+                <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400">
+                  {label}
+                </span>
               </div>
               <p className="mt-3 text-2xl font-black text-slate-900">{count}</p>
             </div>
@@ -3414,9 +4179,14 @@ export default function LiveOrderMonitor() {
                 <button
                   key={key}
                   type="button"
-                  onClick={() => setListFilter(key)}
+                  onClick={() => {
+                    setListFilter(key);
+                    setCurrentPage(1);
+                  }}
                   className={`rounded-full px-3 py-1.5 text-[11px] font-black ${
-                    listFilter === key ? "bg-rose-500 text-white" : "bg-slate-50 text-slate-500"
+                    listFilter === key
+                      ? "bg-rose-500 text-white"
+                      : "bg-slate-50 text-slate-500"
                   }`}
                 >
                   {key} {count}
@@ -3426,7 +4196,10 @@ export default function LiveOrderMonitor() {
                 <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
                 <input
                   value={listSearch}
-                  onChange={(event) => setListSearch(event.target.value)}
+                  onChange={(event) => {
+                    setListSearch(event.target.value);
+                    setCurrentPage(1);
+                  }}
                   placeholder="Search by order ID, table or customer..."
                   className="w-full rounded-xl border border-slate-200 py-2 pl-8 pr-3 text-xs font-semibold outline-none focus:border-rose-300"
                 />
@@ -3437,7 +4210,9 @@ export default function LiveOrderMonitor() {
               <div className="px-6 py-16 text-center">
                 <Radio className="mx-auto mb-2 h-8 w-8 text-slate-300" />
                 <p className="text-sm font-bold text-slate-800">
-                  {orders.length === 0 ? "No live orders right now" : "No orders match this filter"}
+                  {orders.length === 0
+                    ? "No live orders right now"
+                    : "No orders match this filter"}
                 </p>
               </div>
             ) : (
@@ -3473,7 +4248,9 @@ export default function LiveOrderMonitor() {
                         <OrderRow
                           key={order._id}
                           order={order}
-                          isSelected={String(detailOrder?._id) === String(order._id)}
+                          isSelected={
+                            String(detailOrder?._id) === String(order._id)
+                          }
                           onSelect={(selected) => {
                             setDetailClosed(false);
                             setDetailOrderId(selected._id);
@@ -3492,7 +4269,8 @@ export default function LiveOrderMonitor() {
                   <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-100 px-4 py-3 sm:flex-row">
                     <p className="text-xs font-medium text-slate-500">
                       Showing {(currentPage - 1) * itemsPerPage + 1} to{" "}
-                      {Math.min(indexOfLastOrder, visibleOrders.length)} of {visibleOrders.length} orders
+                      {Math.min(indexOfLastOrder, visibleOrders.length)} of{" "}
+                      {visibleOrders.length} orders
                     </p>
                     <div className="flex gap-2">
                       <button
@@ -3522,11 +4300,17 @@ export default function LiveOrderMonitor() {
             <aside className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
               <div className="flex items-start justify-between gap-2">
                 <div>
-                  <p className="font-mono text-sm font-black text-slate-900">#{detailOrder.orderId}</p>
-                  <p className="text-[11px] text-slate-400">{timeAgo(detailOrder.createdAt)}</p>
+                  <p className="font-mono text-sm font-black text-slate-900">
+                    #{detailOrder.orderId}
+                  </p>
+                  <p className="text-[11px] text-slate-400">
+                    {timeAgo(detailOrder.createdAt)}
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className={`rounded-full px-2 py-1 text-[10px] font-black ${KITCHEN_PILL[kitchenLabel(detailOrder)] || "bg-slate-100 text-slate-600"}`}>
+                  <span
+                    className={`rounded-full px-2 py-1 text-[10px] font-black ${KITCHEN_PILL[kitchenLabel(detailOrder)] || "bg-slate-100 text-slate-600"}`}
+                  >
                     {kitchenLabel(detailOrder)}
                   </span>
                   <button
@@ -3541,7 +4325,9 @@ export default function LiveOrderMonitor() {
               </div>
 
               <div className="mt-4 space-y-2 text-sm">
-                <p className="font-bold text-slate-800">{detailOrder.customerName || "Guest"}</p>
+                <p className="font-bold text-slate-800">
+                  {detailOrder.customerName || "Guest"}
+                </p>
                 <p className="text-xs text-slate-500">
                   {orderPlaceLabel(detailOrder)} · {orderTypeLabel(detailOrder)}
                 </p>
@@ -3552,36 +4338,55 @@ export default function LiveOrderMonitor() {
                   Items ({activeOrderItems(detailOrder).length})
                 </p>
                 {activeOrderItems(detailOrder).map((item, index) => (
-                  <div key={item._id || index} className="flex items-center justify-between gap-2 text-xs">
+                  <div
+                    key={item._id || index}
+                    className="flex items-center justify-between gap-2 text-xs"
+                  >
                     <div className="min-w-0">
-                      <p className="truncate font-bold text-slate-800">{item.name}</p>
-                      <p className="text-slate-400">₹{item.price} · {item.itemReadyStatus || "PREPARING"}</p>
+                      <p className="truncate font-bold text-slate-800">
+                        {item.name}
+                      </p>
+                      <p className="text-slate-400">
+                        ₹{item.price} · {item.itemReadyStatus || "PREPARING"}
+                      </p>
                     </div>
-                    <span className="font-bold text-slate-700">{item.quantity}</span>
-                    {detailOrder.status === "ACCEPTED" && item._id && item.itemReadyStatus !== "SERVED" && (
-                      <button
-                        type="button"
-                        onClick={() =>
-                          handleItemReadyStatus(
-                            detailOrder._id,
-                            item._id,
-                            item.itemReadyStatus === "READY" ? "SERVED" : "READY",
-                          )
-                        }
-                        className="rounded-lg bg-sky-50 px-2 py-1 text-[10px] font-black text-sky-700"
-                      >
-                        {item.itemReadyStatus === "READY" ? "Served" : "Ready"}
-                      </button>
-                    )}
-                    {item._id && detailOrder.status !== "COMPLETED" && detailOrder.status !== "REJECTED" && (
-                      <button
-                        type="button"
-                        onClick={() => handleCancelItem(detailOrder._id, item._id)}
-                        className="text-[10px] font-bold text-rose-500"
-                      >
-                        Cancel
-                      </button>
-                    )}
+                    <span className="font-bold text-slate-700">
+                      {item.quantity}
+                    </span>
+                    {detailOrder.status === "ACCEPTED" &&
+                      item._id &&
+                      item.itemReadyStatus !== "SERVED" && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleItemReadyStatus(
+                              detailOrder._id,
+                              item._id,
+                              item.itemReadyStatus === "READY"
+                                ? "SERVED"
+                                : "READY",
+                            )
+                          }
+                          className="rounded-lg bg-sky-50 px-2 py-1 text-[10px] font-black text-sky-700"
+                        >
+                          {item.itemReadyStatus === "READY"
+                            ? "Served"
+                            : "Ready"}
+                        </button>
+                      )}
+                    {item._id &&
+                      detailOrder.status !== "COMPLETED" &&
+                      detailOrder.status !== "REJECTED" && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            handleCancelItem(detailOrder._id, item._id)
+                          }
+                          className="text-[10px] font-bold text-rose-500"
+                        >
+                          Cancel
+                        </button>
+                      )}
                   </div>
                 ))}
               </div>
@@ -3589,23 +4394,34 @@ export default function LiveOrderMonitor() {
               <div className="mt-4 space-y-1 border-t border-slate-100 pt-3 text-sm">
                 <div className="flex justify-between text-slate-500">
                   <span>Item Total</span>
-                  <span>₹{Number(detailOrder.subtotal || detailOrder.total || 0).toLocaleString("en-IN")}</span>
+                  <span>
+                    ₹
+                    {Number(
+                      detailOrder.subtotal || detailOrder.total || 0,
+                    ).toLocaleString("en-IN")}
+                  </span>
                 </div>
                 {Number(detailOrder.discount) > 0 && (
                   <div className="flex justify-between text-emerald-600">
                     <span>Discount</span>
-                    <span>-₹{Number(detailOrder.discount).toLocaleString("en-IN")}</span>
+                    <span>
+                      -₹{Number(detailOrder.discount).toLocaleString("en-IN")}
+                    </span>
                   </div>
                 )}
                 {Number(detailOrder.tax) > 0 && (
                   <div className="flex justify-between text-slate-500">
                     <span>Tax</span>
-                    <span>₹{Number(detailOrder.tax).toLocaleString("en-IN")}</span>
+                    <span>
+                      ₹{Number(detailOrder.tax).toLocaleString("en-IN")}
+                    </span>
                   </div>
                 )}
                 <div className="flex justify-between pt-1 text-base font-black text-rose-500">
                   <span>Grand Total</span>
-                  <span>₹{Number(detailOrder.total || 0).toLocaleString("en-IN")}</span>
+                  <span>
+                    ₹{Number(detailOrder.total || 0).toLocaleString("en-IN")}
+                  </span>
                 </div>
               </div>
 
@@ -3613,22 +4429,27 @@ export default function LiveOrderMonitor() {
                 {detailOrder.status === "PENDING" && (
                   <button
                     type="button"
-                    onClick={() => handleStatusClick(detailOrder._id, "ACCEPTED")}
+                    onClick={() =>
+                      handleStatusClick(detailOrder._id, "ACCEPTED")
+                    }
                     className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 text-sm font-black text-white"
                   >
                     <Check size={16} /> Accept Order
                   </button>
                 )}
-                {detailOrder.status === "ACCEPTED" && detailOrder.tableNumber !== "N/A" && (
-                  <button
-                    type="button"
-                    disabled={activeOrderItems(detailOrder).some((item) => item.itemReadyStatus !== "SERVED")}
-                    onClick={() => handleBillAndWhatsApp(detailOrder)}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
-                  >
-                    <IndianRupee size={16} /> Generate Bill
-                  </button>
-                )}
+                {detailOrder.status === "ACCEPTED" &&
+                  detailOrder.tableNumber !== "N/A" && (
+                    <button
+                      type="button"
+                      disabled={activeOrderItems(detailOrder).some(
+                        (item) => item.itemReadyStatus !== "SERVED",
+                      )}
+                      onClick={() => handleBillAndWhatsApp(detailOrder)}
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+                    >
+                      <IndianRupee size={16} /> Generate Bill
+                    </button>
+                  )}
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
@@ -3652,13 +4473,22 @@ export default function LiveOrderMonitor() {
 
         <div className="mt-4 rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
-            <p className="text-xs font-black uppercase tracking-wider text-slate-400">Table Live Status</p>
+            <p className="text-xs font-black uppercase tracking-wider text-slate-400">
+              Table Live Status
+            </p>
             <div className="flex items-center gap-3 text-[10px] font-bold text-slate-500">
-              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-400" /> Free</span>
-              <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-rose-400" /> Occupied</span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-emerald-400" /> Free
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="h-2 w-2 rounded-full bg-rose-400" /> Occupied
+              </span>
             </div>
           </div>
-          <TableStatusStrip tables={tableStatus} isLoading={isLoadingTableStatus} />
+          <TableStatusStrip
+            tables={tableStatus}
+            isLoading={isLoadingTableStatus}
+          />
         </div>
 
         {rejectModalOrder && (
