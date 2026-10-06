@@ -180,7 +180,7 @@ const currency = (value) =>
     maximumFractionDigits: 2,
   })}`;
 
-const SELLABLE_PLANS = ["TRIAL", "BASIC", "PREMIUM"];
+const SELLABLE_PLANS = ["TRIAL", "BASIC", "PREMIUM", "PRO"];
 
 const formatPlan = (plan) => {
   const value = String(plan || "").trim();
@@ -854,7 +854,8 @@ export default function SuperAdminPanel() {
     1,
     (platformAnalytics?.subscriptions?.trial || 0) +
       (platformAnalytics?.subscriptions?.basic || 0) +
-      (platformAnalytics?.subscriptions?.premium || 0),
+      (platformAnalytics?.subscriptions?.premium || 0) +
+      (platformAnalytics?.subscriptions?.pro || 0),
   );
   const restaurantGrowthSeries = buildDailySeries(
     platformAnalytics?.restaurantGrowth,
@@ -929,6 +930,7 @@ export default function SuperAdminPanel() {
                     <option value="TRIAL">Trial</option>
                     <option value="BASIC">Basic</option>
                     <option value="PREMIUM">Premium</option>
+                    <option value="PRO">Pro</option>
                   </>
                 ) : (
                   <>
@@ -1077,7 +1079,9 @@ export default function SuperAdminPanel() {
                     className="inline-flex items-center justify-center gap-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700"
                   >
                     <Power size={13} />
-                    {selectedRestaurant.isActive !== false ? "Block" : "Unblock"}
+                    {selectedRestaurant.isActive !== false
+                      ? "Block"
+                      : "Unblock"}
                   </button>
                   <button
                     type="button"
@@ -1601,8 +1605,12 @@ export default function SuperAdminPanel() {
               </div>
               {activeTab === "restaurants" && (
                 <div className="rounded-2xl bg-white/15 px-4 py-3 text-right">
-                  <p className="text-[11px] font-bold text-white/80">Total Restaurants</p>
-                  <p className="text-2xl font-black">{statsLoading ? "…" : totalStores}</p>
+                  <p className="text-[11px] font-bold text-white/80">
+                    Total Restaurants
+                  </p>
+                  <p className="text-2xl font-black">
+                    {statsLoading ? "…" : totalStores}
+                  </p>
                 </div>
               )}
             </div>
@@ -1631,886 +1639,1018 @@ export default function SuperAdminPanel() {
           </div>
 
           {activeTab === "graphs" && (
-          <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-stone-200 bg-stone-200 sm:grid-cols-4 lg:grid-cols-7">
-            <StatCell
-              title="Total restaurants"
-              value={statsLoading ? "…" : totalStores}
-            />
-            <StatCell
-              title="Approved"
-              value={statsLoading ? "…" : approvedStores}
-              tone="emerald"
-            />
-            <StatCell
-              title="Pending approval"
-              value={statsLoading ? "…" : pendingStores}
-              tone="amber"
-            />
-            <StatCell
-              title="Blocked"
-              value={statsLoading ? "…" : blockedStores}
-              tone="rose"
-            />
-            <StatCell
-              title="Active restaurants"
-              value={statsLoading ? "…" : activeStores}
-              tone="emerald"
-            />
-            <StatCell
-              title="Total orders"
-              value={statsLoading ? "…" : totalOrders}
-            />
-            <StatCell
-              title="Live orders"
-              value={statsLoading ? "…" : activeOrders}
-              tone="brand"
-            />
-          </div>
+            <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-stone-200 bg-stone-200 sm:grid-cols-4 lg:grid-cols-7">
+              <StatCell
+                title="Total restaurants"
+                value={statsLoading ? "…" : totalStores}
+              />
+              <StatCell
+                title="Approved"
+                value={statsLoading ? "…" : approvedStores}
+                tone="emerald"
+              />
+              <StatCell
+                title="Pending approval"
+                value={statsLoading ? "…" : pendingStores}
+                tone="amber"
+              />
+              <StatCell
+                title="Blocked"
+                value={statsLoading ? "…" : blockedStores}
+                tone="rose"
+              />
+              <StatCell
+                title="Active restaurants"
+                value={statsLoading ? "…" : activeStores}
+                tone="emerald"
+              />
+              <StatCell
+                title="Total orders"
+                value={statsLoading ? "…" : totalOrders}
+              />
+              <StatCell
+                title="Live orders"
+                value={statsLoading ? "…" : activeOrders}
+                tone="brand"
+              />
+            </div>
           )}
 
           {activeTab === "revenue" && (
-          <>
-          <div className="rounded-2xl border border-stone-200 bg-white">
-            <div className="flex flex-col gap-4 border-b border-stone-100 p-5 sm:flex-row sm:items-center sm:justify-between">
-              <SectionHeading
-                title="Revenue & payments"
-                subtitle="Platform-wide completed billing collection"
-              />
+            <>
+              <div className="rounded-2xl border border-stone-200 bg-white">
+                <div className="flex flex-col gap-4 border-b border-stone-100 p-5 sm:flex-row sm:items-center sm:justify-between">
+                  <SectionHeading
+                    title="Revenue & payments"
+                    subtitle="Platform-wide completed billing collection"
+                  />
 
-              <SelectField
-                value={revenuePeriod}
-                onChange={(event) => setRevenuePeriod(event.target.value)}
-                disabled={revenueLoading}
-                className="sm:w-44"
-              >
-                <option value="today">Today</option>
-                <option value="week">Last 7 days</option>
-                <option value="month">Last 30 days</option>
-                <option value="year">Last 12 months</option>
-              </SelectField>
-            </div>
-
-            <div className="p-5">
-              {revenueLoading ? (
-                <div className="flex min-h-[160px] items-center justify-center rounded-xl bg-stone-50">
-                  <Loader2 size={24} className="animate-spin text-red-600" />
+                  <SelectField
+                    value={revenuePeriod}
+                    onChange={(event) => setRevenuePeriod(event.target.value)}
+                    disabled={revenueLoading}
+                    className="sm:w-44"
+                  >
+                    <option value="today">Today</option>
+                    <option value="week">Last 7 days</option>
+                    <option value="month">Last 30 days</option>
+                    <option value="year">Last 12 months</option>
+                  </SelectField>
                 </div>
-              ) : revenueStats ? (
-                <>
-                  {/* Revenue Cards */}
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                    <div className="rounded-xl border border-red-100 bg-red-50 p-4">
-                      <div className="flex items-center gap-1.5 text-red-500">
-                        <Wallet size={13} />
-                        <p className="text-xs">Total collected</p>
-                      </div>
-                      <p className="mt-2 text-xl font-semibold tabular-nums text-red-700">
-                        {currency(revenueStats.revenue?.totalCollected)}
-                      </p>
+
+                <div className="p-5">
+                  {revenueLoading ? (
+                    <div className="flex min-h-[160px] items-center justify-center rounded-xl bg-stone-50">
+                      <Loader2
+                        size={24}
+                        className="animate-spin text-red-600"
+                      />
                     </div>
-
-                    <div className="rounded-xl border border-stone-200 bg-white p-4">
-                      <div className="flex items-center gap-1.5 text-stone-400">
-                        <Banknote size={13} />
-                        <p className="text-xs">Cash</p>
-                      </div>
-                      <p className="mt-2 text-xl font-semibold tabular-nums text-stone-900">
-                        {currency(revenueStats.revenue?.cash)}
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl border border-stone-200 bg-white p-4">
-                      <div className="flex items-center gap-1.5 text-stone-400">
-                        <Smartphone size={13} />
-                        <p className="text-xs">UPI</p>
-                      </div>
-                      <p className="mt-2 text-xl font-semibold tabular-nums text-stone-900">
-                        {currency(revenueStats.revenue?.upi)}
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl border border-stone-200 bg-white p-4">
-                      <div className="flex items-center gap-1.5 text-stone-400">
-                        <TrendingUp size={13} />
-                        <p className="text-xs">Due collected</p>
-                      </div>
-                      <p className="mt-2 text-xl font-semibold tabular-nums text-stone-900">
-                        {currency(revenueStats.revenue?.dueCollected)}
-                      </p>
-                    </div>
-
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                      <p className="text-xs text-amber-600">Outstanding due</p>
-                      <p className="mt-2 text-xl font-semibold tabular-nums text-amber-700">
-                        {currency(revenueStats.revenue?.outstandingDue)}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Payment Breakdown + Collection Summary */}
-                  <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
-                    <div className="rounded-xl border border-stone-200 p-4">
-                      <h3 className="text-sm font-semibold text-stone-900">
-                        Payment breakdown
-                      </h3>
-
-                      <div className="mt-3.5 space-y-2.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-stone-500">
-                            Cash bills
-                          </span>
-                          <span className="text-sm font-semibold tabular-nums text-stone-900">
-                            {revenueStats.bills?.cash || 0}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-stone-500">
-                            UPI bills
-                          </span>
-                          <span className="text-sm font-semibold tabular-nums text-stone-900">
-                            {revenueStats.bills?.upi || 0}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-stone-500">
-                            Due bills
-                          </span>
-                          <span className="text-sm font-semibold tabular-nums text-stone-900">
-                            {revenueStats.bills?.due || 0}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between border-t border-stone-100 pt-2.5">
-                          <span className="text-xs font-medium text-stone-400">
-                            Total bills
-                          </span>
-                          <span className="text-base font-semibold tabular-nums text-stone-900">
-                            {revenueStats.bills?.total || 0}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="rounded-xl border border-stone-200 p-4">
-                      <h3 className="text-sm font-semibold text-stone-900">
-                        Collection summary
-                      </h3>
-
-                      <div className="mt-3.5 space-y-2.5">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-stone-500">
-                            Cash collection
-                          </span>
-                          <span className="text-sm font-semibold tabular-nums text-stone-900">
-                            {currency(revenueStats.revenue?.cash)}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-stone-500">
-                            UPI collection
-                          </span>
-                          <span className="text-sm font-semibold tabular-nums text-stone-900">
-                            {currency(revenueStats.revenue?.upi)}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs text-stone-500">
-                            Due collection
-                          </span>
-                          <span className="text-sm font-semibold tabular-nums text-stone-900">
-                            {currency(revenueStats.revenue?.dueCollected)}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center justify-between border-t border-stone-100 pt-2.5">
-                          <span className="text-xs font-medium text-stone-400">
-                            Total collected
-                          </span>
-                          <span className="text-base font-semibold tabular-nums text-stone-900">
+                  ) : revenueStats ? (
+                    <>
+                      {/* Revenue Cards */}
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                        <div className="rounded-xl border border-red-100 bg-red-50 p-4">
+                          <div className="flex items-center gap-1.5 text-red-500">
+                            <Wallet size={13} />
+                            <p className="text-xs">Total collected</p>
+                          </div>
+                          <p className="mt-2 text-xl font-semibold tabular-nums text-red-700">
                             {currency(revenueStats.revenue?.totalCollected)}
-                          </span>
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl border border-stone-200 bg-white p-4">
+                          <div className="flex items-center gap-1.5 text-stone-400">
+                            <Banknote size={13} />
+                            <p className="text-xs">Cash</p>
+                          </div>
+                          <p className="mt-2 text-xl font-semibold tabular-nums text-stone-900">
+                            {currency(revenueStats.revenue?.cash)}
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl border border-stone-200 bg-white p-4">
+                          <div className="flex items-center gap-1.5 text-stone-400">
+                            <Smartphone size={13} />
+                            <p className="text-xs">UPI</p>
+                          </div>
+                          <p className="mt-2 text-xl font-semibold tabular-nums text-stone-900">
+                            {currency(revenueStats.revenue?.upi)}
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl border border-stone-200 bg-white p-4">
+                          <div className="flex items-center gap-1.5 text-stone-400">
+                            <TrendingUp size={13} />
+                            <p className="text-xs">Due collected</p>
+                          </div>
+                          <p className="mt-2 text-xl font-semibold tabular-nums text-stone-900">
+                            {currency(revenueStats.revenue?.dueCollected)}
+                          </p>
+                        </div>
+
+                        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
+                          <p className="text-xs text-amber-600">
+                            Outstanding due
+                          </p>
+                          <p className="mt-2 text-xl font-semibold tabular-nums text-amber-700">
+                            {currency(revenueStats.revenue?.outstandingDue)}
+                          </p>
                         </div>
                       </div>
+
+                      {/* Payment Breakdown + Collection Summary */}
+                      <div className="mt-5 grid grid-cols-1 gap-3 lg:grid-cols-2">
+                        <div className="rounded-xl border border-stone-200 p-4">
+                          <h3 className="text-sm font-semibold text-stone-900">
+                            Payment breakdown
+                          </h3>
+
+                          <div className="mt-3.5 space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-stone-500">
+                                Cash bills
+                              </span>
+                              <span className="text-sm font-semibold tabular-nums text-stone-900">
+                                {revenueStats.bills?.cash || 0}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-stone-500">
+                                UPI bills
+                              </span>
+                              <span className="text-sm font-semibold tabular-nums text-stone-900">
+                                {revenueStats.bills?.upi || 0}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-stone-500">
+                                Due bills
+                              </span>
+                              <span className="text-sm font-semibold tabular-nums text-stone-900">
+                                {revenueStats.bills?.due || 0}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between border-t border-stone-100 pt-2.5">
+                              <span className="text-xs font-medium text-stone-400">
+                                Total bills
+                              </span>
+                              <span className="text-base font-semibold tabular-nums text-stone-900">
+                                {revenueStats.bills?.total || 0}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-xl border border-stone-200 p-4">
+                          <h3 className="text-sm font-semibold text-stone-900">
+                            Collection summary
+                          </h3>
+
+                          <div className="mt-3.5 space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-stone-500">
+                                Cash collection
+                              </span>
+                              <span className="text-sm font-semibold tabular-nums text-stone-900">
+                                {currency(revenueStats.revenue?.cash)}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-stone-500">
+                                UPI collection
+                              </span>
+                              <span className="text-sm font-semibold tabular-nums text-stone-900">
+                                {currency(revenueStats.revenue?.upi)}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs text-stone-500">
+                                Due collection
+                              </span>
+                              <span className="text-sm font-semibold tabular-nums text-stone-900">
+                                {currency(revenueStats.revenue?.dueCollected)}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-between border-t border-stone-100 pt-2.5">
+                              <span className="text-xs font-medium text-stone-400">
+                                Total collected
+                              </span>
+                              <span className="text-base font-semibold tabular-nums text-stone-900">
+                                {currency(revenueStats.revenue?.totalCollected)}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="rounded-xl border border-stone-200 bg-stone-50 p-6 text-center">
+                      <p className="text-sm font-medium text-stone-500">
+                        Revenue data unavailable.
+                      </p>
                     </div>
-                  </div>
-                </>
-              ) : (
-                <div className="rounded-xl border border-stone-200 bg-stone-50 p-6 text-center">
-                  <p className="text-sm font-medium text-stone-500">
-                    Revenue data unavailable.
-                  </p>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
-
-          <div className="mt-6 rounded-2xl border border-red-100 bg-red-50/40 p-5">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-red-500">
-                  ChotuGTT Earnings
-                </p>
-
-                <h3 className="mt-1 text-base font-black text-slate-900">
-                  Platform Revenue
-                </h3>
-
-                <p className="mt-1 text-xs font-medium text-slate-500">
-                  Actual platform transactions received from restaurants
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                  Net Platform Revenue
-                </p>
-
-                <p className="mt-2 text-2xl font-black text-red-600">
-                  {currency(revenueStats?.platformRevenue?.net || 0)}
-                </p>
               </div>
 
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                  Subscription
-                </p>
+              <div className="mt-6 rounded-2xl border border-red-100 bg-red-50/40 p-5">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-red-500">
+                      ChotuGTT Earnings
+                    </p>
 
-                <p className="mt-2 text-xl font-black text-slate-900">
-                  {currency(revenueStats?.platformRevenue?.subscription || 0)}
-                </p>
+                    <h3 className="mt-1 text-base font-black text-slate-900">
+                      Platform Revenue
+                    </h3>
+
+                    <p className="mt-1 text-xs font-medium text-slate-500">
+                      Actual platform transactions received from restaurants
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      Net Platform Revenue
+                    </p>
+
+                    <p className="mt-2 text-2xl font-black text-red-600">
+                      {currency(revenueStats?.platformRevenue?.net || 0)}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      Subscription
+                    </p>
+
+                    <p className="mt-2 text-xl font-black text-slate-900">
+                      {currency(
+                        revenueStats?.platformRevenue?.subscription || 0,
+                      )}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      Commission
+                    </p>
+
+                    <p className="mt-2 text-xl font-black text-slate-900">
+                      {currency(revenueStats?.platformRevenue?.commission || 0)}
+                    </p>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      Platform Fees
+                    </p>
+
+                    <p className="mt-2 text-xl font-black text-slate-900">
+                      {currency(
+                        revenueStats?.platformRevenue?.platformFee || 0,
+                      )}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl bg-white/80 p-3">
+                    <p className="text-xs text-slate-500">
+                      Gross Platform Revenue
+                    </p>
+
+                    <p className="mt-1 text-sm font-black text-slate-900">
+                      {currency(revenueStats?.platformRevenue?.gross || 0)}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-white/80 p-3">
+                    <p className="text-xs text-slate-500">Refunds</p>
+
+                    <p className="mt-1 text-sm font-black text-rose-600">
+                      {currency(revenueStats?.platformRevenue?.refunds || 0)}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl bg-white/80 p-3">
+                    <p className="text-xs text-slate-500">
+                      Platform Transactions
+                    </p>
+
+                    <p className="mt-1 text-sm font-black text-slate-900">
+                      {Number(
+                        revenueStats?.platformRevenue?.transactionCount || 0,
+                      ).toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                </div>
               </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                  Commission
-                </p>
-
-                <p className="mt-2 text-xl font-black text-slate-900">
-                  {currency(revenueStats?.platformRevenue?.commission || 0)}
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                <p className="text-[10px] font-black uppercase tracking-wider text-slate-400">
-                  Platform Fees
-                </p>
-
-                <p className="mt-2 text-xl font-black text-slate-900">
-                  {currency(revenueStats?.platformRevenue?.platformFee || 0)}
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <div className="rounded-xl bg-white/80 p-3">
-                <p className="text-xs text-slate-500">Gross Platform Revenue</p>
-
-                <p className="mt-1 text-sm font-black text-slate-900">
-                  {currency(revenueStats?.platformRevenue?.gross || 0)}
-                </p>
-              </div>
-
-              <div className="rounded-xl bg-white/80 p-3">
-                <p className="text-xs text-slate-500">Refunds</p>
-
-                <p className="mt-1 text-sm font-black text-rose-600">
-                  {currency(revenueStats?.platformRevenue?.refunds || 0)}
-                </p>
-              </div>
-
-              <div className="rounded-xl bg-white/80 p-3">
-                <p className="text-xs text-slate-500">Platform Transactions</p>
-
-                <p className="mt-1 text-sm font-black text-slate-900">
-                  {Number(
-                    revenueStats?.platformRevenue?.transactionCount || 0,
-                  ).toLocaleString("en-IN")}
-                </p>
-              </div>
-            </div>
-          </div>
-          </>
+            </>
           )}
 
           {activeTab === "graphs" && (
-          <div className="rounded-2xl border border-stone-200 bg-white">
-            <div className="flex flex-col gap-4 border-b border-stone-100 p-5 sm:flex-row sm:items-center sm:justify-between">
-              <SectionHeading
-                title="Platform analytics"
-                subtitle="Restaurant, order and revenue trends"
-              />
+            <div className="rounded-2xl border border-stone-200 bg-white">
+              <div className="flex flex-col gap-4 border-b border-stone-100 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <SectionHeading
+                  title="Platform analytics"
+                  subtitle="Restaurant, order and revenue trends"
+                />
 
-              <SelectField
-                value={analyticsPeriod}
-                onChange={(event) => setAnalyticsPeriod(event.target.value)}
-                disabled={analyticsLoading}
-                className="sm:w-44"
-              >
-                <option value="7d">Last 7 days</option>
-                <option value="30d">Last 30 days</option>
-                <option value="90d">Last 90 days</option>
-                <option value="1y">Last 1 year</option>
-              </SelectField>
-            </div>
+                <SelectField
+                  value={analyticsPeriod}
+                  onChange={(event) => setAnalyticsPeriod(event.target.value)}
+                  disabled={analyticsLoading}
+                  className="sm:w-44"
+                >
+                  <option value="7d">Last 7 days</option>
+                  <option value="30d">Last 30 days</option>
+                  <option value="90d">Last 90 days</option>
+                  <option value="1y">Last 1 year</option>
+                </SelectField>
+              </div>
 
-            <div className="p-5">
-              {analyticsLoading ? (
-                <div className="flex min-h-[200px] items-center justify-center rounded-xl bg-stone-50">
-                  <Loader2 size={24} className="animate-spin text-red-600" />
-                </div>
-              ) : platformAnalytics ? (
-                <>
-                  {/* Status Summary */}
-                  <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-stone-200 bg-stone-200 md:grid-cols-5">
-                    <StatCell
-                      title="Total restaurants"
-                      value={platformAnalytics.restaurants?.total ?? 0}
-                    />
-                    <StatCell
-                      title="Approved"
-                      value={platformAnalytics.restaurants?.approved ?? 0}
-                      tone="emerald"
-                    />
-                    <StatCell
-                      title="Pending"
-                      value={platformAnalytics.restaurants?.pending ?? 0}
-                      tone="amber"
-                    />
-                    <StatCell
-                      title="Active"
-                      value={platformAnalytics.restaurants?.active ?? 0}
-                      tone="emerald"
-                    />
-                    <StatCell
-                      title="Blocked"
-                      value={platformAnalytics.restaurants?.blocked ?? 0}
-                      tone="rose"
-                    />
+              <div className="p-5">
+                {analyticsLoading ? (
+                  <div className="flex min-h-[200px] items-center justify-center rounded-xl bg-stone-50">
+                    <Loader2 size={24} className="animate-spin text-red-600" />
                   </div>
-
-                  {/* Subscription Distribution */}
-                  <div className="mt-5 rounded-xl border border-stone-200 p-4">
-                    <h3 className="text-sm font-semibold text-stone-900">
-                      Subscription distribution
-                    </h3>
-
-                    <div className="mt-4 space-y-3">
-                      {[
-                        {
-                          label: "Trial",
-                          value: platformAnalytics.subscriptions?.trial || 0,
-                          tone: "bg-amber-400",
-                        },
-                        {
-                          label: "Basic",
-                          value: platformAnalytics.subscriptions?.basic || 0,
-                          tone: "bg-red-500",
-                        },
-                        {
-                          label: "Premium",
-                          value: platformAnalytics.subscriptions?.premium || 0,
-                          tone: "bg-violet-600",
-                        },
-                      ].map((row) => (
-                        <div key={row.label}>
-                          <div className="mb-1 flex items-center justify-between">
-                            <span className="text-xs text-stone-500">
-                              {row.label}
-                            </span>
-                            <span className="text-xs font-semibold tabular-nums text-stone-800">
-                              {row.value}
-                            </span>
-                          </div>
-                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-100">
-                            <div
-                              className={`h-full rounded-full ${row.tone}`}
-                              style={{
-                                width: `${Math.min(100, (row.value / subscriptionTotal) * 100)}%`,
-                              }}
-                            />
-                          </div>
-                        </div>
-                      ))}
+                ) : platformAnalytics ? (
+                  <>
+                    {/* Status Summary */}
+                    <div className="grid grid-cols-2 gap-px overflow-hidden rounded-xl border border-stone-200 bg-stone-200 md:grid-cols-5">
+                      <StatCell
+                        title="Total restaurants"
+                        value={platformAnalytics.restaurants?.total ?? 0}
+                      />
+                      <StatCell
+                        title="Approved"
+                        value={platformAnalytics.restaurants?.approved ?? 0}
+                        tone="emerald"
+                      />
+                      <StatCell
+                        title="Pending"
+                        value={platformAnalytics.restaurants?.pending ?? 0}
+                        tone="amber"
+                      />
+                      <StatCell
+                        title="Active"
+                        value={platformAnalytics.restaurants?.active ?? 0}
+                        tone="emerald"
+                      />
+                      <StatCell
+                        title="Blocked"
+                        value={platformAnalytics.restaurants?.blocked ?? 0}
+                        tone="rose"
+                      />
                     </div>
-                  </div>
 
-                  <TrendChart
-                    title="Restaurant growth"
-                    series={restaurantGrowthSeries}
-                    color="bg-stone-800"
-                    formatValue={(value) => String(value)}
-                  />
-                  <TrendChart
-                    title="Order trend"
-                    series={orderTrendSeries}
-                    color="bg-red-500"
-                    formatValue={(value) => String(value)}
-                  />
-                  <TrendChart
-                    title="Revenue trend"
-                    series={revenueTrendSeries}
-                    color="bg-emerald-500"
-                    formatValue={currency}
-                  />
-                </>
-              ) : (
-                <div className="rounded-xl bg-stone-50 p-6 text-center">
-                  <p className="text-sm font-medium text-stone-500">
-                    Analytics data unavailable.
-                  </p>
-                </div>
-              )}
+                    {/* Subscription Distribution */}
+                    <div className="mt-5 rounded-xl border border-stone-200 p-4">
+                      <h3 className="text-sm font-semibold text-stone-900">
+                        Subscription distribution
+                      </h3>
+
+                      <div className="mt-4 space-y-3">
+                        {[
+                          {
+                            label: "Trial",
+                            value: platformAnalytics.subscriptions?.trial || 0,
+                            tone: "bg-amber-400",
+                          },
+                          {
+                            label: "Basic",
+                            value: platformAnalytics.subscriptions?.basic || 0,
+                            tone: "bg-red-500",
+                          },
+                          {
+                            label: "Premium",
+                            value:
+                              platformAnalytics.subscriptions?.premium || 0,
+                            tone: "bg-violet-600",
+                          },
+                          {
+                            label: "Pro",
+                            value: platformAnalytics.subscriptions?.pro || 0,
+                            tone: "bg-blue-500",
+                          },
+                        ].map((row) => (
+                          <div key={row.label}>
+                            <div className="mb-1 flex items-center justify-between">
+                              <span className="text-xs text-stone-500">
+                                {row.label}
+                              </span>
+                              <span className="text-xs font-semibold tabular-nums text-stone-800">
+                                {row.value}
+                              </span>
+                            </div>
+                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-stone-100">
+                              <div
+                                className={`h-full rounded-full ${row.tone}`}
+                                style={{
+                                  width: `${Math.min(100, (row.value / subscriptionTotal) * 100)}%`,
+                                }}
+                              />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <TrendChart
+                      title="Restaurant growth"
+                      series={restaurantGrowthSeries}
+                      color="bg-stone-800"
+                      formatValue={(value) => String(value)}
+                    />
+                    <TrendChart
+                      title="Order trend"
+                      series={orderTrendSeries}
+                      color="bg-red-500"
+                      formatValue={(value) => String(value)}
+                    />
+                    <TrendChart
+                      title="Revenue trend"
+                      series={revenueTrendSeries}
+                      color="bg-emerald-500"
+                      formatValue={currency}
+                    />
+                  </>
+                ) : (
+                  <div className="rounded-xl bg-stone-50 p-6 text-center">
+                    <p className="text-sm font-medium text-stone-500">
+                      Analytics data unavailable.
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
           )}
 
           {activeTab === "restaurants" && (
-          <>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            {[
-              ["Total Restaurants", statsLoading ? "…" : totalStores, Building2, "text-violet-600 bg-violet-50", "All partners"],
-              ["Active Restaurants", statsLoading ? "…" : activeStores, CheckCircle2, "text-emerald-600 bg-emerald-50", statsLoading || !totalStores ? "" : `${((activeStores / totalStores) * 100).toFixed(1)}% active`],
-              ["Pending Approval", statsLoading ? "…" : pendingStores, AlertCircle, "text-amber-600 bg-amber-50", statsLoading || !totalStores ? "" : `${((pendingStores / totalStores) * 100).toFixed(1)}% pending`],
-              ["Blocked Restaurants", statsLoading ? "…" : blockedStores, XCircle, "text-rose-600 bg-rose-50", statsLoading || !totalStores ? "" : `${((blockedStores / totalStores) * 100).toFixed(1)}% blocked`],
-            ].map(([label, value, Icon, tint, note]) => (
-              <div key={label} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-                <div className="flex items-center justify-between">
-                  <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${tint}`}><Icon size={16} /></span>
-                  <p className="text-[11px] font-bold text-slate-400">{label}</p>
-                </div>
-                <p className="mt-3 text-2xl font-black text-slate-900">{value}</p>
-                {note ? <p className="mt-1 text-[11px] font-bold text-slate-400">{note}</p> : null}
-              </div>
-            ))}
-          </div>
-          <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
-              <div className="relative lg:col-span-2">
-                <Search
-                  size={16}
-                  className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400"
-                />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => {
-                    setSearch(e.target.value);
-                    setPage(1);
-                  }}
-                  placeholder="Restaurant name, owner, email, phone"
-                  className="h-10 w-full rounded-lg border border-stone-200 bg-stone-50 pl-10 pr-4 text-sm outline-none transition focus:border-stone-400 focus:bg-white"
-                />
-              </div>
-
-              <SelectField
-                value={joinedFilter}
-                onChange={(e) => {
-                  setJoinedFilter(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="all">All restaurants</option>
-                <option value="new">New (last 7 days)</option>
-              </SelectField>
-
-              <SelectField
-                value={sortBy}
-                onChange={(e) => {
-                  setSortBy(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="newest">Newest first</option>
-                <option value="oldest">Oldest first</option>
-                <option value="name_asc">Name A–Z</option>
-                <option value="name_desc">Name Z–A</option>
-              </SelectField>
-
-              {/* Status */}
-              <SelectField
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="all">All access status</option>
-                <option value="active">Active</option>
-                <option value="blocked">Blocked</option>
-              </SelectField>
-
-              <SelectField
-                value={approvalFilter}
-                onChange={(e) => {
-                  setApprovalFilter(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="all">All approval</option>
-                <option value="approved">Approved</option>
-                <option value="pending">Pending</option>
-              </SelectField>
-
-              <SelectField
-                value={planFilter}
-                onChange={(e) => {
-                  setPlanFilter(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="all">All plans</option>
-                <option value="TRIAL">Trial</option>
-                <option value="BASIC">Basic</option>
-                <option value="PREMIUM">Premium</option>
-              </SelectField>
-
-              <SelectField
-                value={subscriptionFilter}
-                onChange={(e) => {
-                  setSubscriptionFilter(e.target.value);
-                  setPage(1);
-                }}
-              >
-                <option value="all">Plan active and inactive</option>
-                <option value="active">Plan active</option>
-                <option value="inactive">Plan inactive</option>
-              </SelectField>
-
-              <input
-                type="text"
-                value={districtFilter}
-                onChange={(e) => {
-                  setDistrictFilter(e.target.value);
-                  setPage(1);
-                }}
-                placeholder="District"
-                className="h-10 w-full rounded-lg border border-stone-200 bg-white px-3 text-sm outline-none focus:border-stone-400"
-              />
-
-              <input
-                type="text"
-                value={pincodeFilter}
-                onChange={(e) => {
-                  setPincodeFilter(e.target.value);
-                  setPage(1);
-                }}
-                placeholder="Pincode"
-                inputMode="numeric"
-                className="h-10 w-full rounded-lg border border-stone-200 bg-white px-3 text-sm outline-none focus:border-stone-400"
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  setSearch("");
-                  setStatusFilter("all");
-                  setApprovalFilter("all");
-                  setSortBy("newest");
-                  setJoinedFilter("all");
-                  setPlanFilter("all");
-                  setSubscriptionFilter("all");
-                  setDistrictFilter("");
-                  setPincodeFilter("");
-                  setPage(1);
-                }}
-                className="h-10 rounded-xl border border-slate-200 px-3 text-xs font-black text-slate-600"
-              >
-                Reset
-              </button>
-            </div>
-          </div>
-
-          {/* Restaurants table */}
-          <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white">
-            {loading ? (
-              <div className="flex items-center justify-center gap-2 py-16 text-sm text-stone-500">
-                <Loader2 size={18} className="animate-spin text-red-600" />
-                Loading restaurants…
-              </div>
-            ) : restaurants.length === 0 ? (
-              <div className="space-y-3 py-16 text-center">
-                <Store className="mx-auto text-stone-300" size={40} />
-                <p className="text-sm font-medium text-stone-500">
-                  No restaurants registered yet.
-                </p>
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[980px] border-collapse text-left">
-                  <thead className="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wide text-slate-400">
-                    <tr>
-                      <th className="px-4 py-3">#</th>
-                      <th className="px-4 py-3">Restaurant</th>
-                      <th className="px-4 py-3">Owner</th>
-                      <th className="px-4 py-3">Contact</th>
-                      <th className="px-4 py-3">Location</th>
-                      <th className="px-4 py-3">Plan</th>
-                      <th className="px-4 py-3">Status</th>
-                      <th className="px-4 py-3">Joined On</th>
-                      <th className="px-4 py-3 text-right">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-50 text-xs sm:text-sm">
-                    {restaurants.map((store, index) => {
-                      const rowStatus = !store.isApproved
-                        ? "Pending"
-                        : store.isActive === false
-                          ? "Blocked"
-                          : "Active";
-                      const rowTone = rowStatus === "Pending" ? "amber" : rowStatus === "Blocked" ? "rose" : "emerald";
-                      return (
-                      <tr key={store._id} className="hover:bg-slate-50/80">
-                        <td className="px-4 py-3 text-xs font-bold text-slate-400">
-                          {(pagination.page - 1) * pagination.limit + index + 1}
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="text-sm font-black text-slate-900">{store.name}</p>
-                          <p className="text-[11px] font-semibold text-slate-400">{store.slug || "—"}</p>
-                        </td>
-                        <td className="px-4 py-3 font-semibold text-slate-700">{store.ownerName || "—"}</td>
-                        <td className="px-4 py-3">
-                          <p className="flex items-center gap-1 font-semibold text-slate-700"><Phone size={12} className="text-slate-400" />{store.phone || "—"}</p>
-                          <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-400"><Mail size={12} />{store.email || "—"}</p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <p className="font-semibold text-slate-700">{store.address?.city || store.address?.district || "—"}</p>
-                          <p className="text-[11px] text-slate-400">{store.address?.state || store.address?.zip || ""}</p>
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-600">{formatPlan(store.subscriptionPlan)}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <StatusPill tone={rowTone} dot>{rowStatus}</StatusPill>
-                        </td>
-                        <td className="px-4 py-3 text-xs font-semibold text-slate-500">{formatJoined(store.createdAt)}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-1">
-                            <button type="button" onClick={() => handleViewDetails(store._id)} title="View" className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50">
-                              <Eye size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleStatusUpdate(store._id, "isActive", store.isActive === true)}
-                              title={store.isActive !== false ? "Block" : "Unblock"}
-                              className={`rounded-lg border p-2 ${store.isActive !== false ? "border-rose-200 text-rose-500 hover:bg-rose-50" : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"}`}
-                            >
-                              <Power size={14} />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleStatusUpdate(store._id, "isApproved", store.isApproved === true)}
-                              title={store.isApproved ? "Revoke approval" : "Approve"}
-                              className={`rounded-lg border p-2 ${store.isApproved ? "border-amber-200 text-amber-600 hover:bg-amber-50" : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"}`}
-                            >
-                              {store.isApproved ? <XCircle size={14} /> : <Check size={14} />}
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {pagination.totalPages > 0 && (
-              <PaginationBar
-                label={
-                  <>
-                    Showing{" "}
-                    <span className="font-semibold text-stone-700">
-                      {Math.min(
-                        (pagination.page - 1) * pagination.limit + 1,
-                        pagination.total,
-                      )}
-                    </span>
-                    {" – "}
-                    <span className="font-semibold text-stone-700">
-                      {Math.min(
-                        pagination.page * pagination.limit,
-                        pagination.total,
-                      )}
-                    </span>
-                    {" of "}
-                    <span className="font-semibold text-stone-700">
-                      {pagination.total}
-                    </span>
-                    {" restaurants"}
-                  </>
-                }
-                page={pagination.page}
-                totalPages={pagination.totalPages}
-                hasPrev={pagination.hasPreviousPage}
-                hasNext={pagination.hasNextPage}
-                disabled={loading}
-                onPrev={() => setPage((prev) => Math.max(1, prev - 1))}
-                onNext={() => setPage((prev) => prev + 1)}
-              />
-            )}
-          </div>
-          </>
-          )}
-
-          {activeTab === "logs" && (
-          <div className="rounded-2xl border border-stone-200 bg-white">
-            <div className="border-b border-stone-100 p-5">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                <div className="flex items-center gap-2.5">
-                  <History className="h-4 w-4 text-stone-400" />
-                  <SectionHeading
-                    title="Audit logs"
-                    subtitle="History of sensitive super-admin restaurant actions"
-                  />
-                </div>
-
-                <div className="flex flex-wrap gap-2">
-                  <SelectField
-                    value={auditAction}
-                    onChange={(e) => {
-                      setAuditAction(e.target.value);
-                      setAuditPage(1);
-                    }}
-                    className="w-44"
+            <>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  [
+                    "Total Restaurants",
+                    statsLoading ? "…" : totalStores,
+                    Building2,
+                    "text-violet-600 bg-violet-50",
+                    "All partners",
+                  ],
+                  [
+                    "Active Restaurants",
+                    statsLoading ? "…" : activeStores,
+                    CheckCircle2,
+                    "text-emerald-600 bg-emerald-50",
+                    statsLoading || !totalStores
+                      ? ""
+                      : `${((activeStores / totalStores) * 100).toFixed(1)}% active`,
+                  ],
+                  [
+                    "Pending Approval",
+                    statsLoading ? "…" : pendingStores,
+                    AlertCircle,
+                    "text-amber-600 bg-amber-50",
+                    statsLoading || !totalStores
+                      ? ""
+                      : `${((pendingStores / totalStores) * 100).toFixed(1)}% pending`,
+                  ],
+                  [
+                    "Blocked Restaurants",
+                    statsLoading ? "…" : blockedStores,
+                    XCircle,
+                    "text-rose-600 bg-rose-50",
+                    statsLoading || !totalStores
+                      ? ""
+                      : `${((blockedStores / totalStores) * 100).toFixed(1)}% blocked`,
+                  ],
+                ].map(([label, value, Icon, tint, note]) => (
+                  <div
+                    key={label}
+                    className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
                   >
-                    <option value="">All actions</option>
-                    <option value="RESTAURANT_APPROVED">Approved</option>
-                    <option value="RESTAURANT_APPROVAL_REVOKED">
-                      Approval revoked
-                    </option>
-                    <option value="RESTAURANT_BLOCKED">Blocked</option>
-                    <option value="RESTAURANT_UNBLOCKED">Unblocked</option>
-                    <option value="RESTAURANT_DELETED">Deleted</option>
-                    <option value="SUBSCRIPTION_PLAN_CHANGED">
-                      Plan changed
-                    </option>
-                    <option value="SUBSCRIPTION_STATUS_CHANGED">
-                      Status changed
-                    </option>
-                    <option value="STAFF_ACTIVATED">Staff activated</option>
-                    <option value="STAFF_DEACTIVATED">
-                      Staff deactivated
-                    </option>
+                    <div className="flex items-center justify-between">
+                      <span
+                        className={`flex h-9 w-9 items-center justify-center rounded-xl ${tint}`}
+                      >
+                        <Icon size={16} />
+                      </span>
+                      <p className="text-[11px] font-bold text-slate-400">
+                        {label}
+                      </p>
+                    </div>
+                    <p className="mt-3 text-2xl font-black text-slate-900">
+                      {value}
+                    </p>
+                    {note ? (
+                      <p className="mt-1 text-[11px] font-bold text-slate-400">
+                        {note}
+                      </p>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+              <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
+                  <div className="relative lg:col-span-2">
+                    <Search
+                      size={16}
+                      className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-stone-400"
+                    />
+                    <input
+                      type="text"
+                      value={search}
+                      onChange={(e) => {
+                        setSearch(e.target.value);
+                        setPage(1);
+                      }}
+                      placeholder="Restaurant name, owner, email, phone"
+                      className="h-10 w-full rounded-lg border border-stone-200 bg-stone-50 pl-10 pr-4 text-sm outline-none transition focus:border-stone-400 focus:bg-white"
+                    />
+                  </div>
+
+                  <SelectField
+                    value={joinedFilter}
+                    onChange={(e) => {
+                      setJoinedFilter(e.target.value);
+                      setPage(1);
+                    }}
+                  >
+                    <option value="all">All restaurants</option>
+                    <option value="new">New (last 7 days)</option>
                   </SelectField>
 
                   <SelectField
-                    value={auditSort}
+                    value={sortBy}
                     onChange={(e) => {
-                      setAuditSort(e.target.value);
-                      setAuditPage(1);
+                      setSortBy(e.target.value);
+                      setPage(1);
                     }}
-                    className="w-40"
                   >
                     <option value="newest">Newest first</option>
                     <option value="oldest">Oldest first</option>
+                    <option value="name_asc">Name A–Z</option>
+                    <option value="name_desc">Name Z–A</option>
                   </SelectField>
+
+                  {/* Status */}
+                  <SelectField
+                    value={statusFilter}
+                    onChange={(e) => {
+                      setStatusFilter(e.target.value);
+                      setPage(1);
+                    }}
+                  >
+                    <option value="all">All access status</option>
+                    <option value="active">Active</option>
+                    <option value="blocked">Blocked</option>
+                  </SelectField>
+
+                  <SelectField
+                    value={approvalFilter}
+                    onChange={(e) => {
+                      setApprovalFilter(e.target.value);
+                      setPage(1);
+                    }}
+                  >
+                    <option value="all">All approval</option>
+                    <option value="approved">Approved</option>
+                    <option value="pending">Pending</option>
+                  </SelectField>
+
+                  <SelectField
+                    value={planFilter}
+                    onChange={(e) => {
+                      setPlanFilter(e.target.value);
+                      setPage(1);
+                    }}
+                  >
+                    <option value="all">All plans</option>
+                    <option value="TRIAL">Trial</option>
+                    <option value="BASIC">Basic</option>
+                    <option value="PREMIUM">Premium</option>
+                    <option value="PRO">Pro</option>
+                  </SelectField>
+
+                  <SelectField
+                    value={subscriptionFilter}
+                    onChange={(e) => {
+                      setSubscriptionFilter(e.target.value);
+                      setPage(1);
+                    }}
+                  >
+                    <option value="all">Plan active and inactive</option>
+                    <option value="active">Plan active</option>
+                    <option value="inactive">Plan inactive</option>
+                  </SelectField>
+
+                  <input
+                    type="text"
+                    value={districtFilter}
+                    onChange={(e) => {
+                      setDistrictFilter(e.target.value);
+                      setPage(1);
+                    }}
+                    placeholder="District"
+                    className="h-10 w-full rounded-lg border border-stone-200 bg-white px-3 text-sm outline-none focus:border-stone-400"
+                  />
+
+                  <input
+                    type="text"
+                    value={pincodeFilter}
+                    onChange={(e) => {
+                      setPincodeFilter(e.target.value);
+                      setPage(1);
+                    }}
+                    placeholder="Pincode"
+                    inputMode="numeric"
+                    className="h-10 w-full rounded-lg border border-stone-200 bg-white px-3 text-sm outline-none focus:border-stone-400"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearch("");
+                      setStatusFilter("all");
+                      setApprovalFilter("all");
+                      setSortBy("newest");
+                      setJoinedFilter("all");
+                      setPlanFilter("all");
+                      setSubscriptionFilter("all");
+                      setDistrictFilter("");
+                      setPincodeFilter("");
+                      setPage(1);
+                    }}
+                    className="h-10 rounded-xl border border-slate-200 px-3 text-xs font-black text-slate-600"
+                  >
+                    Reset
+                  </button>
                 </div>
               </div>
-            </div>
 
-            <div className="overflow-x-auto">
-              {auditLoading ? (
-                <div className="p-10 text-center text-sm font-medium text-stone-500">
-                  Loading audit logs…
-                </div>
-              ) : auditLogs.length === 0 ? (
-                <div className="p-10 text-center text-sm font-medium text-stone-500">
-                  No audit logs found.
-                </div>
-              ) : (
-                <table className="min-w-full">
-                  <thead>
-                    <tr className="border-b border-stone-100 bg-stone-50">
-                      <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-stone-400">
-                        Restaurant
-                      </th>
-                      <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-stone-400">
-                        Action
-                      </th>
-                      <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-stone-400">
-                        Admin
-                      </th>
-                      <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-stone-400">
-                        Change
-                      </th>
-                      <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-stone-400">
-                        IP
-                      </th>
-                      <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-stone-400">
-                        Date
-                      </th>
-                    </tr>
-                  </thead>
+              {/* Restaurants table */}
+              <div className="overflow-hidden rounded-2xl border border-stone-200 bg-white">
+                {loading ? (
+                  <div className="flex items-center justify-center gap-2 py-16 text-sm text-stone-500">
+                    <Loader2 size={18} className="animate-spin text-red-600" />
+                    Loading restaurants…
+                  </div>
+                ) : restaurants.length === 0 ? (
+                  <div className="space-y-3 py-16 text-center">
+                    <Store className="mx-auto text-stone-300" size={40} />
+                    <p className="text-sm font-medium text-stone-500">
+                      No restaurants registered yet.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full min-w-[980px] border-collapse text-left">
+                      <thead className="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                        <tr>
+                          <th className="px-4 py-3">#</th>
+                          <th className="px-4 py-3">Restaurant</th>
+                          <th className="px-4 py-3">Owner</th>
+                          <th className="px-4 py-3">Contact</th>
+                          <th className="px-4 py-3">Location</th>
+                          <th className="px-4 py-3">Plan</th>
+                          <th className="px-4 py-3">Status</th>
+                          <th className="px-4 py-3">Joined On</th>
+                          <th className="px-4 py-3 text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-50 text-xs sm:text-sm">
+                        {restaurants.map((store, index) => {
+                          const rowStatus = !store.isApproved
+                            ? "Pending"
+                            : store.isActive === false
+                              ? "Blocked"
+                              : "Active";
+                          const rowTone =
+                            rowStatus === "Pending"
+                              ? "amber"
+                              : rowStatus === "Blocked"
+                                ? "rose"
+                                : "emerald";
+                          return (
+                            <tr
+                              key={store._id}
+                              className="hover:bg-slate-50/80"
+                            >
+                              <td className="px-4 py-3 text-xs font-bold text-slate-400">
+                                {(pagination.page - 1) * pagination.limit +
+                                  index +
+                                  1}
+                              </td>
+                              <td className="px-4 py-3">
+                                <p className="text-sm font-black text-slate-900">
+                                  {store.name}
+                                </p>
+                                <p className="text-[11px] font-semibold text-slate-400">
+                                  {store.slug || "—"}
+                                </p>
+                              </td>
+                              <td className="px-4 py-3 font-semibold text-slate-700">
+                                {store.ownerName || "—"}
+                              </td>
+                              <td className="px-4 py-3">
+                                <p className="flex items-center gap-1 font-semibold text-slate-700">
+                                  <Phone size={12} className="text-slate-400" />
+                                  {store.phone || "—"}
+                                </p>
+                                <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-400">
+                                  <Mail size={12} />
+                                  {store.email || "—"}
+                                </p>
+                              </td>
+                              <td className="px-4 py-3">
+                                <p className="font-semibold text-slate-700">
+                                  {store.address?.city ||
+                                    store.address?.district ||
+                                    "—"}
+                                </p>
+                                <p className="text-[11px] text-slate-400">
+                                  {store.address?.state ||
+                                    store.address?.zip ||
+                                    ""}
+                                </p>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-600">
+                                  {formatPlan(store.subscriptionPlan)}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <StatusPill tone={rowTone} dot>
+                                  {rowStatus}
+                                </StatusPill>
+                              </td>
+                              <td className="px-4 py-3 text-xs font-semibold text-slate-500">
+                                {formatJoined(store.createdAt)}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center justify-end gap-1">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleViewDetails(store._id)}
+                                    title="View"
+                                    className="rounded-lg border border-slate-200 p-2 text-slate-500 hover:bg-slate-50"
+                                  >
+                                    <Eye size={14} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleStatusUpdate(
+                                        store._id,
+                                        "isActive",
+                                        store.isActive === true,
+                                      )
+                                    }
+                                    title={
+                                      store.isActive !== false
+                                        ? "Block"
+                                        : "Unblock"
+                                    }
+                                    className={`rounded-lg border p-2 ${store.isActive !== false ? "border-rose-200 text-rose-500 hover:bg-rose-50" : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"}`}
+                                  >
+                                    <Power size={14} />
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      handleStatusUpdate(
+                                        store._id,
+                                        "isApproved",
+                                        store.isApproved === true,
+                                      )
+                                    }
+                                    title={
+                                      store.isApproved
+                                        ? "Revoke approval"
+                                        : "Approve"
+                                    }
+                                    className={`rounded-lg border p-2 ${store.isApproved ? "border-amber-200 text-amber-600 hover:bg-amber-50" : "border-emerald-200 text-emerald-600 hover:bg-emerald-50"}`}
+                                  >
+                                    {store.isApproved ? (
+                                      <XCircle size={14} />
+                                    ) : (
+                                      <Check size={14} />
+                                    )}
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
 
-                  <tbody>
-                    {auditLogs.map((log) => (
-                      <tr
-                        key={log._id}
-                        className="border-b border-stone-100 transition-colors last:border-0 hover:bg-stone-50/70"
-                      >
-                        <td className="px-5 py-4">
-                          <p className="font-semibold text-stone-900">
-                            {log.restaurantId?.name || "Deleted restaurant"}
-                          </p>
-                          {log.restaurantId?.email && (
-                            <p className="text-xs text-stone-400">
-                              {log.restaurantId.email}
-                            </p>
+                {pagination.totalPages > 0 && (
+                  <PaginationBar
+                    label={
+                      <>
+                        Showing{" "}
+                        <span className="font-semibold text-stone-700">
+                          {Math.min(
+                            (pagination.page - 1) * pagination.limit + 1,
+                            pagination.total,
                           )}
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <StatusPill tone={getAuditActionTone(log.action)}>
-                            {getAuditActionLabel(log.action)}
-                          </StatusPill>
-                        </td>
-
-                        <td className="px-5 py-4">
-                          <p className="font-medium text-stone-700">
-                            {log.adminUserId?.name || "Unknown"}
-                          </p>
-                          {log.adminUserId?.email && (
-                            <p className="text-xs text-stone-400">
-                              {log.adminUserId.email}
-                            </p>
+                        </span>
+                        {" – "}
+                        <span className="font-semibold text-stone-700">
+                          {Math.min(
+                            pagination.page * pagination.limit,
+                            pagination.total,
                           )}
-                        </td>
+                        </span>
+                        {" of "}
+                        <span className="font-semibold text-stone-700">
+                          {pagination.total}
+                        </span>
+                        {" restaurants"}
+                      </>
+                    }
+                    page={pagination.page}
+                    totalPages={pagination.totalPages}
+                    hasPrev={pagination.hasPreviousPage}
+                    hasNext={pagination.hasNextPage}
+                    disabled={loading}
+                    onPrev={() => setPage((prev) => Math.max(1, prev - 1))}
+                    onNext={() => setPage((prev) => prev + 1)}
+                  />
+                )}
+              </div>
+            </>
+          )}
 
-                        <td className="px-5 py-4 text-sm text-stone-600">
-                          {String(log.previousValue)} → {String(log.newValue)}
-                        </td>
+          {activeTab === "logs" && (
+            <div className="rounded-2xl border border-stone-200 bg-white">
+              <div className="border-b border-stone-100 p-5">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex items-center gap-2.5">
+                    <History className="h-4 w-4 text-stone-400" />
+                    <SectionHeading
+                      title="Audit logs"
+                      subtitle="History of sensitive super-admin restaurant actions"
+                    />
+                  </div>
 
-                        <td className="px-5 py-4 font-mono text-xs text-stone-400">
-                          {log.ipAddress || "N/A"}
-                        </td>
+                  <div className="flex flex-wrap gap-2">
+                    <SelectField
+                      value={auditAction}
+                      onChange={(e) => {
+                        setAuditAction(e.target.value);
+                        setAuditPage(1);
+                      }}
+                      className="w-44"
+                    >
+                      <option value="">All actions</option>
+                      <option value="RESTAURANT_APPROVED">Approved</option>
+                      <option value="RESTAURANT_APPROVAL_REVOKED">
+                        Approval revoked
+                      </option>
+                      <option value="RESTAURANT_BLOCKED">Blocked</option>
+                      <option value="RESTAURANT_UNBLOCKED">Unblocked</option>
+                      <option value="RESTAURANT_DELETED">Deleted</option>
+                      <option value="SUBSCRIPTION_PLAN_CHANGED">
+                        Plan changed
+                      </option>
+                      <option value="SUBSCRIPTION_STATUS_CHANGED">
+                        Status changed
+                      </option>
+                      <option value="STAFF_ACTIVATED">Staff activated</option>
+                      <option value="STAFF_DEACTIVATED">
+                        Staff deactivated
+                      </option>
+                    </SelectField>
 
-                        <td className="px-5 py-4 text-xs text-stone-500">
-                          {log.createdAt
-                            ? new Date(log.createdAt).toLocaleString()
-                            : "N/A"}
-                        </td>
+                    <SelectField
+                      value={auditSort}
+                      onChange={(e) => {
+                        setAuditSort(e.target.value);
+                        setAuditPage(1);
+                      }}
+                      className="w-40"
+                    >
+                      <option value="newest">Newest first</option>
+                      <option value="oldest">Oldest first</option>
+                    </SelectField>
+                  </div>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto">
+                {auditLoading ? (
+                  <div className="p-10 text-center text-sm font-medium text-stone-500">
+                    Loading audit logs…
+                  </div>
+                ) : auditLogs.length === 0 ? (
+                  <div className="p-10 text-center text-sm font-medium text-stone-500">
+                    No audit logs found.
+                  </div>
+                ) : (
+                  <table className="min-w-full">
+                    <thead>
+                      <tr className="border-b border-stone-100 bg-stone-50">
+                        <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-stone-400">
+                          Restaurant
+                        </th>
+                        <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-stone-400">
+                          Action
+                        </th>
+                        <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-stone-400">
+                          Admin
+                        </th>
+                        <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-stone-400">
+                          Change
+                        </th>
+                        <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-stone-400">
+                          IP
+                        </th>
+                        <th className="px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-stone-400">
+                          Date
+                        </th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
+                    </thead>
 
-            <PaginationBar
-              label={`${auditPagination.total} total audit records`}
-              page={auditPagination.page}
-              totalPages={auditPagination.totalPages}
-              hasPrev={auditPagination.hasPreviousPage}
-              hasNext={auditPagination.hasNextPage}
-              onPrev={() => setAuditPage((current) => Math.max(1, current - 1))}
-              onNext={() => setAuditPage((current) => current + 1)}
-            />
-          </div>
+                    <tbody>
+                      {auditLogs.map((log) => (
+                        <tr
+                          key={log._id}
+                          className="border-b border-stone-100 transition-colors last:border-0 hover:bg-stone-50/70"
+                        >
+                          <td className="px-5 py-4">
+                            <p className="font-semibold text-stone-900">
+                              {log.restaurantId?.name || "Deleted restaurant"}
+                            </p>
+                            {log.restaurantId?.email && (
+                              <p className="text-xs text-stone-400">
+                                {log.restaurantId.email}
+                              </p>
+                            )}
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <StatusPill tone={getAuditActionTone(log.action)}>
+                              {getAuditActionLabel(log.action)}
+                            </StatusPill>
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <p className="font-medium text-stone-700">
+                              {log.adminUserId?.name || "Unknown"}
+                            </p>
+                            {log.adminUserId?.email && (
+                              <p className="text-xs text-stone-400">
+                                {log.adminUserId.email}
+                              </p>
+                            )}
+                          </td>
+
+                          <td className="px-5 py-4 text-sm text-stone-600">
+                            {String(log.previousValue)} → {String(log.newValue)}
+                          </td>
+
+                          <td className="px-5 py-4 font-mono text-xs text-stone-400">
+                            {log.ipAddress || "N/A"}
+                          </td>
+
+                          <td className="px-5 py-4 text-xs text-stone-500">
+                            {log.createdAt
+                              ? new Date(log.createdAt).toLocaleString()
+                              : "N/A"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+
+              <PaginationBar
+                label={`${auditPagination.total} total audit records`}
+                page={auditPagination.page}
+                totalPages={auditPagination.totalPages}
+                hasPrev={auditPagination.hasPreviousPage}
+                hasNext={auditPagination.hasNextPage}
+                onPrev={() =>
+                  setAuditPage((current) => Math.max(1, current - 1))
+                }
+                onNext={() => setAuditPage((current) => current + 1)}
+              />
+            </div>
           )}
         </div>
       </div>

@@ -1,9 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-} from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { useAuth } from "../context/AuthContext";
 import {
@@ -26,8 +21,7 @@ import {
 |--------------------------------------------------------------------------
 */
 
-const RAZORPAY_SCRIPT_URL =
-  "https://checkout.razorpay.com/v1/checkout.js";
+const RAZORPAY_SCRIPT_URL = "https://checkout.razorpay.com/v1/checkout.js";
 
 /*
 |--------------------------------------------------------------------------
@@ -48,7 +42,7 @@ const PLAN_COPY = Object.freeze({
       "7 days only, once per restaurant",
       "Full workspace during the trial",
       "Account is blocked when the 7 days end",
-      "Choose Basic or Premium to continue",
+      "Choose Basic, Premium, or Pro to continue",
     ],
     icon: Clock3,
     popular: false,
@@ -85,6 +79,22 @@ const PLAN_COPY = Object.freeze({
     popular: false,
     buttonText: "Choose Premium",
   },
+ PRO: {
+  title: "Pro",
+  subtitle: "Everything in ChotuGTT",
+  description:
+    "All current features plus every new feature released in the future.",
+  features: [
+    "All current ChotuGTT features",
+    "All Premium features",
+    "All future features",
+    "Advanced features and upgrades",
+    "Priority access to new capabilities",
+  ],
+  icon: ShieldCheck,
+  popular: false,
+  buttonText: "Choose Pro",
+},
 });
 
 /*
@@ -146,26 +156,14 @@ const loadRazorpayScript = () => {
       };
 
       const cleanup = () => {
-        existingScript.removeEventListener(
-          "load",
-          handleLoad,
-        );
+        existingScript.removeEventListener("load", handleLoad);
 
-        existingScript.removeEventListener(
-          "error",
-          handleError,
-        );
+        existingScript.removeEventListener("error", handleError);
       };
 
-      existingScript.addEventListener(
-        "load",
-        handleLoad,
-      );
+      existingScript.addEventListener("load", handleLoad);
 
-      existingScript.addEventListener(
-        "error",
-        handleError,
-      );
+      existingScript.addEventListener("error", handleError);
 
       return;
     }
@@ -208,12 +206,9 @@ const loadRazorpayScript = () => {
 
 const createIdempotencyKey = (planCode) => {
   const randomPart =
-    typeof crypto !== "undefined" &&
-    typeof crypto.randomUUID === "function"
+    typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
       ? crypto.randomUUID()
-      : `${Date.now()}-${Math.random()
-          .toString(36)
-          .slice(2, 12)}`;
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 
   return `${IDEMPOTENCY_PREFIX}-${planCode}-${randomPart}`;
 };
@@ -254,29 +249,21 @@ export default function SubscriptionCheckout() {
   const [plans, setPlans] = useState([]);
   const [plansLoading, setPlansLoading] = useState(true);
 
-  const [loadingPlan, setLoadingPlan] =
-    useState(null);
+  const [loadingPlan, setLoadingPlan] = useState(null);
 
-  const [error, setError] =
-    useState("");
+  const [error, setError] = useState("");
 
-  const [razorpayReady, setRazorpayReady] =
-    useState(false);
+  const [razorpayReady, setRazorpayReady] = useState(false);
 
-  const [isInitializing, setIsInitializing] =
-    useState(true);
+  const [isInitializing, setIsInitializing] = useState(true);
 
-  const [paymentStage, setPaymentStage] =
-    useState("");
+  const [paymentStage, setPaymentStage] = useState("");
 
-  const mountedRef =
-    useRef(true);
+  const mountedRef = useRef(true);
 
-  const razorpayInstanceRef =
-    useRef(null);
+  const razorpayInstanceRef = useRef(null);
 
-  const paymentTimeoutRef =
-    useRef(null);
+  const paymentTimeoutRef = useRef(null);
 
   /*
   |--------------------------------------------------------------------------
@@ -292,16 +279,13 @@ export default function SubscriptionCheckout() {
   |--------------------------------------------------------------------------
   */
 
-  const clearPaymentTimeout =
-    useCallback(() => {
-      if (paymentTimeoutRef.current) {
-        window.clearTimeout(
-          paymentTimeoutRef.current,
-        );
+  const clearPaymentTimeout = useCallback(() => {
+    if (paymentTimeoutRef.current) {
+      window.clearTimeout(paymentTimeoutRef.current);
 
-        paymentTimeoutRef.current = null;
-      }
-    }, []);
+      paymentTimeoutRef.current = null;
+    }
+  }, []);
 
   /*
   |--------------------------------------------------------------------------
@@ -314,34 +298,26 @@ export default function SubscriptionCheckout() {
 
     let cancelled = false;
 
-    const initializePaymentGateway =
-      async () => {
-        setIsInitializing(true);
-        setError("");
+    const initializePaymentGateway = async () => {
+      setIsInitializing(true);
+      setError("");
 
-        const loaded =
-          await loadRazorpayScript();
+      const loaded = await loadRazorpayScript();
 
-        if (
-          cancelled ||
-          !mountedRef.current
-        ) {
-          return;
-        }
+      if (cancelled || !mountedRef.current) {
+        return;
+      }
 
-        if (
-          !loaded ||
-          !window.Razorpay
-        ) {
-          setRazorpayReady(false);
-          setIsInitializing(false);
-          return;
-        }
-
-        setRazorpayReady(true);
-
+      if (!loaded || !window.Razorpay) {
+        setRazorpayReady(false);
         setIsInitializing(false);
-      };
+        return;
+      }
+
+      setRazorpayReady(true);
+
+      setIsInitializing(false);
+    };
 
     initializePaymentGateway();
 
@@ -431,14 +407,11 @@ export default function SubscriptionCheckout() {
   |--------------------------------------------------------------------------
   */
 
-  const redirectToDashboard =
-    useCallback(() => {
-      clearPaymentTimeout();
+  const redirectToDashboard = useCallback(() => {
+    clearPaymentTimeout();
 
-      window.location.replace(
-        "/",
-      );
-    }, [clearPaymentTimeout]);
+    window.location.replace("/");
+  }, [clearPaymentTimeout]);
 
   const handleStartTrial = useCallback(async () => {
     if (loadingPlan) {
@@ -477,58 +450,48 @@ export default function SubscriptionCheckout() {
   |--------------------------------------------------------------------------
   */
 
-  const handlePayment =
-    useCallback(
-      async (planCode) => {
-        /*
+  const handlePayment = useCallback(
+    async (planCode) => {
+      /*
         |--------------------------------------------------------------------------
         | Prevent double payment initiation.
         |--------------------------------------------------------------------------
         */
 
-        if (loadingPlan) {
-          return;
-        }
+      if (loadingPlan) {
+        return;
+      }
 
-        const selectedPlan = plans.find(
-          (plan) => plan.code === planCode,
-        );
+      const selectedPlan = plans.find((plan) => plan.code === planCode);
 
-        if (!selectedPlan || selectedPlan.trial) {
-          setError(
-            "Invalid subscription plan selected.",
-          );
+      if (!selectedPlan || selectedPlan.trial) {
+        setError("Invalid subscription plan selected.");
 
-          return;
-        }
+        return;
+      }
 
-        /*
+      /*
         |--------------------------------------------------------------------------
         | Razorpay readiness
         |--------------------------------------------------------------------------
         */
 
-        if (
-          !razorpayReady ||
-          !window.Razorpay
-        ) {
-          setError(
-            "Secure payment gateway is still loading. Please wait a moment and try again.",
-          );
-
-          return;
-        }
-
-        setLoadingPlan(planCode);
-
-        setError("");
-
-        setPaymentStage(
-          "Creating secure payment order...",
+      if (!razorpayReady || !window.Razorpay) {
+        setError(
+          "Secure payment gateway is still loading. Please wait a moment and try again.",
         );
 
-        try {
-          /*
+        return;
+      }
+
+      setLoadingPlan(planCode);
+
+      setError("");
+
+      setPaymentStage("Creating secure payment order...");
+
+      try {
+        /*
           |--------------------------------------------------------------------------
           | STEP 1
           | Create backend payment order
@@ -548,192 +511,147 @@ export default function SubscriptionCheckout() {
           |--------------------------------------------------------------------------
           */
 
-          const idempotencyKey =
-            createIdempotencyKey(
-              planCode,
-            );
+        const idempotencyKey = createIdempotencyKey(planCode);
 
-          const createOrderResponse =
-            await axios.post(
-              "/payments/create-order",
-              {
-                plan: planCode,
-              },
-              {
-                withCredentials: true,
+        const createOrderResponse = await axios.post(
+          "/payments/create-order",
+          {
+            plan: planCode,
+          },
+          {
+            withCredentials: true,
 
-                timeout:
-                  PAYMENT_TIMEOUT_MS,
+            timeout: PAYMENT_TIMEOUT_MS,
 
-                headers: {
-                  "Content-Type":
-                    "application/json",
+            headers: {
+              "Content-Type": "application/json",
 
-                  "Idempotency-Key":
-                    idempotencyKey,
-                },
-              },
-            );
+              "Idempotency-Key": idempotencyKey,
+            },
+          },
+        );
 
-          const responseData =
-            createOrderResponse?.data;
+        const responseData = createOrderResponse?.data;
 
-          if (!responseData?.success) {
-            throw new Error(
-              responseData?.message ||
-                "Unable to create payment order.",
-            );
-          }
+        if (!responseData?.success) {
+          throw new Error(
+            responseData?.message || "Unable to create payment order.",
+          );
+        }
 
-          const paymentData =
-            responseData?.data;
+        const paymentData = responseData?.data;
 
-          const {
-            keyId,
-            orderId,
-            amount,
-            currency,
-            transactionId,
-          } =
-            paymentData || {};
+        const { keyId, orderId, amount, currency, transactionId } =
+          paymentData || {};
 
-          /*
+        /*
           |--------------------------------------------------------------------------
           | Validate backend response
           |--------------------------------------------------------------------------
           */
 
-          if (
-            !keyId ||
-            !orderId ||
-            !transactionId ||
-            !amount ||
-            !currency
-          ) {
-            throw new Error(
-              "Invalid payment order received from server.",
-            );
-          }
+        if (!keyId || !orderId || !transactionId || !amount || !currency) {
+          throw new Error("Invalid payment order received from server.");
+        }
 
-          if (
-            String(currency).toUpperCase() !==
-            PAYMENT_CURRENCY
-          ) {
-            throw new Error(
-              "Unsupported payment currency received from server.",
-            );
-          }
+        if (String(currency).toUpperCase() !== PAYMENT_CURRENCY) {
+          throw new Error("Unsupported payment currency received from server.");
+        }
 
-          /*
+        /*
           |--------------------------------------------------------------------------
           | STEP 2
           | Open Razorpay
           |--------------------------------------------------------------------------
           */
 
-          setPaymentStage(
-            "Opening secure checkout...",
-          );
+        setPaymentStage("Opening secure checkout...");
 
-          const options = {
-            key: keyId,
+        const options = {
+          key: keyId,
 
-            amount,
+          amount,
 
-            currency,
+          currency,
 
-            name: "ChotuGTT",
+          name: "ChotuGTT",
 
-            description:
-              "ChotuGTT - 15 Months Subscription",
+          description: `ChotuGTT - ${formatDuration(selectedPlan)} Subscription`,
 
-            order_id:
-              orderId,
+          order_id: orderId,
 
-            /*
+          /*
             |--------------------------------------------------------------------------
             | Payment success handler
             |--------------------------------------------------------------------------
             */
 
-            handler:
-              async (razorpayResponse) => {
-                try {
-                  setPaymentStage(
-                    "Verifying your payment...",
-                  );
+          handler: async (razorpayResponse) => {
+            try {
+              setPaymentStage("Verifying your payment...");
 
-                  setError("");
+              setError("");
 
-                  /*
+              /*
                   |--------------------------------------------------------------------------
                   | Validate Razorpay response
                   |--------------------------------------------------------------------------
                   */
 
-                  const {
-                    razorpay_order_id,
-                    razorpay_payment_id,
-                    razorpay_signature,
-                  } =
-                    razorpayResponse || {};
+              const {
+                razorpay_order_id,
+                razorpay_payment_id,
+                razorpay_signature,
+              } = razorpayResponse || {};
 
-                  if (
-                    !razorpay_order_id ||
-                    !razorpay_payment_id ||
-                    !razorpay_signature
-                  ) {
-                    throw new Error(
-                      "Incomplete payment response received from Razorpay.",
-                    );
-                  }
+              if (
+                !razorpay_order_id ||
+                !razorpay_payment_id ||
+                !razorpay_signature
+              ) {
+                throw new Error(
+                  "Incomplete payment response received from Razorpay.",
+                );
+              }
 
-                  /*
+              /*
                   |--------------------------------------------------------------------------
                   | STEP 3
                   | Verify payment on backend
                   |--------------------------------------------------------------------------
                   */
 
-                  const verifyResponse =
-                    await axios.post(
-                      "/payments/verify",
-                      {
-                        razorpay_order_id,
+              const verifyResponse = await axios.post(
+                "/payments/verify",
+                {
+                  razorpay_order_id,
 
-                        razorpay_payment_id,
+                  razorpay_payment_id,
 
-                        razorpay_signature,
+                  razorpay_signature,
 
-                        transactionId,
-                      },
-                      {
-                        withCredentials:
-                          true,
+                  transactionId,
+                },
+                {
+                  withCredentials: true,
 
-                        timeout:
-                          PAYMENT_TIMEOUT_MS,
+                  timeout: PAYMENT_TIMEOUT_MS,
 
-                        headers: {
-                          "Content-Type":
-                            "application/json",
-                        },
-                      },
-                    );
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                },
+              );
 
-                  const verifyData =
-                    verifyResponse?.data;
+              const verifyData = verifyResponse?.data;
 
-                  if (
-                    !verifyData?.success
-                  ) {
-                    throw new Error(
-                      verifyData?.message ||
-                        "Payment verification failed.",
-                    );
-                  }
+              if (!verifyData?.success) {
+                throw new Error(
+                  verifyData?.message || "Payment verification failed.",
+                );
+              }
 
-                  /*
+              /*
                   |--------------------------------------------------------------------------
                   | SUCCESS
                   |--------------------------------------------------------------------------
@@ -750,65 +668,57 @@ export default function SubscriptionCheckout() {
                   |--------------------------------------------------------------------------
                   */
 
-                  setPaymentStage(
-                    "Subscription activated. Opening dashboard...",
-                  );
+              setPaymentStage("Subscription activated. Opening dashboard...");
 
-                  clearPaymentTimeout();
+              clearPaymentTimeout();
 
-                  // Refresh the authenticated user exactly once after
-                  // backend payment verification. This updates the
-                  // AuthContext with the newly ACTIVE subscription.
-                  await refreshSession();
+              // Refresh the authenticated user exactly once after
+              // backend payment verification. This updates the
+              // AuthContext with the newly ACTIVE subscription.
+              await refreshSession();
 
-                  if (!mountedRef.current) {
-                    return;
-                  }
+              if (!mountedRef.current) {
+                return;
+              }
 
-                  // Only a successful, backend-verified payment reaches
-                  // this point. Navigate to dashboard once; there is no
-                  // polling/reload loop on the subscription page.
-                  redirectToDashboard();
-                } catch (verifyError) {
-                  console.error(
-                    "Payment verification failed:",
-                    verifyError,
-                  );
+              // Only a successful, backend-verified payment reaches
+              // this point. Navigate to dashboard once; there is no
+              // polling/reload loop on the subscription page.
+              redirectToDashboard();
+            } catch (verifyError) {
+              console.error("Payment verification failed:", verifyError);
 
-                  if (
-                    !mountedRef.current
-                  ) {
-                    return;
-                  }
+              if (!mountedRef.current) {
+                return;
+              }
 
-                  setError(
-                    verifyError?.response
-                      ?.data?.message ||
-                      verifyError?.message ||
-                      "Payment was received, but verification could not be completed. If money was deducted, please contact support.",
-                  );
+              setError(
+                verifyError?.response?.data?.message ||
+                  verifyError?.message ||
+                  "Payment was received, but verification could not be completed. If money was deducted, please contact support.",
+              );
 
-                  setPaymentStage("");
+              setPaymentStage("");
 
-                  setLoadingPlan(null);
-                }
-              },
+              setLoadingPlan(null);
+            }
+          },
 
-            /*
+          /*
             |--------------------------------------------------------------------------
             | Razorpay Prefill
             |--------------------------------------------------------------------------
             */
 
-            prefill: {
-              name: "",
+          prefill: {
+            name: "",
 
-              email: "",
+            email: "",
 
-              contact: "",
-            },
+            contact: "",
+          },
 
-            /*
+          /*
             |--------------------------------------------------------------------------
             | Notes
             |--------------------------------------------------------------------------
@@ -817,111 +727,93 @@ export default function SubscriptionCheckout() {
             |--------------------------------------------------------------------------
             */
 
-            notes: {
-              plan: planCode,
+          notes: {
+            plan: planCode,
+            duration: selectedPlan.durationMonths
+              ? `${selectedPlan.durationMonths}_MONTHS`
+              : `${selectedPlan.durationDays}_DAYS`,
+          },
 
-              duration:
-                "15_MONTHS",
-            },
-
-            /*
+          /*
             |--------------------------------------------------------------------------
             | Theme
             |--------------------------------------------------------------------------
             */
 
-            theme: {
-              color: "#E11D48",
-            },
+          theme: {
+            color: "#E11D48",
+          },
 
-            /*
+          /*
             |--------------------------------------------------------------------------
             | Modal
             |--------------------------------------------------------------------------
             */
 
-            modal: {
-              escape: true,
+          modal: {
+            escape: true,
 
-              ondismiss: () => {
-                clearPaymentTimeout();
+            ondismiss: () => {
+              clearPaymentTimeout();
 
-                if (
-                  !mountedRef.current
-                ) {
-                  return;
-                }
+              if (!mountedRef.current) {
+                return;
+              }
 
-                setLoadingPlan(null);
+              setLoadingPlan(null);
 
-                setPaymentStage("");
+              setPaymentStage("");
 
-                razorpayInstanceRef.current =
-                  null;
-              },
+              razorpayInstanceRef.current = null;
             },
-          };
+          },
+        };
 
-          /*
+        /*
           |--------------------------------------------------------------------------
           | Create Razorpay instance
           |--------------------------------------------------------------------------
           */
 
-          const razorpay =
-            new window.Razorpay(
-              options,
-            );
+        const razorpay = new window.Razorpay(options);
 
-          razorpayInstanceRef.current =
-            razorpay;
+        razorpayInstanceRef.current = razorpay;
 
-          /*
+        /*
           |--------------------------------------------------------------------------
           | Payment Failure
           |--------------------------------------------------------------------------
           */
 
-          razorpay.on(
-            "payment.failed",
-            (response) => {
-              console.error(
-                "Razorpay payment failed:",
-                response,
-              );
+        razorpay.on("payment.failed", (response) => {
+          console.error("Razorpay payment failed:", response);
 
-              clearPaymentTimeout();
+          clearPaymentTimeout();
 
-              if (
-                !mountedRef.current
-              ) {
-                return;
-              }
+          if (!mountedRef.current) {
+            return;
+          }
 
-              setError(
-                response?.error
-                  ?.description ||
-                  "Payment failed. Please try again.",
-              );
-
-              setPaymentStage("");
-
-              setLoadingPlan(null);
-
-              razorpayInstanceRef.current =
-                null;
-            },
+          setError(
+            response?.error?.description || "Payment failed. Please try again.",
           );
 
-          /*
+          setPaymentStage("");
+
+          setLoadingPlan(null);
+
+          razorpayInstanceRef.current = null;
+        });
+
+        /*
           |--------------------------------------------------------------------------
           | Open Razorpay
           |--------------------------------------------------------------------------
           */
 
-          razorpay.open();
+        razorpay.open();
 
-          /*
+        /*
           |--------------------------------------------------------------------------
           | Safety timeout
           |--------------------------------------------------------------------------
@@ -931,59 +823,48 @@ export default function SubscriptionCheckout() {
           |--------------------------------------------------------------------------
           */
 
-          clearPaymentTimeout();
+        clearPaymentTimeout();
 
-          paymentTimeoutRef.current =
-            window.setTimeout(() => {
-              if (
-                !mountedRef.current
-              ) {
-                return;
-              }
-
-              setLoadingPlan(null);
-
-              setPaymentStage("");
-
-              setError(
-                "Payment session timed out. Please try again.",
-              );
-            }, PAYMENT_TIMEOUT_MS);
-        } catch (paymentError) {
-          console.error(
-            "Subscription payment error:",
-            paymentError,
-          );
-
-          clearPaymentTimeout();
-
-          if (
-            !mountedRef.current
-          ) {
+        paymentTimeoutRef.current = window.setTimeout(() => {
+          if (!mountedRef.current) {
             return;
           }
 
-          setError(
-            paymentError?.response
-              ?.data?.message ||
-              paymentError?.message ||
-              "Unable to start payment. Please try again.",
-          );
+          setLoadingPlan(null);
 
           setPaymentStage("");
 
-          setLoadingPlan(null);
+          setError("Payment session timed out. Please try again.");
+        }, PAYMENT_TIMEOUT_MS);
+      } catch (paymentError) {
+        console.error("Subscription payment error:", paymentError);
+
+        clearPaymentTimeout();
+
+        if (!mountedRef.current) {
+          return;
         }
-      },
-      [
-        clearPaymentTimeout,
-        loadingPlan,
-        razorpayReady,
-        redirectToDashboard,
-        refreshSession,
-        plans,
-      ],
-    );
+
+        setError(
+          paymentError?.response?.data?.message ||
+            paymentError?.message ||
+            "Unable to start payment. Please try again.",
+        );
+
+        setPaymentStage("");
+
+        setLoadingPlan(null);
+      }
+    },
+    [
+      clearPaymentTimeout,
+      loadingPlan,
+      razorpayReady,
+      redirectToDashboard,
+      refreshSession,
+      plans,
+    ],
+  );
 
   /*
   |--------------------------------------------------------------------------
@@ -991,8 +872,7 @@ export default function SubscriptionCheckout() {
   |--------------------------------------------------------------------------
   */
 
-  const isBusy =
-    loadingPlan !== null;
+  const isBusy = loadingPlan !== null;
 
   const activeExpiry = user?.subscriptionExpiresAt
     ? new Date(user.subscriptionExpiresAt)
@@ -1023,12 +903,11 @@ export default function SubscriptionCheckout() {
           <div className="flex min-w-0 items-center gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[var(--primary)] shadow-sm">
               {/* <ChefHat size={20} strokeWidth={2.25} /> */}
-               <img
+              <img
                 src="/ChotuGTT__1_-removebg-preview.png"
                 alt="ChotuGTT Logo"
                 className="h-6 w-6"
               />
-
             </span>
 
             <div className="min-w-0 leading-tight">
@@ -1107,51 +986,40 @@ export default function SubscriptionCheckout() {
         <section className="mx-auto max-w-3xl text-center">
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-rose-100 bg-white px-3.5 py-1.5 text-[11px] font-bold text-rose-600 shadow-sm">
             <ShieldCheck size={14} />
-
             Choose a plan
           </div>
 
           <h1 className="text-3xl font-black tracking-[-0.03em] text-slate-950 sm:text-4xl lg:text-5xl">
             Start free, or run
-            <span className="block text-rose-600">
-              the full restaurant
-            </span>
+            <span className="block text-rose-600">the full restaurant</span>
           </h1>
 
           <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
-            Trial lasts 7 days, then the restaurant account is blocked.
-            Basic is ₹4,000 for 1 year. Premium is ₹8,000 for that same
-            year plus one thermal printer.
+            Trial lasts 7 days, then the restaurant account is blocked. Basic is
+            ₹4,000 for 1 year. Premium is ₹8,000 for 1 year with one thermal
+            printer. Pro is ₹12,000 for 1 year with all current and future
+            ChotuGTT features.
           </p>
 
           {/* Secure indicators */}
 
           <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-[11px] font-semibold text-slate-500">
             <span className="inline-flex items-center gap-1.5">
-              <CircleCheck
-                size={14}
-                className="text-emerald-500"
-              />
+              <CircleCheck size={14} className="text-emerald-500" />
               7-day trial
             </span>
 
             <span className="hidden h-3 w-px bg-slate-200 sm:block" />
 
             <span className="inline-flex items-center gap-1.5">
-              <CircleCheck
-                size={14}
-                className="text-emerald-500"
-              />
+              <CircleCheck size={14} className="text-emerald-500" />
               Basic ₹4,000 / year
             </span>
 
             <span className="hidden h-3 w-px bg-slate-200 sm:block" />
 
             <span className="inline-flex items-center gap-1.5">
-              <CircleCheck
-                size={14}
-                className="text-emerald-500"
-              />
+              <CircleCheck size={14} className="text-emerald-500" />
               Premium includes a printer
             </span>
           </div>
@@ -1163,21 +1031,14 @@ export default function SubscriptionCheckout() {
 
         {isInitializing && (
           <div className="mx-auto mt-8 flex max-w-md items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-4 text-sm font-semibold text-slate-600 shadow-sm">
-            <Loader2
-              size={18}
-              className="animate-spin text-rose-600"
-            />
-
+            <Loader2 size={18} className="animate-spin text-rose-600" />
             Preparing secure checkout...
           </div>
         )}
 
         {paymentStage && !error && (
           <div className="mx-auto mt-8 flex max-w-lg items-center justify-center gap-3 rounded-2xl border border-rose-100 bg-rose-50 px-5 py-4 text-sm font-semibold text-rose-700">
-            <Loader2
-              size={18}
-              className="animate-spin"
-            />
+            <Loader2 size={18} className="animate-spin" />
 
             {paymentStage}
           </div>
@@ -1195,7 +1056,7 @@ export default function SubscriptionCheckout() {
             </p>
             <p className="mt-1 text-xs leading-5 text-emerald-700">
               The free trial cannot replace this subscription. Continue to the
-              dashboard, or choose Basic or Premium below to extend it.
+              dashboard, or choose Basic, Premium, or Pro below to extend it.
             </p>
             <button
               type="button"
@@ -1207,26 +1068,18 @@ export default function SubscriptionCheckout() {
             </button>
           </div>
         )}
-          <div
-            role="alert"
-            className="mx-auto mt-8 flex max-w-2xl items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-left text-sm text-rose-700"
-          >
-            <ShieldCheck
-              size={19}
-              className="mt-0.5 shrink-0"
-            />
+        <div
+          role="alert"
+          className="mx-auto mt-8 flex max-w-2xl items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-left text-sm text-rose-700"
+        >
+          <ShieldCheck size={19} className="mt-0.5 shrink-0" />
 
-            <div>
-              <p className="font-bold">
-                Unable to continue
-              </p>
+          <div>
+            <p className="font-bold">Unable to continue</p>
 
-              <p className="mt-1 text-xs leading-5 text-rose-600">
-                {error}
-              </p>
-            </div>
+            <p className="mt-1 text-xs leading-5 text-rose-600">{error}</p>
           </div>
-        
+        </div>
 
         {/* ============================================================
             PLANS
@@ -1293,19 +1146,20 @@ export default function SubscriptionCheckout() {
                   </p>
                 </div>
 
-                {Array.isArray(plan.components) && plan.components.length > 0 && (
-                  <div className="mt-4 space-y-1 rounded-xl bg-slate-50 px-3 py-3">
-                    {plan.components.map((component) => (
-                      <div
-                        key={component.label}
-                        className="flex items-center justify-between text-[11px] font-semibold text-slate-600"
-                      >
-                        <span>{component.label}</span>
-                        <span>{formatPrice(component.amount)}</span>
-                      </div>
-                    ))}
-                  </div>
-                )}
+                {Array.isArray(plan.components) &&
+                  plan.components.length > 0 && (
+                    <div className="mt-4 space-y-1 rounded-xl bg-slate-50 px-3 py-3">
+                      {plan.components.map((component) => (
+                        <div
+                          key={component.label}
+                          className="flex items-center justify-between text-[11px] font-semibold text-slate-600"
+                        >
+                          <span>{component.label}</span>
+                          <span>{formatPrice(component.amount)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                 <p className="mt-4 text-xs leading-5 text-slate-500">
                   {plan.description}
@@ -1314,7 +1168,10 @@ export default function SubscriptionCheckout() {
                 <div className="mt-5 space-y-2">
                   {plan.features.map((feature) => (
                     <div key={feature} className="flex items-start gap-2">
-                      <Check size={14} className="mt-0.5 shrink-0 text-emerald-600" />
+                      <Check
+                        size={14}
+                        className="mt-0.5 shrink-0 text-emerald-600"
+                      />
                       <span className="text-xs font-semibold leading-5 text-slate-600">
                         {feature}
                       </span>
@@ -1325,9 +1182,7 @@ export default function SubscriptionCheckout() {
                 <button
                   type="button"
                   onClick={() =>
-                    plan.trial
-                      ? handleStartTrial()
-                      : handlePayment(plan.code)
+                    plan.trial ? handleStartTrial() : handlePayment(plan.code)
                   }
                   disabled={isDisabled}
                   className={`mt-6 flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-black text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
@@ -1369,9 +1224,7 @@ export default function SubscriptionCheckout() {
           <div className="grid gap-5 sm:grid-cols-3">
             <div className="flex items-start gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
-                <ShieldCheck
-                  size={18}
-                />
+                <ShieldCheck size={18} />
               </div>
 
               <div>
@@ -1380,17 +1233,14 @@ export default function SubscriptionCheckout() {
                 </h3>
 
                 <p className="mt-1 text-[11px] leading-5 text-slate-500">
-                  Payment signatures are verified
-                  on the ChotuGTT backend.
+                  Payment signatures are verified on the ChotuGTT backend.
                 </p>
               </div>
             </div>
 
             <div className="flex items-start gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
-                <LockKeyhole
-                  size={17}
-                />
+                <LockKeyhole size={17} />
               </div>
 
               <div>
@@ -1399,8 +1249,7 @@ export default function SubscriptionCheckout() {
                 </h3>
 
                 <p className="mt-1 text-[11px] leading-5 text-slate-500">
-                  Your restaurant identity is
-                  derived from your authenticated
+                  Your restaurant identity is derived from your authenticated
                   session.
                 </p>
               </div>
@@ -1408,9 +1257,7 @@ export default function SubscriptionCheckout() {
 
             <div className="flex items-start gap-3">
               <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-violet-50 text-violet-600">
-                <CircleCheck
-                  size={18}
-                />
+                <CircleCheck size={18} />
               </div>
 
               <div>
@@ -1419,10 +1266,8 @@ export default function SubscriptionCheckout() {
                 </h3>
 
                 <p className="mt-1 text-[11px] leading-5 text-slate-500">
-                  After successful verification,
-                  the selected 1-year plan is
-                  activated automatically. The
-                  Basic trial needs no payment.
+                  After successful verification, the selected 1-year plan is
+                  activated automatically. The Basic trial needs no payment.
                 </p>
               </div>
             </div>
@@ -1436,13 +1281,12 @@ export default function SubscriptionCheckout() {
         <div className="mt-8 flex flex-col items-center justify-center gap-2 text-center">
           <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-400">
             <LockKeyhole size={13} />
-
             Secure SSL encrypted checkout
           </div>
 
           <p className="text-[10px] font-medium text-slate-400">
-            By continuing, you agree to the applicable
-            subscription and payment terms.
+            By continuing, you agree to the applicable subscription and payment
+            terms.
           </p>
         </div>
       </main>
