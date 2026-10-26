@@ -85,6 +85,36 @@ function orderTypeLabel(order) {
   return "Dine In";
 }
 
+async function translateToHindi(text) {
+  if (!text || typeof text !== "string") return "";
+
+  try {
+    const url =
+      `https://translate.googleapis.com/translate_a/single` +
+      `?client=gtx&sl=en&tl=hi&dt=t&q=${encodeURIComponent(text)}`;
+
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      throw new Error(`Translation failed: HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    const translatedText = Array.isArray(data?.[0])
+      ? data[0]
+          .map((part) => (Array.isArray(part) ? part[0] || "" : ""))
+          .join("")
+      : "";
+
+    return translatedText.trim() || text;
+  } catch (error) {
+    console.warn("Hindi translation failed:", text, error);
+    return text;
+  }
+}
+
+
 const OrderRow = memo(function OrderRow({
   order,
   onStatusChange,
@@ -551,6 +581,25 @@ export default function LiveOrderMonitor() {
   const [kotItems, setKotItems] = useState([]);
   const [cancelledKotItems, setCancelledKotItems] = useState([]);
   const [cancelItemData, setCancelItemData] = useState(null);
+  // LiveOrderMonitor() के अंदर अन्य स्टेट्स के साथ इसे जोड़ें:
+  const [isHindiPrint, setIsHindiPrint] = useState(() => {
+  try {
+    const restaurantId =
+      typeof user?.restaurantId === "object"
+        ? user.restaurantId?._id
+        : user?.restaurantId;
+
+    if (!restaurantId) return false;
+
+    return (
+      localStorage.getItem(
+        `chotugtt:kot-language:${restaurantId}`,
+      ) === "hi"
+    );
+  } catch {
+    return false;
+  }
+}); // हिंदी टॉगल स्टेट
 
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
@@ -723,6 +772,24 @@ export default function LiveOrderMonitor() {
   }, [billOrder?.total, manualDiscountType, manualDiscountValue]);
 
   useEffect(() => {
+  const restaurantId =
+    typeof user?.restaurantId === "object"
+      ? user.restaurantId?._id
+      : user?.restaurantId;
+
+  if (!restaurantId) return;
+
+  try {
+    localStorage.setItem(
+      `chotugtt:kot-language:${restaurantId}`,
+      isHindiPrint ? "hi" : "en",
+    );
+  } catch (error) {
+    console.error("Could not save KOT language preference:", error);
+  }
+}, [isHindiPrint, user?.restaurantId]);
+
+  useEffect(() => {
     if (
       selectedPaymentMethod !== "MIXED" ||
       !billOrder ||
@@ -845,10 +912,50 @@ export default function LiveOrderMonitor() {
           ? "ADDITIONAL ITEMS"
           : "NEW ORDER";
 
+      // printKOT फ़ंक्शन के अंदर kotTitle और kotSubtitle वेरिएबल्स के ठीक नीचे यह ब्लॉक जोड़ें:
+
+      // -------------------------------------------------------------------------
+      // DYNAMIC HINDI TRANSLATION LAYER
+      // -------------------------------------------------------------------------
+      let printableItems = [...activeItems];
+      let printableCancelledItems = [...(cancelledItems || [])];
+
+      if (isHindiPrint) {
+        // 1. एक्टिव आइटम्स को हिंदी में ट्रांसलेट करें
+        printableItems = await Promise.all(
+          activeItems.map(async (item) => {
+            const translatedName = await translateToHindi(item.name);
+            const translatedVariant = item.variant
+              ? await translateToHindi(item.variant)
+              : "";
+            const translatedNotes = item.notes
+              ? await translateToHindi(item.notes)
+              : "";
+            return {
+              ...item,
+              name: translatedName,
+              variant: translatedVariant,
+              notes: translatedNotes,
+            };
+          }),
+        );
+
+        // 2. कैंसिल्ड आइटम्स को हिंदी में ट्रांसलेट करें
+        printableCancelledItems = await Promise.all(
+          (cancelledItems || []).map(async (item) => {
+            const translatedName = await translateToHindi(item.name);
+            return {
+              ...item,
+              name: translatedName,
+            };
+          }),
+        );
+      }
+
       // -----------------------------------------
       // KOT ITEMS
       // -----------------------------------------
-      const kotRows = activeItems
+      const kotRows = printableItems
         .map((item, index) => {
           return `
           <tr>
@@ -890,7 +997,7 @@ export default function LiveOrderMonitor() {
         })
         .join("");
 
-      const cancelledRows = (cancelledItems || [])
+      const cancelledRows = printableCancelledItems
         .filter((item) => item && item.status === "REJECTED")
         .map(
           (item) => `
@@ -3911,9 +4018,12 @@ export default function LiveOrderMonitor() {
                           </span>
 
                           <span className="text-sm font-black text-purple-700">
-                            ₹ Math.max( 0,
-                            Number(manualDiscountPreview.finalTotal || 0) -
-                            Number(splitAmount || 0), ).toFixed(2)
+                            ₹
+                            {Math.max(
+                              0,
+                              Number(manualDiscountPreview.finalTotal || 0) -
+                                Number(splitAmount || 0),
+                            ).toFixed(2)}
                           </span>
                         </div>
                       </div>
@@ -4114,6 +4224,34 @@ export default function LiveOrderMonitor() {
                   minute: "2-digit",
                 })}
               </p>
+            </div>
+            {/* <!-- इसे <h1>Live Kitchen Monitor</h1> के ठीक बगल में या "LIVE" बैज के पास ऐड करें --> */}
+            <div className="flex items-center gap-2">
+              <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-black">
+                {
+                  orders.filter(
+                    (order) =>
+                      order.status === "PENDING" || order.status === "ACCEPTED",
+                  ).length
+                }{" "}
+                LIVE
+              </span>
+
+              {/* <!-- 🎛️ NEW HINDI PRINT TOGGLE SWITCH --> */}
+              <button
+                type="button"
+                onClick={() => setIsHindiPrint((prev) => !prev)}
+                className={`ml-2 inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition-all cursor-pointer border ${
+                  isHindiPrint
+                    ? "bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20"
+                    : "bg-white/10 text-white border-white/20 hover:bg-white/20"
+                }`}
+              >
+                <span>A / अ</span>
+                <span>
+                  {isHindiPrint ? "हिंदी प्रिंट चालू" : "English Print"}
+                </span>
+              </button>
             </div>
           </div>
         </div>
