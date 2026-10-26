@@ -318,6 +318,9 @@ export default function Payment() {
         },
         {
           withCredentials: true,
+           headers: {
+            "Idempotency-Key": crypto.randomUUID(),
+          },
         },
       );
 
