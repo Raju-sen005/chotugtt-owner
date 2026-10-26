@@ -16,6 +16,7 @@ import {
   ShieldCheck,
   Crown,
   CheckCircle2,
+  CalendarDays,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -66,21 +67,62 @@ export default function Sidebar({ closeMobileSidebar }) {
     refetchInterval: 60_000,
   });
 
-  const navItems = isSuperAdmin
-    ? [{ to: "/super-admin", icon: ShieldCheck, label: "Admin" }]
-    : NAV_ITEMS;
-
   const expiry =
-    user?.subscriptionExpiresAt || user?.restaurant?.subscriptionExpiresAt;
-  const expiryLabel = formatExpiry(expiry);
-  const subscriptionActive =
-    user?.subscriptionStatus === "ACTIVE" ||
-    (expiryLabel && new Date(expiry).getTime() > Date.now());
+    user?.subscriptionExpiresAt ||
+    user?.restaurant?.subscriptionExpiresAt ||
+    null;
 
+  const expiryLabel = formatExpiry(expiry);
+
+  const subscriptionActive =
+    user?.subscriptionStatus === "ACTIVE" &&
+    Boolean(expiry) &&
+    Number.isFinite(new Date(expiry).getTime()) &&
+    new Date(expiry).getTime() > Date.now();
+
+  const subscriptionPlan =
+    user?.subscriptionPlan || user?.restaurant?.subscriptionPlan || null;
+
+  const showEventManagement =
+    !isSuperAdmin &&
+    subscriptionActive &&
+    String(subscriptionPlan).toUpperCase() === "PRO";
+
+  console.log("EVENT MANAGEMENT DEBUG", {
+    role: user?.role,
+    subscriptionPlan: user?.subscriptionPlan,
+    restaurantSubscriptionPlan: user?.restaurant?.subscriptionPlan,
+    subscriptionStatus: user?.subscriptionStatus,
+    subscriptionExpiresAt: user?.subscriptionExpiresAt,
+    restaurantSubscriptionExpiresAt: user?.restaurant?.subscriptionExpiresAt,
+    subscriptionActive,
+    showEventManagement,
+  });
+
+  const navItems = isSuperAdmin
+    ? [
+        {
+          to: "/super-admin",
+          icon: ShieldCheck,
+          label: "Admin",
+        },
+      ]
+    : [
+        ...NAV_ITEMS,
+        ...(showEventManagement
+          ? [
+              {
+                to: "/events",
+                icon: CalendarDays,
+                label: "Event Management",
+              },
+            ]
+          : []),
+      ];
   return (
     <aside className="flex h-full w-full flex-col overflow-hidden border-r border-[var(--border)] bg-white font-sans text-[var(--text-secondary)] select-none">
       <div className="flex items-center gap-3 px-6 pb-4 pt-6">
-       <img
+        <img
           src="/ChotuGTT__1_-removebg-preview.png"
           alt="ChotuGTT Logo"
           className="h-7 w-7"
@@ -157,7 +199,7 @@ export default function Sidebar({ closeMobileSidebar }) {
             </div> */}
 
             <div className="mt-3 flex items-start gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--secondary-light)] text-[var(--secondary)]">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--secondary-light)] text-[var(--secondary)]">
                 <Crown size={15} />
               </span>
               <CheckCircle2

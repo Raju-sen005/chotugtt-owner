@@ -238,7 +238,8 @@ const menuImageSrc = (src) => {
 
 const offerBadge = (offer) => {
   if (!offer) return "";
-  if (offer.discountType === "FLAT") return `₹${Number(offer.discountValue || 0)} OFF`;
+  if (offer.discountType === "FLAT")
+    return `₹${Number(offer.discountValue || 0)} OFF`;
   return `${Number(offer.discountValue || 0)}% OFF`;
 };
 
@@ -270,7 +271,9 @@ const ItemCard = memo(function ItemCard({
             <Utensils size={22} />
           </div>
         )}
-        <span className={`absolute left-2 top-2 h-3 w-3 rounded-full border-2 border-white ${item.isVeg === false ? "bg-red-500" : "bg-emerald-500"}`} />
+        <span
+          className={`absolute left-2 top-2 h-3 w-3 rounded-full border-2 border-white ${item.isVeg === false ? "bg-red-500" : "bg-emerald-500"}`}
+        />
         {offerLabel ? (
           <span className="absolute right-2 top-2 rounded-lg bg-rose-500 px-1.5 py-0.5 text-[10px] font-black text-white">
             {offerLabel}
@@ -282,9 +285,13 @@ const ItemCard = memo(function ItemCard({
         ) : null}
       </div>
       <div className="flex flex-1 flex-col p-2.5">
-        <h3 className="line-clamp-2 text-[13px] font-black leading-4 text-slate-900">{item.name}</h3>
+        <h3 className="line-clamp-2 text-[13px] font-black leading-4 text-slate-900">
+          {item.name}
+        </h3>
         {item.description ? (
-          <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-400">{item.description}</p>
+          <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-400">
+            {item.description}
+          </p>
         ) : null}
         <div className="mt-auto flex items-center justify-between gap-2 pt-2">
           <p className="text-sm font-black text-slate-900">₹{item.price}</p>
@@ -639,7 +646,9 @@ export default function PublicMenu() {
       });
       if (!applicable.length) return;
       const best = applicable.reduce((winner, offer) =>
-        Number(offer.discountValue) > Number(winner.discountValue) ? offer : winner,
+        Number(offer.discountValue) > Number(winner.discountValue)
+          ? offer
+          : winner,
       );
       labels[item._id] = offerBadge(best);
     });
@@ -892,7 +901,9 @@ export default function PublicMenu() {
         const index = prev.findIndex((row) => sameOrder(row, payload));
 
         if (payload.status === "COMPLETED") {
-          return index === -1 ? prev : prev.filter((_, itemIndex) => itemIndex !== index);
+          return index === -1
+            ? prev
+            : prev.filter((_, itemIndex) => itemIndex !== index);
         }
 
         if (index === -1) {
@@ -1140,7 +1151,7 @@ export default function PublicMenu() {
     <div className="min-h-screen bg-[var(--background)] pb-28 font-sans text-slate-900">
       <div className="relative mx-auto min-h-screen w-full max-w-md lg:max-w-6xl">
         <div className="sticky top-0 z-40 border-b border-slate-100 bg-white">
-          <div className="flex items-center gap-3 bg-slate-950 px-4 py-3 text-white">
+          <div className="flex items-center gap-3 bg-gradient-to-r from-[var(--primary)] via-[var(--primary)] to-[var(--secondary)] px-4 py-3 text-white">
             {restaurant?.logo ? (
               <img
                 src={
@@ -1157,12 +1168,14 @@ export default function PublicMenu() {
               </div>
             )}
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-black tracking-wide text-rose-300">ChotuGTT</p>
+              {/* <p className="text-[10px] font-black tracking-wide text-rose-300">ChotuGTT</p> */}
               <h1 className="truncate text-base font-black">
                 {restaurant?.name || "Our Restaurant"}
               </h1>
               <p className="truncate text-[11px] font-semibold text-white/70">
-                {currentTableNumber ? `Table ${currentTableNumber}` : "Scan & order"}
+                {currentTableNumber
+                  ? `Table ${currentTableNumber}`
+                  : "Scan & order"}
                 {restaurantAddress ? ` · ${restaurantAddress}` : ""}
               </p>
             </div>
@@ -1173,13 +1186,15 @@ export default function PublicMenu() {
                 disabled={!isCustomerSessionReady}
                 aria-label="Order history"
                 title="Order History"
-                className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-500 hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
+                className="w-9 h-9 rounded-xl border border-slate-200 flex items-center justify-center text-slate-200  disabled:opacity-50 disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300"
               >
                 <ShoppingBag size={15} />
               </button>
               <button
                 type="button"
-                onClick={() => setLanguage((current) => (current === "EN" ? "HI" : "EN"))}
+                onClick={() =>
+                  setLanguage((current) => (current === "EN" ? "HI" : "EN"))
+                }
                 aria-label="Toggle language"
                 className="rounded-xl border border-white/15 px-2.5 py-1.5 text-[11px] font-black text-white"
               >

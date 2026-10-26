@@ -8,8 +8,12 @@ import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Navbar";
 import GlobalOrderAlert from "../components/GlobalOrderAlert";
 
-const LiveOrderMonitor = lazy(() => import("../features/orders/LiveOrderMonitor"));
-const DashboardOverview = lazy(() => import("../features/dashboard/DashboardOverview"));
+const LiveOrderMonitor = lazy(
+  () => import("../features/orders/LiveOrderMonitor"),
+);
+const DashboardOverview = lazy(
+  () => import("../features/dashboard/DashboardOverview"),
+);
 const MenuCatalog = lazy(() => import("../features/menu/MenuCatalog"));
 const StoreSettings = lazy(() => import("../features/settings/StoreSettings"));
 const TableMonitor = lazy(() => import("../components/TableMonitor"));
@@ -19,8 +23,13 @@ const Offers = lazy(() => import("../features/offers/Offers"));
 const Payment = lazy(() => import("../features/payment/Payment"));
 const CounterPOS = lazy(() => import("../components/CounterPOS"));
 const Profile = lazy(() => import("../features/profile/RestaurantProfile"));
-const AIMarketingDashboard = lazy(() => import("../components/AIMarketingDashboard"));
-const StaffManagement = lazy(() => import("../features/profile/StaffManagement"));
+const AIMarketingDashboard = lazy(
+  () => import("../components/AIMarketingDashboard"),
+);
+const StaffManagement = lazy(
+  () => import("../features/profile/StaffManagement"),
+);
+const EventManagement = lazy(() => import("../components/EventManagement"));
 
 function PageLoading() {
   return (
@@ -226,45 +235,46 @@ export default function MerchantLayout() {
           "
         >
           <Suspense fallback={<PageLoading />}>
-          <Routes>
-            {isSuperAdmin ? (
-              <>
-                <Route path="/super-admin" element={<SuperAdminPanel />} />
-                <Route
-                  path="*"
-                  element={<Navigate to="/super-admin" replace />}
-                />
-              </>
-            ) : (
-              <>
-                <Route path="/" element={<DashboardOverview />} />
+            <Routes>
+              {isSuperAdmin ? (
+                <>
+                  <Route path="/super-admin" element={<SuperAdminPanel />} />
+                  <Route
+                    path="*"
+                    element={<Navigate to="/super-admin" replace />}
+                  />
+                </>
+              ) : (
+                <>
+                  <Route path="/" element={<DashboardOverview />} />
 
-                <Route path="/orders" element={<LiveOrderMonitor />} />
+                  <Route path="/orders" element={<LiveOrderMonitor />} />
 
-                <Route path="/menu" element={<MenuCatalog />} />
+                  <Route path="/menu" element={<MenuCatalog />} />
 
-                <Route path="/settings" element={<StoreSettings />} />
+                  <Route path="/settings" element={<StoreSettings />} />
 
-                <Route path="/table-monitor" element={<TableMonitor />} />
+                  <Route path="/table-monitor" element={<TableMonitor />} />
 
-                <Route path="/analysis" element={<Analysis />} />
+                  <Route path="/analysis" element={<Analysis />} />
 
-                <Route path="/offer" element={<Offers />} />
+                  <Route path="/offer" element={<Offers />} />
 
-                <Route path="/payment" element={<Payment />} />
+                  <Route path="/payment" element={<Payment />} />
 
-                <Route path="/marketing" element={<AIMarketingDashboard />} />
+                  <Route path="/marketing" element={<AIMarketingDashboard />} />
 
-                <Route path="/counter" element={<CounterPOS />} />
+                  <Route path="/counter" element={<CounterPOS />} />
 
-                <Route path="/profile" element={<Profile />} />
+                  <Route path="/profile" element={<Profile />} />
 
-                <Route path="/staff" element={<StaffManagement />} />
+                  <Route path="/events" element={<EventManagement />} />
+                  <Route path="/staff" element={<StaffManagement />} />
 
-                <Route path="*" element={<Navigate to="/" replace />} />
-              </>
-            )}
-          </Routes>
+                  <Route path="*" element={<Navigate to="/" replace />} />
+                </>
+              )}
+            </Routes>
           </Suspense>
         </main>
       </div>
