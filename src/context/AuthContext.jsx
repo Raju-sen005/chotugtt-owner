@@ -40,7 +40,11 @@ axios.interceptors.response.use(
       url.includes("/auth/register") ||
       url.includes("/auth/logout");
 
-    if (status === 401 && !isAuthProbe && typeof unauthorizedHandler === "function") {
+    if (
+      status === 401 &&
+      !isAuthProbe &&
+      typeof unauthorizedHandler === "function"
+    ) {
       unauthorizedHandler(error);
     }
 
@@ -85,9 +89,7 @@ const getSubscriptionExpiry = (user) => {
   }
 
   return (
-    user.subscriptionExpiresAt ||
-    user.restaurant?.subscriptionExpiresAt ||
-    null
+    user.subscriptionExpiresAt || user.restaurant?.subscriptionExpiresAt || null
   );
 };
 
@@ -109,9 +111,7 @@ const isSubscriptionExpired = (user) => {
   }
 
   const subscriptionStatus =
-    user.subscriptionStatus ||
-    user.restaurant?.subscriptionStatus ||
-    null;
+    user.subscriptionStatus || user.restaurant?.subscriptionStatus || null;
 
   /*
   |--------------------------------------------------------------------------
@@ -195,10 +195,7 @@ const requiresSubscriptionFromResponse = (data) => {
   |--------------------------------------------------------------------------
   */
 
-  const userData =
-    data.data ||
-    data.user ||
-    null;
+  const userData = data.data || data.user || null;
 
   if (!userData) {
     return false;
@@ -236,6 +233,7 @@ export const AuthProvider = ({ children }) => {
 
   const expiryTimerRef = useRef(null);
   const mountedRef = useRef(true);
+  const verifySessionRef = useRef(null);
 
   /*
   |--------------------------------------------------------------------------
@@ -259,10 +257,10 @@ export const AuthProvider = ({ children }) => {
 |--------------------------------------------------------------------------
 */
 
-const redirectToSubscription = useCallback(() => {
-  const currentPath = window.location.pathname;
+  const redirectToSubscription = useCallback(() => {
+    const currentPath = window.location.pathname;
 
-  /*
+    /*
   |--------------------------------------------------------------------------
   | Already on checkout page
   |--------------------------------------------------------------------------
@@ -274,20 +272,18 @@ const redirectToSubscription = useCallback(() => {
   |
   */
 
-  if (currentPath === "/subscription-checkout") {
-    return;
-  }
+    if (currentPath === "/subscription-checkout") {
+      return;
+    }
 
-  /*
+    /*
   |--------------------------------------------------------------------------
   | Canonical subscription route
   |--------------------------------------------------------------------------
   */
 
-  window.location.replace(
-    "/subscription-checkout",
-  );
-}, []);
+    window.location.replace("/subscription-checkout");
+  }, []);
 
   /*
   |--------------------------------------------------------------------------
@@ -341,16 +337,14 @@ const redirectToSubscription = useCallback(() => {
         return;
       }
 
-      const expiryTime =
-        new Date(expiry).getTime();
+      const expiryTime = new Date(expiry).getTime();
 
       if (!Number.isFinite(expiryTime)) {
         redirectToSubscription();
         return;
       }
 
-      const remainingTime =
-        expiryTime - Date.now();
+      const remainingTime = expiryTime - Date.now();
 
       /*
       |--------------------------------------------------------------------------
@@ -371,18 +365,14 @@ const redirectToSubscription = useCallback(() => {
 
       const MAX_TIMEOUT = 2147483647;
 
-      const timeout = Math.min(
-        remainingTime,
-        MAX_TIMEOUT,
-      );
+      const timeout = Math.min(remainingTime, MAX_TIMEOUT);
 
-      expiryTimerRef.current =
-        window.setTimeout(() => {
-          if (!mountedRef.current) {
-            return;
-          }
+      expiryTimerRef.current = window.setTimeout(() => {
+        if (!mountedRef.current) {
+          return;
+        }
 
-          /*
+        /*
           |--------------------------------------------------------------------------
           | Re-check server before redirecting.
           |
@@ -390,13 +380,10 @@ const redirectToSubscription = useCallback(() => {
           |--------------------------------------------------------------------------
           */
 
-          verifySession();
-        }, timeout);
+        verifySessionRef.current?.();
+      }, timeout);
     },
-    [
-      clearSubscriptionTimer,
-      redirectToSubscription,
-    ],
+    [clearSubscriptionTimer, redirectToSubscription],
   );
 
   /*
@@ -425,8 +412,7 @@ const redirectToSubscription = useCallback(() => {
         return null;
       }
 
-      const authenticatedUser =
-        res.data.data;
+      const authenticatedUser = res.data.data;
 
       /*
       |--------------------------------------------------------------------------
@@ -460,11 +446,7 @@ const redirectToSubscription = useCallback(() => {
       |--------------------------------------------------------------------------
       */
 
-      if (
-        requiresSubscriptionFromResponse(
-          res.data,
-        )
-      ) {
+      if (requiresSubscriptionFromResponse(res.data)) {
         if (mountedRef.current) {
           setUser(authenticatedUser);
         }
@@ -482,11 +464,7 @@ const redirectToSubscription = useCallback(() => {
       |--------------------------------------------------------------------------
       */
 
-      if (
-        isSubscriptionExpired(
-          authenticatedUser,
-        )
-      ) {
+      if (isSubscriptionExpired(authenticatedUser)) {
         if (mountedRef.current) {
           setUser(authenticatedUser);
         }
@@ -498,34 +476,17 @@ const redirectToSubscription = useCallback(() => {
         return authenticatedUser;
       }
 
-      /*
-      |--------------------------------------------------------------------------
-      | Valid authenticated user
-      |--------------------------------------------------------------------------
-      */
+     
 
       if (mountedRef.current) {
         setUser(authenticatedUser);
       }
 
-      scheduleSubscriptionCheck(
-        authenticatedUser,
-      );
+      scheduleSubscriptionCheck(authenticatedUser);
 
       return authenticatedUser;
-    } catch (error) {
-      /*
-      |--------------------------------------------------------------------------
-      | Authentication failure
-      |--------------------------------------------------------------------------
-      |
-      | Do NOT redirect normal authentication errors
-      | to subscription.
-      |
-      | Only the explicit requiresSubscription response
-      | should redirect to subscription.
-      |--------------------------------------------------------------------------
-      */
+    } catch {
+     
 
       if (mountedRef.current) {
         setUser(null);
@@ -540,6 +501,10 @@ const redirectToSubscription = useCallback(() => {
     redirectToSubscription,
     scheduleSubscriptionCheck,
   ]);
+
+  useEffect(() => {
+    verifySessionRef.current = verifySession;
+  }, [verifySession]);
 
   /*
   |--------------------------------------------------------------------------
@@ -566,10 +531,7 @@ const redirectToSubscription = useCallback(() => {
       mountedRef.current = false;
       clearSubscriptionTimer();
     };
-  }, [
-    clearSubscriptionTimer,
-    verifySession,
-  ]);
+  }, [clearSubscriptionTimer, verifySession]);
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
@@ -594,13 +556,10 @@ const redirectToSubscription = useCallback(() => {
   const login = useCallback(
     async (email, password) => {
       try {
-        const res = await axios.post(
-          "/auth/login",
-          {
-            email,
-            password,
-          },
-        );
+        const res = await axios.post("/auth/login", {
+          email,
+          password,
+        });
 
         /*
         |--------------------------------------------------------------------------
@@ -609,8 +568,7 @@ const redirectToSubscription = useCallback(() => {
         */
 
         if (res.data?.success) {
-          const authenticatedUser =
-            res.data.data;
+          const authenticatedUser = res.data.data;
 
           if (!authenticatedUser) {
             return res.data;
@@ -626,18 +584,12 @@ const redirectToSubscription = useCallback(() => {
           |--------------------------------------------------------------------------
           */
 
-          if (
-            isSubscriptionExpired(
-              authenticatedUser,
-            )
-          ) {
+          if (isSubscriptionExpired(authenticatedUser)) {
             if (mountedRef.current) {
               setUser(authenticatedUser);
             }
 
-            scheduleSubscriptionCheck(
-              authenticatedUser,
-            );
+            scheduleSubscriptionCheck(authenticatedUser);
 
             redirectToSubscription();
 
@@ -657,9 +609,7 @@ const redirectToSubscription = useCallback(() => {
             setUser(authenticatedUser);
           }
 
-          scheduleSubscriptionCheck(
-            authenticatedUser,
-          );
+          scheduleSubscriptionCheck(authenticatedUser);
 
           return res.data;
         }
@@ -682,11 +632,9 @@ const redirectToSubscription = useCallback(() => {
         |--------------------------------------------------------------------------
         */
 
-        const response =
-          error?.response;
+        const response = error?.response;
 
-        const responseData =
-          response?.data;
+        const responseData = response?.data;
 
         /*
         |--------------------------------------------------------------------------
@@ -694,10 +642,7 @@ const redirectToSubscription = useCallback(() => {
         |--------------------------------------------------------------------------
         */
 
-        if (
-          responseData?.requiresSubscription ===
-          true
-        ) {
+        if (responseData?.requiresSubscription === true) {
           /*
           |--------------------------------------------------------------------------
           | Preserve authenticated session information.
@@ -711,21 +656,13 @@ const redirectToSubscription = useCallback(() => {
           */
 
           const subscriptionUser = {
-            id:
-              responseData.data?.id ||
-              null,
+            id: responseData.data?.id || null,
 
-            name:
-              responseData.data?.name ||
-              null,
+            name: responseData.data?.name || null,
 
-            email:
-              responseData.data?.email ||
-              email,
+            email: responseData.data?.email || email,
 
-            role:
-              responseData.data?.role ||
-              "OWNER",
+            role: responseData.data?.role || "OWNER",
 
             restaurantId:
               responseData.restaurantId ||
@@ -786,12 +723,35 @@ const redirectToSubscription = useCallback(() => {
         throw error;
       }
     },
-    [
-      clearSubscriptionTimer,
-      redirectToSubscription,
-      scheduleSubscriptionCheck,
-    ],
+    [clearSubscriptionTimer, redirectToSubscription, scheduleSubscriptionCheck],
   );
+
+  const requestPasswordResetOtp = useCallback(async (email) => {
+    const res = await axios.post("/auth/forgot-password", {
+      email: email.trim().toLowerCase(),
+    });
+
+    return res.data;
+  }, []);
+
+  const verifyPasswordResetOtp = useCallback(async (email, otp) => {
+    const res = await axios.post("/auth/verify-reset-otp", {
+      email: email.trim().toLowerCase(),
+      otp: otp.trim(),
+    });
+
+    return res.data;
+  }, []);
+
+  const resetPassword = useCallback(async (email, resetToken, newPassword) => {
+    const res = await axios.post("/auth/reset-password", {
+      email: email.trim().toLowerCase(),
+      resetToken,
+      newPassword,
+    });
+
+    return res.data;
+  }, []);
 
   /*
   |--------------------------------------------------------------------------
@@ -801,92 +761,71 @@ const redirectToSubscription = useCallback(() => {
 
   const registerTenant = useCallback(
     async (formData) => {
-      try {
-        const res = await axios.post(
-          "/auth/register",
-          formData,
-        );
+      const res = await axios.post("/auth/register", formData);
 
-        if (res.data?.success) {
-          const registeredUser =
-            res.data.data?.user || null;
+      if (res.data?.success) {
+        const registeredUser = res.data.data?.user || null;
 
-          /*
-          |--------------------------------------------------------------------------
-          | Registration creates an OWNER but does not
-          | create a paid subscription.
-          |
-          | Therefore new owner must go to subscription.
-          |--------------------------------------------------------------------------
-          */
+        /*
+        |--------------------------------------------------------------------------
+        | Registration creates an OWNER but does not
+        | create a paid subscription.
+        |
+        | Therefore new owner must go to subscription.
+        |--------------------------------------------------------------------------
+        */
 
-          const registrationUser = {
-            ...(registeredUser || {}),
-            role:
-              registeredUser?.role ||
-              "OWNER",
+        const registrationUser = {
+          ...(registeredUser || {}),
+          role: registeredUser?.role || "OWNER",
 
-            restaurantId:
-              registeredUser?.restaurantId ||
-              res.data.data?.restaurant?._id ||
-              null,
+          restaurantId:
+            registeredUser?.restaurantId ||
+            res.data.data?.restaurant?._id ||
+            null,
 
-            subscriptionStatus:
-              registeredUser?.subscriptionStatus ||
-              res.data.data?.restaurant
-                ?.subscriptionStatus ||
-              null,
+          subscriptionStatus:
+            registeredUser?.subscriptionStatus ||
+            res.data.data?.restaurant?.subscriptionStatus ||
+            null,
 
-            subscriptionExpiresAt:
-              registeredUser?.subscriptionExpiresAt ||
-              res.data.data?.restaurant
-                ?.subscriptionExpiresAt ||
-              null,
-          };
+          subscriptionExpiresAt:
+            registeredUser?.subscriptionExpiresAt ||
+            res.data.data?.restaurant?.subscriptionExpiresAt ||
+            null,
+        };
 
-          if (mountedRef.current) {
-            setUser(registrationUser);
-          }
-
-          /*
-          |--------------------------------------------------------------------------
-          | New registration must have an active subscription
-          | before dashboard access.
-          |--------------------------------------------------------------------------
-          */
-
-          if (
-            res.data.requiresSubscription ===
-              true ||
-            isSubscriptionExpired(
-              registrationUser,
-            )
-          ) {
-            clearSubscriptionTimer();
-
-            redirectToSubscription();
-
-            return {
-              ...res.data,
-              requiresSubscription: true,
-            };
-          }
-
-          scheduleSubscriptionCheck(
-            registrationUser,
-          );
+        if (mountedRef.current) {
+          setUser(registrationUser);
         }
 
-        return res.data;
-      } catch (error) {
-        throw error;
+        /*
+        |--------------------------------------------------------------------------
+        | New registration must have an active subscription
+        | before dashboard access.
+        |--------------------------------------------------------------------------
+        */
+
+        if (
+          res.data.requiresSubscription === true ||
+          isSubscriptionExpired(registrationUser)
+        ) {
+          clearSubscriptionTimer();
+
+          redirectToSubscription();
+
+          return {
+            ...res.data,
+            requiresSubscription: true,
+          };
+        }
+
+        scheduleSubscriptionCheck(registrationUser);
       }
+
+      return res.data;
     },
-    [
-      clearSubscriptionTimer,
-      redirectToSubscription,
-      scheduleSubscriptionCheck,
-    ],
+    [clearSubscriptionTimer, redirectToSubscription, scheduleSubscriptionCheck],
   );
 
   /*
@@ -951,23 +890,18 @@ const redirectToSubscription = useCallback(() => {
   |--------------------------------------------------------------------------
   */
 
-  const logout = useCallback(
-    async () => {
-      try {
-        await axios.post(
-          "/auth/logout",
-        );
-      } finally {
-        clearSubscriptionTimer();
-        queryClient.clear();
+  const logout = useCallback(async () => {
+    try {
+      await axios.post("/auth/logout");
+    } finally {
+      clearSubscriptionTimer();
+      queryClient.clear();
 
-        if (mountedRef.current) {
-          setUser(null);
-        }
+      if (mountedRef.current) {
+        setUser(null);
       }
-    },
-    [clearSubscriptionTimer, queryClient],
-  );
+    }
+  }, [clearSubscriptionTimer, queryClient]);
 
   /*
   |--------------------------------------------------------------------------
@@ -976,23 +910,29 @@ const redirectToSubscription = useCallback(() => {
   */
 
   const value = useMemo(
-  () => ({
-    user,
-    login,
-    registerTenant,
-    logout,
-    refreshSession: verifySession,
-    loading,
-  }),
-  [
-    user,
-    login,
-    registerTenant,
-    logout,
-    verifySession,
-    loading,
-  ],
-);
+    () => ({
+      user,
+      login,
+      requestPasswordResetOtp,
+      verifyPasswordResetOtp,
+      resetPassword,
+      registerTenant,
+      logout,
+      refreshSession: verifySession,
+      loading,
+    }),
+    [
+      user,
+      login,
+      requestPasswordResetOtp,
+      verifyPasswordResetOtp,
+      resetPassword,
+      registerTenant,
+      logout,
+      verifySession,
+      loading,
+    ],
+  );
 
   /*
   |--------------------------------------------------------------------------
@@ -1001,9 +941,7 @@ const redirectToSubscription = useCallback(() => {
   */
 
   return (
-    <AuthContext.Provider
-      value={value}
-    >
+    <AuthContext.Provider value={value}>
       {loading ? (
         <div className="flex min-h-dvh items-center justify-center bg-[var(--background)]">
           <div className="h-8 w-8 animate-spin rounded-full border-2 border-slate-200 border-t-[var(--primary)]" />
@@ -1022,7 +960,5 @@ const redirectToSubscription = useCallback(() => {
 */
 
 export const useAuth = () => {
-  return useContext(
-    AuthContext,
-  );
+  return useContext(AuthContext);
 };

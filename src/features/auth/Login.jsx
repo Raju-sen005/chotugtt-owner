@@ -113,7 +113,15 @@ export default function Login({ onSwitchToSignup }) {
             </button>
           </div>
         </AuthField>
-
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={() => navigate("/forgot-password")}
+            className="text-sm font-semibold text-[var(--primary)] hover:underline"
+          >
+            Forgot password?
+          </button>
+        </div>
         <button
           type="submit"
           disabled={isLoggingIn}

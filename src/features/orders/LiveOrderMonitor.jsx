@@ -114,7 +114,6 @@ async function translateToHindi(text) {
   }
 }
 
-
 const OrderRow = memo(function OrderRow({
   order,
   onStatusChange,
@@ -583,23 +582,21 @@ export default function LiveOrderMonitor() {
   const [cancelItemData, setCancelItemData] = useState(null);
   // LiveOrderMonitor() के अंदर अन्य स्टेट्स के साथ इसे जोड़ें:
   const [isHindiPrint, setIsHindiPrint] = useState(() => {
-  try {
-    const restaurantId =
-      typeof user?.restaurantId === "object"
-        ? user.restaurantId?._id
-        : user?.restaurantId;
+    try {
+      const restaurantId =
+        typeof user?.restaurantId === "object"
+          ? user.restaurantId?._id
+          : user?.restaurantId;
 
-    if (!restaurantId) return false;
+      if (!restaurantId) return false;
 
-    return (
-      localStorage.getItem(
-        `chotugtt:kot-language:${restaurantId}`,
-      ) === "hi"
-    );
-  } catch {
-    return false;
-  }
-}); // हिंदी टॉगल स्टेट
+      return (
+        localStorage.getItem(`chotugtt:kot-language:${restaurantId}`) === "hi"
+      );
+    } catch {
+      return false;
+    }
+  }); // हिंदी टॉगल स्टेट
 
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [successMessage, setSuccessMessage] = useState("");
@@ -772,22 +769,22 @@ export default function LiveOrderMonitor() {
   }, [billOrder?.total, manualDiscountType, manualDiscountValue]);
 
   useEffect(() => {
-  const restaurantId =
-    typeof user?.restaurantId === "object"
-      ? user.restaurantId?._id
-      : user?.restaurantId;
+    const restaurantId =
+      typeof user?.restaurantId === "object"
+        ? user.restaurantId?._id
+        : user?.restaurantId;
 
-  if (!restaurantId) return;
+    if (!restaurantId) return;
 
-  try {
-    localStorage.setItem(
-      `chotugtt:kot-language:${restaurantId}`,
-      isHindiPrint ? "hi" : "en",
-    );
-  } catch (error) {
-    console.error("Could not save KOT language preference:", error);
-  }
-}, [isHindiPrint, user?.restaurantId]);
+    try {
+      localStorage.setItem(
+        `chotugtt:kot-language:${restaurantId}`,
+        isHindiPrint ? "hi" : "en",
+      );
+    } catch (error) {
+      console.error("Could not save KOT language preference:", error);
+    }
+  }, [isHindiPrint, user?.restaurantId]);
 
   useEffect(() => {
     if (
@@ -4183,17 +4180,21 @@ export default function LiveOrderMonitor() {
       )}
       <div className="-m-4 bg-[var(--background)] p-4 font-sans md:-m-6 md:p-5 lg:-m-8 lg:p-5">
         <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[var(--primary)] via-[var(--primary)] to-[var(--secondary)] px-5 py-5 text-white shadow-sm">
-          <div className="relative z-10 flex flex-wrap items-start justify-between gap-4">
-            <div className="flex items-start gap-3">
-              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
+          <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+            {/* Left: Title and live count */}
+            <div className="flex min-w-0 items-start gap-3">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15 ring-1 ring-white/20">
                 <ChefHat className="h-6 w-6" />
               </div>
-              <div>
+
+              <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl font-black tracking-tight">
+                  <h1 className="text-xl font-black tracking-tight sm:text-2xl">
                     Live Kitchen Monitor
                   </h1>
-                  <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-black">
+
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-extrabold tracking-wider ring-1 ring-white/15">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-300" />
                     {
                       orders.filter(
                         (order) =>
@@ -4204,54 +4205,73 @@ export default function LiveOrderMonitor() {
                     LIVE
                   </span>
                 </div>
-                <p className="mt-1 max-w-xl text-sm text-white/85">
+
+                <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-white/75">
                   Manage incoming orders, table occupancy statuses, and kitchen
                   execution queue.
                 </p>
               </div>
             </div>
-            <div className="text-right">
-              <div className="inline-flex items-center gap-2 rounded-full bg-white/15 px-3 py-1 text-[11px] font-black">
-                <Radio size={14} className="animate-pulse" /> STREAM ACTIVE
-              </div>
-              <p className="mt-2 text-xs font-semibold text-white/80">
-                {new Date().toLocaleString("en-IN", {
-                  weekday: "short",
-                  day: "2-digit",
-                  month: "short",
-                  year: "numeric",
-                  hour: "numeric",
-                  minute: "2-digit",
-                })}
-              </p>
-            </div>
-            {/* <!-- इसे <h1>Live Kitchen Monitor</h1> के ठीक बगल में या "LIVE" बैज के पास ऐड करें --> */}
-            <div className="flex items-center gap-2">
-              <span className="rounded-full bg-white/20 px-2 py-0.5 text-[11px] font-black">
-                {
-                  orders.filter(
-                    (order) =>
-                      order.status === "PENDING" || order.status === "ACCEPTED",
-                  ).length
-                }{" "}
-                LIVE
-              </span>
 
-              {/* <!-- 🎛️ NEW HINDI PRINT TOGGLE SWITCH --> */}
+            {/* Right: Print language and stream status */}
+            <div className="flex flex-wrap items-center gap-3 sm:justify-between lg:justify-end">
+              {/* Hindi / English print toggle */}
               <button
                 type="button"
+                role="switch"
+                aria-checked={isHindiPrint}
                 onClick={() => setIsHindiPrint((prev) => !prev)}
-                className={`ml-2 inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-black transition-all cursor-pointer border ${
+                className={`inline-flex min-h-10 items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold transition-all duration-200 focus:outline-none ${
                   isHindiPrint
-                    ? "bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/20"
-                    : "bg-white/10 text-white border-white/20 hover:bg-white/20"
+                    ? "border-amber-300 bg-amber-400 text-slate-950 shadow-md shadow-amber-950/10"
+                    : "border-white/25 bg-white/10 text-white hover:bg-white/20"
                 }`}
               >
-                <span>A / अ</span>
-                <span>
-                  {isHindiPrint ? "हिंदी प्रिंट चालू" : "English Print"}
+                <span className="flex h-6 min-w-9 items-center justify-center rounded-lg bg-black/10 px-1.5 text-sm font-black">
+                  A / अ
+                </span>
+
+                <span className="whitespace-nowrap">
+                  {isHindiPrint ? "हिंदी प्रिंट ON" : "English Print"}
+                </span>
+
+                <span
+                  className={`relative ml-1 h-5 w-9 rounded-full transition-colors ${
+                    isHindiPrint ? "bg-slate-900/25" : "bg-white/20"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-0.5 h-4 w-4 rounded-full shadow-sm transition-all ${
+                      isHindiPrint
+                        ? "left-[18px] bg-slate-950"
+                        : "left-0.5 bg-white"
+                    }`}
+                  />
                 </span>
               </button>
+
+              {/* Stream status and current time */}
+              <div className="flex items-center gap-3 rounded-xl border border-white/15 bg-black/10 px-3 py-2">
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-emerald-400/15 text-emerald-200">
+                  <Radio size={16} className="animate-pulse" />
+                </div>
+
+                <div>
+                  <p className="text-[10px] font-extrabold tracking-widest text-white/90">
+                    STREAM ACTIVE
+                  </p>
+                  <p className="mt-0.5 text-xs font-medium text-white/70">
+                    {new Date().toLocaleString("en-IN", {
+                      weekday: "short",
+                      day: "2-digit",
+                      month: "short",
+                      year: "numeric",
+                      hour: "numeric",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </div>

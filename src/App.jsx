@@ -6,7 +6,10 @@ import AuthGate from "./features/auth/AuthGate";
 
 const MerchantLayout = lazy(() => import("./layouts/MerchantLayout"));
 const PublicMenu = lazy(() => import("./features/public/PublicMenu"));
-const SubscriptionCheckout = lazy(() => import("./components/SubscriptionCheckout"));
+const SubscriptionCheckout = lazy(
+  () => import("./components/SubscriptionCheckout"),
+);
+const ForgotPassword = lazy(() => import("./features/auth/ForgotPassword"));
 
 function ScreenLoading() {
   return (
@@ -43,13 +46,12 @@ export default function App() {
   */
 
   const requiresSubscription =
-    user?.role === "OWNER" &&
-    user?.requiresSubscription === true;
+    user?.role === "OWNER" && user?.requiresSubscription === true;
 
   return (
     <Suspense fallback={<ScreenLoading />}>
-    <Routes>
-      {/*
+      <Routes>
+        {/*
       |--------------------------------------------------------------------------
       | Public Customer Menu
       |--------------------------------------------------------------------------
@@ -58,12 +60,9 @@ export default function App() {
       | merchant authentication/subscription.
       |
       */}
-      <Route
-        path="/catalog/:restaurantId"
-        element={<PublicMenu />}
-      />
+        <Route path="/catalog/:restaurantId" element={<PublicMenu />} />
 
-      {/*
+        {/*
       |--------------------------------------------------------------------------
       | Subscription Checkout
       |--------------------------------------------------------------------------
@@ -78,12 +77,13 @@ export default function App() {
       | Razorpay order and complete payment.
       |
       */}
-      <Route
-        path="/subscription-checkout"
-        element={<SubscriptionCheckout />}
-      />
+        <Route
+          path="/subscription-checkout"
+          element={<SubscriptionCheckout />}
+        />
 
-      {/*
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        {/*
       |--------------------------------------------------------------------------
       | Merchant Application
       |--------------------------------------------------------------------------
@@ -102,22 +102,19 @@ export default function App() {
       |--------------------------------------------------------------------------
       */}
 
-      <Route
-        path="/*"
-        element={
-          !user ? (
-            <AuthGate />
-          ) : requiresSubscription ? (
-            <Navigate
-              to="/subscription-checkout"
-              replace
-            />
-          ) : (
-            <MerchantLayout />
-          )
-        }
-      />
-    </Routes>
+        <Route
+          path="/*"
+          element={
+            !user ? (
+              <AuthGate />
+            ) : requiresSubscription ? (
+              <Navigate to="/subscription-checkout" replace />
+            ) : (
+              <MerchantLayout />
+            )
+          }
+        />
+      </Routes>
     </Suspense>
   );
 }
