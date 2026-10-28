@@ -30,7 +30,9 @@ const StaffManagement = lazy(
   () => import("../features/profile/StaffManagement"),
 );
 const EventManagement = lazy(() => import("../components/EventManagement"));
+const SupplyAdmin = lazy(() => import("../features/supply/SupplyAdmin"));
 
+const SupplyStore = lazy(() => import("../features/supply/SupplyStore"));
 function PageLoading() {
   return (
     <div className="flex min-h-[40vh] items-center justify-center">
@@ -239,6 +241,9 @@ export default function MerchantLayout() {
               {isSuperAdmin ? (
                 <>
                   <Route path="/super-admin" element={<SuperAdminPanel />} />
+
+                  <Route path="/super-admin/supply" element={<SupplyAdmin />} />
+
                   <Route
                     path="*"
                     element={<Navigate to="/super-admin" replace />}
@@ -251,7 +256,7 @@ export default function MerchantLayout() {
                   <Route path="/orders" element={<LiveOrderMonitor />} />
 
                   <Route path="/menu" element={<MenuCatalog />} />
-
+                  <Route path="/supply" element={<SupplyStore />} />
                   <Route path="/settings" element={<StoreSettings />} />
 
                   <Route path="/table-monitor" element={<TableMonitor />} />

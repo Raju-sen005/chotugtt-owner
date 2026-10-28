@@ -17,6 +17,8 @@ import {
   Crown,
   CheckCircle2,
   CalendarDays,
+  ShoppingBasket,
+  Package,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -47,6 +49,7 @@ export default function Sidebar({ closeMobileSidebar }) {
   const { user } = useAuth();
   const restaurantId = user?.restaurantId?._id || user?.restaurantId || null;
   const isSuperAdmin = user?.role === "SUPERADMIN";
+  const canAccessSupply = ["OWNER", "MANAGER"].includes(user?.role);
   const handleNavClick = useMemo(
     () => (closeMobileSidebar ? closeMobileSidebar : () => {}),
     [closeMobileSidebar],
@@ -106,9 +109,23 @@ export default function Sidebar({ closeMobileSidebar }) {
           icon: ShieldCheck,
           label: "Admin",
         },
+        {
+          to: "/super-admin/supply",
+          icon: Package,
+          label: "Supply Management",
+        },
       ]
     : [
         ...NAV_ITEMS,
+        ...(canAccessSupply
+          ? [
+              {
+                to: "/supply",
+                icon: ShoppingBasket,
+                label: "Supply",
+              },
+            ]
+          : []),
         ...(showEventManagement
           ? [
               {

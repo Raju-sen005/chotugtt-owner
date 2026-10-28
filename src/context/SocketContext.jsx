@@ -56,9 +56,7 @@ const getRestaurantId = (user) => {
   }
 
   if (typeof user.restaurantId === "object") {
-    return user.restaurantId?._id
-      ? String(user.restaurantId._id)
-      : null;
+    return user.restaurantId?._id ? String(user.restaurantId._id) : null;
   }
 
   return String(user.restaurantId);
@@ -76,9 +74,7 @@ const getEventRestaurantId = (payload) => {
   }
 
   if (typeof payload.restaurantId === "object") {
-    return payload.restaurantId?._id
-      ? String(payload.restaurantId._id)
-      : null;
+    return payload.restaurantId?._id ? String(payload.restaurantId._id) : null;
   }
 
   return String(payload.restaurantId);
@@ -146,20 +142,14 @@ export const SocketProvider = ({ children }) => {
    */
 
   const triggerNotificationSound = (payload, source) => {
-    const orderId =
-      payload?.orderId ??
-      payload?._id ??
-      payload?.id ??
-      null;
+    const orderId = payload?.orderId ?? payload?._id ?? payload?.id ?? null;
 
     /*
      * Preserve existing behavior when order ID
      * is not available.
      */
     if (!orderId) {
-      socketLog(
-        `🔊 Notification sound triggered from ${source}`
-      );
+      socketLog(`🔊 Notification sound triggered from ${source}`);
 
       playAlert();
       return;
@@ -176,13 +166,8 @@ export const SocketProvider = ({ children }) => {
       cachedOrderId,
       timestamp,
     ] of recentSoundEventsRef.current.entries()) {
-      if (
-        now - timestamp >
-        SOUND_DEDUP_WINDOW_MS
-      ) {
-        recentSoundEventsRef.current.delete(
-          cachedOrderId
-        );
+      if (now - timestamp > SOUND_DEDUP_WINDOW_MS) {
+        recentSoundEventsRef.current.delete(cachedOrderId);
       }
     }
 
@@ -190,17 +175,11 @@ export const SocketProvider = ({ children }) => {
      * Check duplicate.
      */
     const previousTimestamp =
-      recentSoundEventsRef.current.get(
-        normalizedOrderId
-      );
+      recentSoundEventsRef.current.get(normalizedOrderId);
 
-    if (
-      previousTimestamp &&
-      now - previousTimestamp <
-        SOUND_DEDUP_WINDOW_MS
-    ) {
+    if (previousTimestamp && now - previousTimestamp < SOUND_DEDUP_WINDOW_MS) {
       socketLog(
-        `🔇 Duplicate notification sound ignored: ${normalizedOrderId}`
+        `🔇 Duplicate notification sound ignored: ${normalizedOrderId}`,
       );
 
       return;
@@ -209,14 +188,11 @@ export const SocketProvider = ({ children }) => {
     /*
      * Remember this order.
      */
-    recentSoundEventsRef.current.set(
-      normalizedOrderId,
-      now
-    );
+    recentSoundEventsRef.current.set(normalizedOrderId, now);
 
     socketLog(
       `🔊 Notification sound triggered from ${source}:`,
-      normalizedOrderId
+      normalizedOrderId,
     );
 
     playAlert();
@@ -237,9 +213,7 @@ export const SocketProvider = ({ children }) => {
 
     if (!user || !restaurantId) {
       if (socketRef.current) {
-        socketLog(
-          "🧹 Disconnecting socket because tenant is unavailable"
-        );
+        socketLog("🧹 Disconnecting socket because tenant is unavailable");
 
         socketRef.current.removeAllListeners();
 
@@ -262,17 +236,12 @@ export const SocketProvider = ({ children }) => {
      */
 
     if (socketRef.current) {
-      socketLog(
-        "♻️ Existing socket already present"
-      );
+      socketLog("♻️ Existing socket already present");
 
       return;
     }
 
-    socketLog(
-      "🔌 Creating tenant socket:",
-      restaurantId
-    );
+    socketLog("🔌 Creating tenant socket:", restaurantId);
 
     /*
      * -----------------------------------------------
@@ -291,10 +260,7 @@ export const SocketProvider = ({ children }) => {
        * WebSocket first is generally preferable,
        * polling remains the fallback.
        */
-      transports: [
-        "websocket",
-        "polling",
-      ],
+      transports: ["websocket", "polling"],
 
       upgrade: true,
 
@@ -324,15 +290,9 @@ export const SocketProvider = ({ children }) => {
      */
 
     const handleConnect = () => {
-      socketLog(
-        "🟢 Socket connected:",
-        socketInstance.id
-      );
+      socketLog("🟢 Socket connected:", socketInstance.id);
 
-      socketLog(
-        "🏪 Authenticated tenant:",
-        restaurantId
-      );
+      socketLog("🏪 Authenticated tenant:", restaurantId);
 
       /*
        * IMPORTANT:
@@ -353,10 +313,7 @@ export const SocketProvider = ({ children }) => {
      */
 
     const handleNewOrder = (order) => {
-      socketLog(
-        "🔔 NEW_ORDER_RECEIVED:",
-        order
-      );
+      socketLog("🔔 NEW_ORDER_RECEIVED:", order);
 
       /*
        * Defense in depth.
@@ -365,15 +322,8 @@ export const SocketProvider = ({ children }) => {
        * If payload contains restaurantId, validate it.
        */
 
-      if (
-        !isTenantEvent(
-          order,
-          restaurantId
-        )
-      ) {
-        socketWarn(
-          "🚫 Ignoring cross-tenant order event"
-        );
+      if (!isTenantEvent(order, restaurantId)) {
+        socketWarn("🚫 Ignoring cross-tenant order event");
 
         return;
       }
@@ -381,10 +331,7 @@ export const SocketProvider = ({ children }) => {
       /*
        * Existing notification sound.
        */
-      triggerNotificationSound(
-        order,
-        "NEW_ORDER_RECEIVED"
-      );
+      triggerNotificationSound(order, "NEW_ORDER_RECEIVED");
     };
 
     /*
@@ -402,26 +349,13 @@ export const SocketProvider = ({ children }) => {
      * accept/reject/cancel/etc.
      */
 
-    const handleRunningOrderUpdated = (
-      payload
-    ) => {
-      socketLog(
-        "🔔 RUNNING_ORDER_UPDATED:",
-        payload
-      );
+    const handleRunningOrderUpdated = (payload) => {
+      socketLog("🔔 RUNNING_ORDER_UPDATED:", payload);
 
-      const order =
-        payload?.order ?? payload;
+      const order = payload?.order ?? payload;
 
-      if (
-        !isTenantEvent(
-          order,
-          restaurantId
-        )
-      ) {
-        socketWarn(
-          "🚫 Ignoring cross-tenant running-order event"
-        );
+      if (!isTenantEvent(order, restaurantId)) {
+        socketWarn("🚫 Ignoring cross-tenant running-order event");
 
         return;
       }
@@ -432,10 +366,7 @@ export const SocketProvider = ({ children }) => {
        * If backend also emits PLAY_NOTIFICATION_SOUND,
        * deduplication prevents double playback.
        */
-      triggerNotificationSound(
-        order,
-        "RUNNING_ORDER_UPDATED"
-      );
+      triggerNotificationSound(order, "RUNNING_ORDER_UPDATED");
     };
 
     /*
@@ -446,46 +377,38 @@ export const SocketProvider = ({ children }) => {
      * Existing event preserved.
      */
 
-    const handleNotificationSound = (
-      payload
-    ) => {
-      socketLog(
-        "🔊 PLAY_NOTIFICATION_SOUND:",
-        payload
-      );
+    const handleNotificationSound = (payload) => {
+      socketLog("🔊 PLAY_NOTIFICATION_SOUND:", payload);
 
-      if (
-        !isTenantEvent(
-          payload,
-          restaurantId
-        )
-      ) {
-        socketWarn(
-          "🚫 Ignoring cross-tenant notification sound"
-        );
+      if (!isTenantEvent(payload, restaurantId)) {
+        socketWarn("🚫 Ignoring cross-tenant notification sound");
 
         return;
       }
 
-      triggerNotificationSound(
-        payload,
-        "PLAY_NOTIFICATION_SOUND"
-      );
+      triggerNotificationSound(payload, "PLAY_NOTIFICATION_SOUND");
     };
 
+    const handleNotificationReceived = (notification) => {
+      if (!isTenantEvent(notification, restaurantId)) {
+        return;
+      }
+
+      // Notification UI context ko update karne ke liye event
+      window.dispatchEvent(
+        new CustomEvent("supply-notification-received", {
+          detail: notification,
+        }),
+      );
+    };
     /*
      * -----------------------------------------------
      * DISCONNECT
      * -----------------------------------------------
      */
 
-    const handleDisconnect = (
-      reason
-    ) => {
-      socketWarn(
-        "🟡 Socket disconnected:",
-        reason
-      );
+    const handleDisconnect = (reason) => {
+      socketWarn("🟡 Socket disconnected:", reason);
     };
 
     /*
@@ -494,13 +417,8 @@ export const SocketProvider = ({ children }) => {
      * -----------------------------------------------
      */
 
-    const handleConnectError = (
-      error
-    ) => {
-      socketError(
-        "🔴 Socket connection error:",
-        error?.message || error
-      );
+    const handleConnectError = (error) => {
+      socketError("🔴 Socket connection error:", error?.message || error);
     };
 
     /*
@@ -509,12 +427,8 @@ export const SocketProvider = ({ children }) => {
      * -----------------------------------------------
      */
 
-    const handleReconnectAttempt = (
-      attempt
-    ) => {
-      socketLog(
-        `🔄 Socket reconnect attempt #${attempt}`
-      );
+    const handleReconnectAttempt = (attempt) => {
+      socketLog(`🔄 Socket reconnect attempt #${attempt}`);
     };
 
     /*
@@ -523,12 +437,8 @@ export const SocketProvider = ({ children }) => {
      * -----------------------------------------------
      */
 
-    const handleReconnect = (
-      attempt
-    ) => {
-      socketLog(
-        `🟢 Socket reconnected after ${attempt} attempt(s)`
-      );
+    const handleReconnect = (attempt) => {
+      socketLog(`🟢 Socket reconnected after ${attempt} attempt(s)`);
     };
 
     /*
@@ -537,49 +447,27 @@ export const SocketProvider = ({ children }) => {
      * -----------------------------------------------
      */
 
-    socketInstance.on(
-      "connect",
-      handleConnect
-    );
+    socketInstance.on("connect", handleConnect);
 
-    socketInstance.on(
-      "NEW_ORDER_RECEIVED",
-      handleNewOrder
-    );
+    socketInstance.on("NEW_ORDER_RECEIVED", handleNewOrder);
 
-    socketInstance.on(
-      "RUNNING_ORDER_UPDATED",
-      handleRunningOrderUpdated
-    );
+    socketInstance.on("NOTIFICATION_RECEIVED", handleNotificationReceived);
 
-    socketInstance.on(
-      "PLAY_NOTIFICATION_SOUND",
-      handleNotificationSound
-    );
+    socketInstance.on("RUNNING_ORDER_UPDATED", handleRunningOrderUpdated);
 
-    socketInstance.on(
-      "disconnect",
-      handleDisconnect
-    );
+    socketInstance.on("PLAY_NOTIFICATION_SOUND", handleNotificationSound);
 
-    socketInstance.on(
-      "connect_error",
-      handleConnectError
-    );
+    socketInstance.on("disconnect", handleDisconnect);
+
+    socketInstance.on("connect_error", handleConnectError);
 
     /*
      * Socket.IO Manager events.
      */
 
-    socketInstance.io.on(
-      "reconnect_attempt",
-      handleReconnectAttempt
-    );
+    socketInstance.io.on("reconnect_attempt", handleReconnectAttempt);
 
-    socketInstance.io.on(
-      "reconnect",
-      handleReconnect
-    );
+    socketInstance.io.on("reconnect", handleReconnect);
 
     /*
      * -----------------------------------------------
@@ -588,67 +476,35 @@ export const SocketProvider = ({ children }) => {
      */
 
     return () => {
-      socketLog(
-        "🧹 Cleaning tenant socket:",
-        restaurantId
-      );
+      socketLog("🧹 Cleaning tenant socket:", restaurantId);
 
-      socketInstance.off(
-        "connect",
-        handleConnect
-      );
+      socketInstance.off("connect", handleConnect);
 
-      socketInstance.off(
-        "NEW_ORDER_RECEIVED",
-        handleNewOrder
-      );
+      socketInstance.off("NEW_ORDER_RECEIVED", handleNewOrder);
 
-      socketInstance.off(
-        "RUNNING_ORDER_UPDATED",
-        handleRunningOrderUpdated
-      );
+      socketInstance.off("NOTIFICATION_RECEIVED", handleNotificationReceived);
 
-      socketInstance.off(
-        "PLAY_NOTIFICATION_SOUND",
-        handleNotificationSound
-      );
+      socketInstance.off("RUNNING_ORDER_UPDATED", handleRunningOrderUpdated);
 
-      socketInstance.off(
-        "disconnect",
-        handleDisconnect
-      );
+      socketInstance.off("PLAY_NOTIFICATION_SOUND", handleNotificationSound);
 
-      socketInstance.off(
-        "connect_error",
-        handleConnectError
-      );
+      socketInstance.off("disconnect", handleDisconnect);
 
-      socketInstance.io.off(
-        "reconnect_attempt",
-        handleReconnectAttempt
-      );
+      socketInstance.off("connect_error", handleConnectError);
 
-      socketInstance.io.off(
-        "reconnect",
-        handleReconnect
-      );
+      socketInstance.io.off("reconnect_attempt", handleReconnectAttempt);
+
+      socketInstance.io.off("reconnect", handleReconnect);
 
       socketInstance.disconnect();
 
-      if (
-        socketRef.current ===
-        socketInstance
-      ) {
+      if (socketRef.current === socketInstance) {
         socketRef.current = null;
 
         setSocket(null);
       }
     };
-  }, [
-    user,
-    restaurantId,
-    playAlert,
-  ]);
+  }, [user, restaurantId, playAlert]);
 
   /*
    * --------------------------------------------------
@@ -661,15 +517,10 @@ export const SocketProvider = ({ children }) => {
    * instance exactly like before.
    */
 
-  const value = useMemo(
-    () => socket,
-    [socket]
-  );
+  const value = useMemo(() => socket, [socket]);
 
   return (
-    <SocketContext.Provider value={value}>
-      {children}
-    </SocketContext.Provider>
+    <SocketContext.Provider value={value}>{children}</SocketContext.Provider>
   );
 };
 
@@ -679,5 +530,4 @@ export const SocketProvider = ({ children }) => {
  * --------------------------------------------------
  */
 
-export const useSocket = () =>
-  useContext(SocketContext);
+export const useSocket = () => useContext(SocketContext);
