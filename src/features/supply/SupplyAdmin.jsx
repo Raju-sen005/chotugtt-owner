@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import axios from "axios";
+import * as XLSX from "xlsx";
 import {
   Package,
   Tags,
@@ -62,6 +63,14 @@ export default function SupplyAdmin() {
   const [productStatusFilter, setProductStatusFilter] = useState("all");
   const [orderStatusFilter, setOrderStatusFilter] = useState("all");
   const [orderSearch, setOrderSearch] = useState("");
+  const [selectedOrder, setSelectedOrder] = useState(null);
+  // Bulk Excel product import state
+  const [showBulkImport, setShowBulkImport] = useState(false);
+  const [bulkFileName, setBulkFileName] = useState("");
+  const [bulkRows, setBulkRows] = useState([]);
+  const [bulkPreviewErrors, setBulkPreviewErrors] = useState([]);
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkResult, setBulkResult] = useState(null);
 
   const filteredProducts = products.filter((p) => {
     const categoryId = String(p.categoryId?._id || p.categoryId || "");
@@ -221,6 +230,270 @@ export default function SupplyAdmin() {
 
   const removeExistingProductImage = (index) => {
     setExistingProductImages((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const bulkTemplateHeaders = [
+    "Product Name",
+    "SKU",
+    "Category",
+    "Unit / Pack",
+    "Price",
+    "MRP",
+    "Description",
+    "Sort Order",
+  ];
+
+  const downloadBulkTemplate = () => {
+    const templateRows = [
+      bulkTemplateHeaders,
+      [
+        "Example Rice 1kg",
+        "RICE-001",
+        "Grocery",
+        "1 kg",
+        60,
+        70,
+        "Example product",
+        0,
+      ],
+    ];
+    const worksheet = XLSX.utils.aoa_to_sheet(templateRows);
+    worksheet["!cols"] = [
+      { wch: 28 },
+      { wch: 18 },
+      { wch: 22 },
+      { wch: 16 },
+      { wch: 12 },
+      { wch: 12 },
+      { wch: 36 },
+      { wch: 14 },
+    ];
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Products");
+    XLSX.writeFile(workbook, "supply-products-import-template.xlsx");
+  };
+
+  const normalizeImportHeader = (header) =>
+    String(header || "")
+      .trim()
+      .toLowerCase()
+      .replace(/\s+/g, " ");
+
+  const handleBulkExcelSelect = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    setError("");
+    setNotice("");
+    setBulkResult(null);
+    setBulkRows([]);
+    setBulkPreviewErrors([]);
+
+    const allowedExtensions = [".xlsx", ".xls", ".csv"];
+    const extension = file.name.slice(file.name.lastIndexOf(".")).toLowerCase();
+    if (!allowedExtensions.includes(extension)) {
+      setError("Please select an Excel (.xlsx, .xls) or CSV file.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Maximum import file size is 10 MB.");
+      return;
+    }
+
+    try {
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array", cellDates: false });
+      const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+      if (!firstSheet) throw new Error("The selected file has no worksheet.");
+
+      const matrix = XLSX.utils.sheet_to_json(firstSheet, {
+        header: 1,
+        defval: "",
+        raw: true,
+        blankrows: false,
+      });
+      if (!matrix.length) throw new Error("The selected file is empty.");
+
+      const headers = matrix[0].map(normalizeImportHeader);
+      const headerAliases = {
+        name: ["product name", "name"],
+        sku: ["sku", "product sku"],
+        category: ["category", "category name"],
+        unit: ["unit / pack", "unit", "pack"],
+        price: ["price", "selling price", "wholesale price"],
+        mrp: ["mrp", "maximum retail price"],
+        description: ["description", "product description"],
+        sortOrder: ["sort order", "sortorder", "display order"],
+      };
+      const columnIndexes = {};
+      Object.entries(headerAliases).forEach(([field, aliases]) => {
+        columnIndexes[field] = headers.findIndex((header) =>
+          aliases.includes(header),
+        );
+      });
+
+      const requiredHeaders = ["name", "sku", "category", "unit", "price"];
+      const missingHeaders = requiredHeaders.filter(
+        (field) => columnIndexes[field] < 0,
+      );
+      if (missingHeaders.length) {
+        throw new Error(
+          `Missing required columns: ${missingHeaders.map((field) => headerAliases[field][0]).join(", ")}. Download the template and use its column names.`,
+        );
+      }
+
+      const parsedRows = matrix
+        .slice(1)
+        .map((cells, index) => {
+          const read = (field) => {
+            const column = columnIndexes[field];
+
+            if (column < 0) return "";
+
+            const value = cells[column];
+
+            if (value === null || value === undefined) {
+              return "";
+            }
+
+            if (["price", "mrp", "sortOrder"].includes(field)) {
+              if (typeof value === "number") {
+                return value;
+              }
+
+              const normalized = String(value)
+                .replace(/[₹,\s?]/g, "")
+                .trim();
+
+              return normalized === "" ? "" : normalized;
+            }
+
+            return String(value).trim();
+          };
+          return {
+            _excelRow: index + 2,
+            name: read("name"),
+            sku: read("sku").toUpperCase(),
+            category: read("category"),
+            unit: read("unit"),
+            price: read("price"),
+            mrp: read("mrp"),
+            description: read("description"),
+            sortOrder: read("sortOrder") || "0",
+          };
+        })
+        .filter((row) =>
+          Object.values(row).some((value) => String(value).trim() !== ""),
+        );
+
+      if (!parsedRows.length)
+        throw new Error("No product rows found in the worksheet.");
+      if (parsedRows.length > 5000) {
+        throw new Error("Maximum 5,000 product rows can be imported at once.");
+      }
+
+      // Client-side preview checks. The server repeats all validation.
+      const seenSKUs = new Map();
+      const previewErrors = [];
+      parsedRows.forEach((row) => {
+        const rowNumber = row._excelRow;
+        const sku = row.sku.trim().toUpperCase();
+        const rowMessages = [];
+        if (!row.name) rowMessages.push("Product name is required.");
+        if (!sku) rowMessages.push("SKU is required.");
+        if (!row.category) rowMessages.push("Category is required.");
+        if (!row.unit) rowMessages.push("Unit / Pack is required.");
+        const price = Number(row.price);
+        if (row.price === "" || !Number.isFinite(price) || price < 0) {
+          rowMessages.push("Price must be a non-negative number.");
+        }
+        if (row.mrp !== "") {
+          const mrp = Number(row.mrp);
+          if (!Number.isFinite(mrp) || mrp < price) {
+            rowMessages.push(
+              "MRP must be a number equal to or greater than price.",
+            );
+          }
+        }
+        if (sku && seenSKUs.has(sku)) {
+          rowMessages.push(
+            `Duplicate SKU in file (also row ${seenSKUs.get(sku)}).`,
+          );
+        } else if (sku) {
+          seenSKUs.set(sku, rowNumber);
+        }
+        rowMessages.forEach((message) =>
+          previewErrors.push({ row: rowNumber, sku, message }),
+        );
+      });
+
+      setBulkFileName(file.name);
+      setBulkRows(
+        parsedRows.map((row) => {
+          const cleanRow = { ...row };
+          delete cleanRow._excelRow;
+          return cleanRow;
+        }),
+      );
+      setBulkPreviewErrors(previewErrors);
+    } catch (e) {
+      setError(e.message || "Could not read the selected Excel file.");
+    }
+  };
+
+  const submitBulkImport = async () => {
+    if (!bulkRows.length) {
+      setError("Select an Excel file and review its rows first.");
+      return;
+    }
+    if (bulkPreviewErrors.length) {
+      setError(
+        "Please fix the preview errors in Excel and upload the corrected file.",
+      );
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Import ${bulkRows.length} product rows from "${bulkFileName}"?\n\nExisting SKUs will not be overwritten. New products will start with zero stock.`,
+    );
+    if (!confirmed) return;
+
+    setBulkBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await req("post", "/admin/supply/products/bulk-import", {
+        rows: bulkRows,
+      });
+      const result = response?.data?.data || response?.data;
+      setBulkResult(result);
+      setNotice(result?.message || "Bulk import finished.");
+      await load();
+    } catch (e) {
+      const serverData = e?.response?.data;
+      if (serverData?.errors || serverData?.summary) {
+        setBulkResult(serverData);
+      }
+      setError(errorOf(e));
+    } finally {
+      setBulkBusy(false);
+    }
+  };
+
+  const downloadBulkErrors = () => {
+    const errors = bulkResult?.errors || [];
+    if (!errors.length) return;
+    const worksheet = XLSX.utils.json_to_sheet(
+      errors.map((item) => ({
+        "Excel Row": item.row,
+        SKU: item.sku || "",
+        Error: item.message || "Import failed",
+      })),
+    );
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Import Errors");
+    XLSX.writeFile(workbook, "supply-products-import-errors.xlsx");
   };
 
   const resetProductForm = () => {
@@ -511,6 +784,199 @@ export default function SupplyAdmin() {
           )}
         </div>
       )}
+      {tab === "Products" && (
+        <section className="rounded-2xl border border-stone-200 bg-white p-4 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-stone-900">
+                Bulk product import
+              </h3>
+              <p className="mt-1 text-xs text-stone-500">
+                Import up to 5,000 products from Excel or CSV. Existing SKUs are
+                never overwritten.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={downloadBulkTemplate}
+                className="rounded-xl border border-stone-200 px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-50"
+              >
+                Download template
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowBulkImport((value) => !value);
+                  setBulkResult(null);
+                  setError("");
+                }}
+                className="rounded-xl bg-stone-900 px-3 py-2 text-xs font-semibold text-white hover:bg-stone-800"
+              >
+                {showBulkImport ? "Close import" : "Import Excel"}
+              </button>
+            </div>
+          </div>
+
+          {showBulkImport && (
+            <div className="mt-4 space-y-4 border-t border-stone-100 pt-4">
+              <label className="block text-xs font-semibold text-stone-700">
+                Select Excel / CSV file
+                <input
+                  type="file"
+                  accept=".xlsx,.xls,.csv"
+                  onChange={handleBulkExcelSelect}
+                  disabled={bulkBusy}
+                  className="mt-2 block w-full rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-sm font-normal"
+                />
+              </label>
+
+              {bulkFileName && (
+                <p className="text-xs text-stone-600">
+                  Selected:{" "}
+                  <span className="font-semibold">{bulkFileName}</span>
+                </p>
+              )}
+
+              {bulkRows.length > 0 && (
+                <>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    <div className="rounded-xl bg-stone-50 p-3">
+                      <p className="text-xs text-stone-500">Rows read</p>
+                      <p className="mt-1 text-lg font-bold text-stone-900">
+                        {bulkRows.length}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-emerald-50 p-3">
+                      <p className="text-xs text-emerald-700">Preview errors</p>
+                      <p className="mt-1 text-lg font-bold text-emerald-900">
+                        {bulkPreviewErrors.length}
+                      </p>
+                    </div>
+                    <div className="rounded-xl bg-amber-50 p-3">
+                      <p className="text-xs text-amber-700">Initial stock</p>
+                      <p className="mt-1 text-lg font-bold text-amber-900">
+                        0 units
+                      </p>
+                    </div>
+                  </div>
+
+                  {bulkPreviewErrors.length > 0 && (
+                    <div className="max-h-48 overflow-auto rounded-xl border border-red-200 bg-red-50 p-3">
+                      <p className="mb-2 text-xs font-bold text-red-800">
+                        Fix these issues in Excel before importing:
+                      </p>
+                      <ul className="space-y-1 text-xs text-red-700">
+                        {bulkPreviewErrors.slice(0, 100).map((item, index) => (
+                          <li key={`${item.row}-${index}`}>
+                            Row {item.row} · {item.sku || "No SKU"}:{" "}
+                            {item.message}
+                          </li>
+                        ))}
+                      </ul>
+                      {bulkPreviewErrors.length > 100 && (
+                        <p className="mt-2 text-xs text-red-700">
+                          Showing first 100 errors.
+                        </p>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="overflow-auto rounded-xl border border-stone-200">
+                    <table className="min-w-full text-left text-xs">
+                      <thead className="bg-stone-50 text-stone-600">
+                        <tr>
+                          {[
+                            "Product",
+                            "SKU",
+                            "Category",
+                            "Unit",
+                            "Price",
+                            "MRP",
+                          ].map((heading) => (
+                            <th
+                              key={heading}
+                              className="whitespace-nowrap px-3 py-2 font-semibold"
+                            >
+                              {heading}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {bulkRows.slice(0, 10).map((row, index) => (
+                          <tr
+                            key={`${row.sku}-${index}`}
+                            className="border-t border-stone-100"
+                          >
+                            <td className="px-3 py-2">{row.name}</td>
+                            <td className="px-3 py-2">{row.sku}</td>
+                            <td className="px-3 py-2">{row.category}</td>
+                            <td className="px-3 py-2">{row.unit}</td>
+                            <td className="px-3 py-2">{row.price}</td>
+                            <td className="px-3 py-2">
+                              {row.mrp || row.price}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {bulkRows.length > 10 && (
+                    <p className="text-xs text-stone-500">
+                      Showing first 10 rows of {bulkRows.length}.
+                    </p>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={submitBulkImport}
+                    disabled={
+                      bulkBusy ||
+                      bulkPreviewErrors.length > 0 ||
+                      !bulkRows.length
+                    }
+                    className="rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {bulkBusy
+                      ? "Importing products..."
+                      : `Import ${bulkRows.length} products`}
+                  </button>
+                </>
+              )}
+
+              {bulkResult?.summary && (
+                <div className="rounded-xl border border-stone-200 bg-stone-50 p-3">
+                  <p className="text-sm font-bold text-stone-900">
+                    Import result
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-4 text-xs">
+                    <span>
+                      Total: <b>{bulkResult.summary.totalRows}</b>
+                    </span>
+                    <span className="text-emerald-700">
+                      Imported: <b>{bulkResult.summary.imported}</b>
+                    </span>
+                    <span className="text-red-700">
+                      Failed: <b>{bulkResult.summary.failed}</b>
+                    </span>
+                  </div>
+                  {!!bulkResult.errors?.length && (
+                    <button
+                      type="button"
+                      onClick={downloadBulkErrors}
+                      className="mt-3 rounded-lg border border-stone-200 bg-white px-3 py-2 text-xs font-semibold text-stone-700 hover:bg-stone-100"
+                    >
+                      Download error report
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+      )}
+
       {tab === "Products" && (
         <div className="grid gap-3 sm:grid-cols-3">
           <input
@@ -1007,20 +1473,31 @@ export default function SupplyAdmin() {
               o.expectedDeliveryDate
                 ? new Date(o.expectedDeliveryDate).toLocaleDateString("en-IN")
                 : "—",
-              <button
-                key={`archive-${o._id}`}
-                type="button"
-                onClick={() =>
-                  deleteRecord(
-                    `/admin/supply/orders/${o._id}`,
-                    o.orderNumber || o._id,
-                    "archive order",
-                  )
-                }
-                className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100"
-              >
-                Archive
-              </button>,
+              <div className="flex items-center gap-2">
+                <button
+                  key={`details-${o._id}`}
+                  type="button"
+                  onClick={() => setSelectedOrder(o)}
+                  className="rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100"
+                >
+                  View Details
+                </button>
+
+                <button
+                  key={`archive-${o._id}`}
+                  type="button"
+                  onClick={() =>
+                    deleteRecord(
+                      `/admin/supply/orders/${o._id}`,
+                      o.orderNumber || o._id,
+                      "archive order",
+                    )
+                  }
+                  className="rounded-lg bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100"
+                >
+                  Archive
+                </button>
+              </div>,
             ]),
           )}
           {form(
@@ -1107,6 +1584,318 @@ export default function SupplyAdmin() {
               });
             },
           )}
+        </div>
+      )}
+      {selectedOrder && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-3 backdrop-blur-sm sm:p-6">
+          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-200 bg-white px-5 py-4 sm:px-7">
+              <div>
+                <div className="flex flex-wrap items-center gap-3">
+                  <h2 className="text-xl font-bold tracking-tight text-slate-900">
+                    Order Details
+                  </h2>
+
+                  <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
+                    {selectedOrder.status || "Pending"}
+                  </span>
+                </div>
+
+                <p className="mt-1 text-sm text-slate-500">
+                  Order ID:{" "}
+                  <span className="font-semibold text-slate-700">
+                    {selectedOrder.orderNumber || "—"}
+                  </span>
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedOrder(null)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+              >
+                Close
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="flex-1 space-y-7 overflow-y-auto bg-slate-50/70 p-5 sm:p-7">
+              {/* Order Summary */}
+              <section>
+                <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-500">
+                  Order Summary
+                </h3>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                    <p className="text-xs font-medium text-slate-500">
+                      Order Status
+                    </p>
+                    <p className="mt-2 text-base font-bold text-slate-900">
+                      {selectedOrder.status || "—"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                    <p className="text-xs font-medium text-slate-500">
+                      Payment Method
+                    </p>
+                    <p className="mt-2 text-base font-bold text-slate-900">
+                      {selectedOrder.paymentMethod || "COD"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                    <p className="text-xs font-medium text-slate-500">
+                      Payment Status
+                    </p>
+                    <p className="mt-2 text-base font-bold text-slate-900">
+                      {selectedOrder.paymentStatus || "PENDING"}
+                    </p>
+                  </div>
+                </div>
+              </section>
+
+              {/* Ordered Products */}
+              <section>
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-slate-500">
+                    Ordered Products
+                  </h3>
+
+                  <span className="rounded-lg bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                    {(selectedOrder.items || []).length} Items
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white">
+                  <table className="min-w-[650px] w-full text-sm">
+                    <thead className="bg-slate-100/80">
+                      <tr className="text-xs uppercase tracking-wide text-slate-500">
+                        <th className="px-4 py-3 text-left font-semibold">
+                          Product
+                        </th>
+                        <th className="px-4 py-3 text-left font-semibold">
+                          SKU
+                        </th>
+                        <th className="px-4 py-3 text-right font-semibold">
+                          Qty
+                        </th>
+                         <th className="px-4 py-3 text-right font-semibold">
+                          Unit
+                        </th>
+                        <th className="px-4 py-3 text-right font-semibold">
+                          Price
+                        </th>
+                        <th className="px-4 py-3 text-right font-semibold">
+                          Total
+                        </th>
+                      </tr>
+                    </thead>
+
+                    <tbody className="divide-y divide-slate-100">
+                      {(selectedOrder.items || []).map((item, index) => (
+                        <tr
+                          key={`${item.productId}-${index}`}
+                          className="transition hover:bg-slate-50"
+                        >
+                          <td className="px-4 py-4 font-semibold text-slate-800">
+                            {item.productName}
+                          </td>
+
+                          <td className="px-4 py-4 text-slate-500">
+                            {item.sku || "—"}
+                          </td>
+
+                          <td className="px-4 py-4 text-right text-slate-700">
+                            {item.quantity} 
+                          </td>
+
+                           <td className="px-4 py-4 text-right text-slate-700">
+                            {item.unit || ""}
+                          </td>
+
+                          <td className="px-4 py-4 text-right text-slate-700">
+                            {money(item.unitPrice)}
+                          </td>
+
+                          <td className="px-4 py-4 text-right font-bold text-slate-900">
+                            {money(item.lineTotal)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              {/* Payment Summary */}
+              <section>
+                <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-500">
+                  Payment Summary
+                </h3>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-5">
+                  <div className="space-y-3 text-sm">
+                    <div className="flex items-center justify-between text-slate-600">
+                      <span>Subtotal</span>
+                      <span className="font-medium text-slate-900">
+                        {money(selectedOrder.subtotal)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-slate-600">
+                      <span>Delivery Charge</span>
+                      <span className="font-medium text-slate-900">
+                        {money(selectedOrder.deliveryCharge)}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-4">
+                      <span className="text-base font-bold text-slate-900">
+                        Total Amount
+                      </span>
+
+                      <span className="text-xl font-extrabold text-emerald-600">
+                        {money(selectedOrder.totalAmount)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Delivery Address */}
+              <section>
+                <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-500">
+                  Delivery Address
+                </h3>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-5">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs font-medium text-slate-500">
+                        Restaurant Name
+                      </p>
+                      <p className="mt-1 font-semibold text-slate-900">
+                        {selectedOrder.deliveryAddress?.name || "—"}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-medium text-slate-500">
+                        Contact Number
+                      </p>
+                      {selectedOrder.deliveryAddress?.phone ? (
+                        <a
+                          href={`tel:${selectedOrder.deliveryAddress.phone}`}
+                          className="mt-1 inline-block font-semibold text-blue-600 hover:underline"
+                        >
+                          {selectedOrder.deliveryAddress.phone}
+                        </a>
+                      ) : (
+                        <p className="mt-1 font-semibold text-slate-400">
+                          Not provided
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="sm:col-span-2">
+                      <p className="text-xs font-medium text-slate-500">
+                        Address
+                      </p>
+                      <p className="mt-1 font-medium leading-6 text-slate-800">
+                        {selectedOrder.deliveryAddress?.addressLine || "—"}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-medium text-slate-500">City</p>
+                      <p className="mt-1 font-medium text-slate-800">
+                        {selectedOrder.deliveryAddress?.city || "—"}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-medium text-slate-500">
+                        State
+                      </p>
+                      <p className="mt-1 font-medium text-slate-800">
+                        {selectedOrder.deliveryAddress?.state || "—"}
+                      </p>
+                    </div>
+
+                    <div>
+                      <p className="text-xs font-medium text-slate-500">
+                        Pincode
+                      </p>
+                      <p className="mt-1 font-medium text-slate-800">
+                        {selectedOrder.deliveryAddress?.pincode || "—"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              {/* Additional Details */}
+              <section>
+                <h3 className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-500">
+                  Additional Details
+                </h3>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                    <p className="text-xs font-medium text-slate-500">
+                      Expected Delivery
+                    </p>
+                    <p className="mt-2 font-semibold text-slate-800">
+                      {selectedOrder.expectedDeliveryDate
+                        ? new Date(
+                            selectedOrder.expectedDeliveryDate,
+                          ).toLocaleString("en-IN")
+                        : "—"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                    <p className="text-xs font-medium text-slate-500">
+                      Minimum Order Amount
+                    </p>
+                    <p className="mt-2 font-semibold text-slate-800">
+                      {money(selectedOrder.minimumOrderAmount)}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                    <p className="text-xs font-medium text-slate-500">
+                      Restaurant ID
+                    </p>
+                    <p className="mt-2 break-all font-medium text-slate-700">
+                      {selectedOrder.restaurantId || "—"}
+                    </p>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 bg-white p-4">
+                    <p className="text-xs font-medium text-slate-500">Notes</p>
+                    <p className="mt-2 font-medium text-slate-700">
+                      {selectedOrder.notes || "No notes"}
+                    </p>
+                  </div>
+                </div>
+              </section>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end border-t border-slate-200 bg-white px-5 py-4 sm:px-7">
+              <button
+                type="button"
+                onClick={() => setSelectedOrder(null)}
+                className="rounded-xl bg-slate-900 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-slate-700"
+              >
+                Close Details
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

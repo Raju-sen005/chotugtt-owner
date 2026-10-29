@@ -123,6 +123,7 @@ export default function SupplyStore() {
     city: "",
     state: "",
   });
+  const [restaurantPhone, setRestaurantPhone] = useState("");
   const [delivery, setDelivery] = useState(null);
   const [view, setView] = useState("catalog");
   const [loading, setLoading] = useState(true);
@@ -132,6 +133,7 @@ export default function SupplyStore() {
   const [notice, setNotice] = useState("");
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [additionalNotes, setAdditionalNotes] = useState("");
   useEffect(() => {
     let cancelled = false;
 
@@ -152,6 +154,7 @@ export default function SupplyStore() {
           city: restaurantAddress.city || "",
           state: restaurantAddress.state || "",
         });
+        setRestaurantPhone(profile.phone || "");
         setPincode(
           String(restaurantAddress.zip || "")
             .replace(/\D/g, "")
@@ -365,12 +368,18 @@ export default function SupplyStore() {
         })),
 
         deliveryAddress: {
-          address: formattedDeliveryAddress,
+          name: addressFields.restaurantName.trim(),
+          phone: restaurantPhone.trim(),
+          addressLine: addressFields.street.trim(),
+          city: addressFields.city.trim(),
+          state: addressFields.state.trim(),
           pincode: pincode.trim(),
         },
+        notes: additionalNotes.trim(),
       });
       const result = r?.data?.data ?? r?.data?.order ?? r?.data;
       setCart({});
+      setAdditionalNotes("");
       setView("orders");
       setNotice(
         `Order placed${result?.orderNumber ? ` · ${result.orderNumber}` : ""}. Check My Orders for delivery updates.`,
@@ -1002,6 +1011,32 @@ export default function SupplyStore() {
                   </p>
                 </div>
               </div>
+              {/* Additional Notes */}
+              <div className="space-y-2">
+                <label
+                  htmlFor="supply-order-notes"
+                  className="text-xs font-extrabold text-slate-600"
+                >
+                  Additional Notes
+                  <span className="ml-1 font-normal text-slate-400">
+                    (Optional)
+                  </span>
+                </label>
+
+                <textarea
+                  id="supply-order-notes"
+                  value={additionalNotes}
+                  onChange={(e) => setAdditionalNotes(e.target.value)}
+                  maxLength={1000}
+                  rows={3}
+                  placeholder="Add delivery instructions or any special requirements..."
+                  className="w-full resize-y rounded-xl border border-slate-200 bg-white px-3 py-3 text-sm outline-none transition focus:border-rose-400 focus:ring-4 focus:ring-rose-100"
+                />
+
+                <p className="text-right text-xs text-slate-400">
+                  {additionalNotes.length}/1000 characters
+                </p>
+              </div>
               <div className="space-y-3 rounded-xl bg-slate-50 p-4">
                 <Row label="Subtotal" value={money(subtotal)} />
                 <Row label="Delivery charge" value={money(fee)} />
@@ -1228,7 +1263,7 @@ export default function SupplyStore() {
           )}
 
           {/* Cart summary bar */}
-          <div className="sticky bottom-3 z-10 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-700 bg-slate-950 p-4 text-white shadow-xl shadow-slate-900/20 sm:px-5">
+          <div className="fixed bottom-4 left-[263px] right-6 z-50 flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-slate-700 bg-slate-950 p-4 text-white shadow-xl shadow-slate-900/20 sm:px-5">
             <div className="flex items-center gap-3">
               <span className="grid h-11 w-11 place-items-center rounded-xl bg-rose-500/15 text-rose-400">
                 <ShoppingBasket size={21} />
