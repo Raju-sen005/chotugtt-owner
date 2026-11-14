@@ -2,6 +2,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { useSocket } from "../../context/SocketContext";
 import { useAuth } from "../../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 import React from "react";
 import axios from "axios";
 import {
@@ -45,11 +46,33 @@ function getHourlyCategory(hour) {
 }
 
 function Analysis() {
+  const navigate = useNavigate();
   const [showAllTables, setShowAllTables] = React.useState(false);
   const socket = useSocket();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const restaurantId = user?.restaurantId?._id || user?.restaurantId || null;
+
+  const { data: restaurantProfile, isLoading: isProfileLoading } = useQuery({
+    queryKey: ["restaurant-profile", restaurantId],
+    queryFn: async () => {
+      const res = await axios.get(
+        `${import.meta.env.VITE_APP_API_BASE}/restaurant/profile`,
+        { withCredentials: true },
+      );
+      return res.data.data;
+    },
+    enabled: !!restaurantId,
+    staleTime: 60_000,
+  });
+
+  const currentPlan = String(restaurantProfile?.subscriptionPlan || "")
+    .trim()
+    .toUpperCase();
+
+  const isStarterPlan = currentPlan === "STARTER";
+
+  const [showUpgradePopup, setShowUpgradePopup] = React.useState(false);
 
   React.useEffect(() => {
     if (!socket) return;
@@ -80,7 +103,7 @@ function Analysis() {
       return res.data.data;
     },
     staleTime: 60_000,
-    enabled: !!restaurantId,
+    enabled: !!restaurantId && !!restaurantProfile && !isStarterPlan,
   });
 
   const chartData = React.useMemo(() => {
@@ -125,6 +148,67 @@ function Analysis() {
       { Morning: 0, Afternoon: 0, Evening: 0, Night: 0 },
     );
   }, [stats]);
+
+  if (isProfileLoading) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <div className="text-sm font-medium text-slate-500">Loading...</div>
+      </div>
+    );
+  }
+
+  if (isStarterPlan) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center p-4">
+        <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-lg">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-rose-100">
+            <BarChart3 className="h-8 w-8 text-rose-500" />
+          </div>
+
+          <h2 className="mt-5 text-2xl font-black text-slate-900">
+            Upgrade Your Plan
+          </h2>
+
+          <p className="mt-3 text-sm leading-6 text-slate-600">
+            Analysis feature is not available in the Starter plan. Please
+            upgrade your subscription plan to access business analytics and
+            performance insights.
+          </p>
+
+          <button
+            type="button"
+            onClick={() => navigate("/subscription-checkout")}
+            className="mt-6 w-full rounded-xl bg-rose-500 py-3 text-sm font-bold text-white hover:bg-rose-600"
+          >
+            Upgrade Plan
+          </button>
+        </div>
+
+        {showUpgradePopup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+              <h2 className="text-xl font-black text-gray-900">
+                Upgrade Your Plan
+              </h2>
+
+              <p className="mt-3 text-sm leading-6 text-gray-600">
+                Analysis is available only on eligible subscription plans.
+                Upgrade your plan to use this feature.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => setShowUpgradePopup(false)}
+                className="mt-6 w-full rounded-xl bg-rose-500 py-3 text-sm font-bold text-white"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -215,10 +299,15 @@ function Analysis() {
               <BarChart3 className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-xs font-bold text-white/80">Business Analytics</p>
-              <h2 className="text-2xl font-black tracking-tight">Restaurant Performance</h2>
+              <p className="text-xs font-bold text-white/80">
+                Business Analytics
+              </p>
+              <h2 className="text-2xl font-black tracking-tight">
+                Restaurant Performance
+              </h2>
               <p className="mt-1 max-w-xl text-sm text-white/85">
-                Get insights about your sales, orders, popular items and table performance.
+                Get insights about your sales, orders, popular items and table
+                performance.
               </p>
             </div>
           </div>
@@ -226,7 +315,9 @@ function Analysis() {
             <p className="flex items-center justify-end gap-2 text-sm font-bold">
               <CalendarDays size={14} /> {todayLabel}
             </p>
-            <p className="mt-1 text-[11px] font-semibold text-emerald-100">Today</p>
+            <p className="mt-1 text-[11px] font-semibold text-emerald-100">
+              Today
+            </p>
           </div>
         </div>
       </div>
@@ -235,14 +326,23 @@ function Analysis() {
         {summaryCards.map((item) => {
           const Icon = item.icon;
           return (
-            <div key={item.label} className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+            <div
+              key={item.label}
+              className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
+            >
               <div className="flex items-center justify-between">
-                <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${item.color}`}>
+                <span
+                  className={`flex h-9 w-9 items-center justify-center rounded-xl ${item.color}`}
+                >
                   <Icon size={16} />
                 </span>
-                <p className="text-[11px] font-bold text-slate-400">{item.label}</p>
+                <p className="text-[11px] font-bold text-slate-400">
+                  {item.label}
+                </p>
               </div>
-              <p className="mt-3 text-2xl font-black text-slate-900">{item.val}</p>
+              <p className="mt-3 text-2xl font-black text-slate-900">
+                {item.val}
+              </p>
             </div>
           );
         })}
@@ -254,32 +354,53 @@ function Analysis() {
             <h3 className="flex items-center gap-2 text-sm font-black text-slate-900">
               <BarChart3 size={16} className="text-rose-500" /> Sales Trend
             </h3>
-            <span className="rounded-full bg-rose-500 px-2.5 py-1 text-[10px] font-black text-white">Last 7 days</span>
+            <span className="rounded-full bg-rose-500 px-2.5 py-1 text-[10px] font-black text-white">
+              Last 7 days
+            </span>
           </div>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={chartData}>
-              <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94A3B8" }} />
+              <XAxis
+                dataKey="day"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 11, fill: "#94A3B8" }}
+              />
               <YAxis hide />
               <Tooltip
                 cursor={{ fill: "#fff1f2" }}
                 formatter={(value) => [money(value), "Revenue"]}
                 contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0" }}
               />
-              <Bar dataKey="sales" fill="#FB7185" radius={[6, 6, 0, 0]} barSize={22} />
+              <Bar
+                dataKey="sales"
+                fill="#FB7185"
+                radius={[6, 6, 0, 0]}
+                barSize={22}
+              />
             </BarChart>
           </ResponsiveContainer>
         </div>
 
         <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <h3 className="mb-3 flex items-center gap-2 text-sm font-black text-slate-900">
-            <Clock size={16} className="text-orange-500" /> Hourly Order Distribution
+            <Clock size={16} className="text-orange-500" /> Hourly Order
+            Distribution
           </h3>
           <ResponsiveContainer width="100%" height={220}>
             <BarChart data={hourlyChart}>
-              <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94A3B8" }} />
+              <XAxis
+                dataKey="label"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fontSize: 11, fill: "#94A3B8" }}
+              />
               <Tooltip
                 cursor={{ fill: "#fff7ed" }}
-                formatter={(value, _name, item) => [value, item?.payload?.name || "Orders"]}
+                formatter={(value, _name, item) => [
+                  value,
+                  item?.payload?.name || "Orders",
+                ]}
                 contentStyle={{ borderRadius: 12, border: "1px solid #e2e8f0" }}
               />
               <Bar dataKey="count" radius={[8, 8, 0, 0]} barSize={36}>
@@ -292,15 +413,26 @@ function Analysis() {
         </div>
 
         <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-          <h3 className="mb-3 text-sm font-black text-slate-900">Order Type Distribution</h3>
+          <h3 className="mb-3 text-sm font-black text-slate-900">
+            Order Type Distribution
+          </h3>
           {typeTotal === 0 ? (
-            <p className="py-16 text-center text-xs font-semibold text-slate-400">No completed orders yet</p>
+            <p className="py-16 text-center text-xs font-semibold text-slate-400">
+              No completed orders yet
+            </p>
           ) : (
             <div className="flex items-center gap-4">
               <div className="relative h-40 w-40 shrink-0">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
-                    <Pie data={typeSlices} dataKey="value" innerRadius={48} outerRadius={68} paddingAngle={3} stroke="none">
+                    <Pie
+                      data={typeSlices}
+                      dataKey="value"
+                      innerRadius={48}
+                      outerRadius={68}
+                      paddingAngle={3}
+                      stroke="none"
+                    >
                       {typeSlices.map((slice) => (
                         <Cell key={slice.name} fill={slice.color} />
                       ))}
@@ -308,7 +440,9 @@ function Analysis() {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-                  <p className="text-lg font-black text-slate-900">{typeTotal}</p>
+                  <p className="text-lg font-black text-slate-900">
+                    {typeTotal}
+                  </p>
                   <p className="text-[10px] font-bold text-slate-400">Orders</p>
                 </div>
               </div>
@@ -317,7 +451,8 @@ function Analysis() {
                   <div key={slice.name}>
                     <p className="font-bold text-slate-800">{slice.name}</p>
                     <p className="text-xs text-slate-500">
-                      {slice.value} · {Math.round((slice.value / typeTotal) * 100)}%
+                      {slice.value} ·{" "}
+                      {Math.round((slice.value / typeTotal) * 100)}%
                     </p>
                   </div>
                 ))}
@@ -329,7 +464,9 @@ function Analysis() {
 
       <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-3">
         <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
-          <h3 className="mb-3 text-sm font-black text-slate-900">Top Selling Items</h3>
+          <h3 className="mb-3 text-sm font-black text-slate-900">
+            Top Selling Items
+          </h3>
           <table className="w-full text-left text-xs">
             <thead className="text-[10px] font-bold uppercase text-slate-400">
               <tr>
@@ -341,15 +478,26 @@ function Analysis() {
             <tbody>
               {topItems.length > 0 ? (
                 topItems.map((item, index) => (
-                  <tr key={`${item._id}-${index}`} className="border-t border-slate-50">
-                    <td className="py-2 font-black text-rose-500">{index + 1}</td>
-                    <td className="py-2 font-bold text-slate-800">{item._id}</td>
-                    <td className="py-2 text-right font-black text-slate-700">{item.count}</td>
+                  <tr
+                    key={`${item._id}-${index}`}
+                    className="border-t border-slate-50"
+                  >
+                    <td className="py-2 font-black text-rose-500">
+                      {index + 1}
+                    </td>
+                    <td className="py-2 font-bold text-slate-800">
+                      {item._id}
+                    </td>
+                    <td className="py-2 text-right font-black text-slate-700">
+                      {item.count}
+                    </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan="3" className="py-8 text-center text-slate-400">No top items yet</td>
+                  <td colSpan="3" className="py-8 text-center text-slate-400">
+                    No top items yet
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -358,9 +506,15 @@ function Analysis() {
 
         <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-sm font-black text-slate-900">Table Performance</h3>
+            <h3 className="text-sm font-black text-slate-900">
+              Table Performance
+            </h3>
             {sortedTableStats.length > 5 && (
-              <button type="button" onClick={() => setShowAllTables((open) => !open)} className="text-[11px] font-bold text-rose-500">
+              <button
+                type="button"
+                onClick={() => setShowAllTables((open) => !open)}
+                className="text-[11px] font-bold text-rose-500"
+              >
                 {showAllTables ? "Show less" : "View all"}
               </button>
             )}
@@ -377,19 +531,36 @@ function Analysis() {
             <tbody>
               {displayTables.length > 0 ? (
                 displayTables.map((table, index) => {
-                  const share = Math.round((table.orderCount / maxOrders) * 100);
-                  const label = String(table._id || "").toUpperCase() === "PARCEL" ? "Parcel" : table._id || "N/A";
+                  const share = Math.round(
+                    (table.orderCount / maxOrders) * 100,
+                  );
+                  const label =
+                    String(table._id || "").toUpperCase() === "PARCEL"
+                      ? "Parcel"
+                      : table._id || "N/A";
                   return (
-                    <tr key={table._id || index} className="border-t border-slate-50">
-                      <td className="py-2 font-black text-rose-500">{index + 1}</td>
+                    <tr
+                      key={table._id || index}
+                      className="border-t border-slate-50"
+                    >
+                      <td className="py-2 font-black text-rose-500">
+                        {index + 1}
+                      </td>
                       <td className="py-2 font-bold text-slate-800">{label}</td>
-                      <td className="py-2 text-right font-bold text-slate-700">{table.orderCount}</td>
+                      <td className="py-2 text-right font-bold text-slate-700">
+                        {table.orderCount}
+                      </td>
                       <td className="py-2">
                         <div className="ml-auto flex w-24 items-center gap-2">
                           <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-100">
-                            <div className="h-full rounded-full bg-emerald-400" style={{ width: `${share}%` }} />
+                            <div
+                              className="h-full rounded-full bg-emerald-400"
+                              style={{ width: `${share}%` }}
+                            />
                           </div>
-                          <span className="w-8 text-right text-[10px] font-bold text-slate-500">{share}%</span>
+                          <span className="w-8 text-right text-[10px] font-bold text-slate-500">
+                            {share}%
+                          </span>
                         </div>
                       </td>
                     </tr>
@@ -397,7 +568,9 @@ function Analysis() {
                 })
               ) : (
                 <tr>
-                  <td colSpan="4" className="py-8 text-center text-slate-400">No completed orders yet</td>
+                  <td colSpan="4" className="py-8 text-center text-slate-400">
+                    No completed orders yet
+                  </td>
                 </tr>
               )}
             </tbody>
@@ -410,15 +583,25 @@ function Analysis() {
           </h3>
           <div className="space-y-3">
             {hourlyChart.map((slot, index) => (
-              <div key={slot.name} className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2">
+              <div
+                key={slot.name}
+                className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2"
+              >
                 <div className="flex items-center gap-2">
                   {HOURLY_ICONS[slot.name]}
                   <div>
-                    <p className="text-xs font-black text-slate-800">{slot.name}</p>
+                    <p className="text-xs font-black text-slate-800">
+                      {slot.name}
+                    </p>
                     <p className="text-[10px] text-slate-400">{slot.label}</p>
                   </div>
                 </div>
-                <p className="text-sm font-black" style={{ color: hourlyColors[index] }}>{slot.count}</p>
+                <p
+                  className="text-sm font-black"
+                  style={{ color: hourlyColors[index] }}
+                >
+                  {slot.count}
+                </p>
               </div>
             ))}
           </div>

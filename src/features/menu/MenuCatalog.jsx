@@ -83,7 +83,12 @@ export default function MenuCatalog() {
   });
 
   const isApproved = restaurantProfile?.isApproved === true;
+  const currentPlan = String(restaurantProfile?.subscriptionPlan || "")
+    .trim()
+    .toUpperCase();
 
+  const isStarterPlan = currentPlan === "STARTER";
+  const [showUpgradePopup, setShowUpgradePopup] = useState(false);
   const { data: aiStatus } = useQuery({
     queryKey: ["ai-menu-status", restaurantId],
     queryFn: async () => {
@@ -101,7 +106,10 @@ export default function MenuCatalog() {
     ? new Date(aiStatus.nextAvailableAt)
     : null;
 
-  const { data: menuItems = { items: [], combos: [], categoryOrder: [] }, isLoading } = useQuery({
+  const {
+    data: menuItems = { items: [], combos: [], categoryOrder: [] },
+    isLoading,
+  } = useQuery({
     queryKey: ["menu-items", restaurantId],
     queryFn: async () => {
       const [itemsRes, combosRes] = await Promise.all([
@@ -338,7 +346,8 @@ export default function MenuCatalog() {
     }
 
     if (vegFilter === "VEG") rows = rows.filter((item) => item.isVeg !== false);
-    if (vegFilter === "NONVEG") rows = rows.filter((item) => item.isVeg === false);
+    if (vegFilter === "NONVEG")
+      rows = rows.filter((item) => item.isVeg === false);
 
     const query = menuSearch.trim().toLowerCase();
     if (query) {
@@ -350,9 +359,13 @@ export default function MenuCatalog() {
     }
 
     if (sortMode === "name") {
-      rows = [...rows].sort((a, b) => String(a.name).localeCompare(String(b.name)));
+      rows = [...rows].sort((a, b) =>
+        String(a.name).localeCompare(String(b.name)),
+      );
     } else if (sortMode === "price") {
-      rows = [...rows].sort((a, b) => Number(a.price || 0) - Number(b.price || 0));
+      rows = [...rows].sort(
+        (a, b) => Number(a.price || 0) - Number(b.price || 0),
+      );
     }
 
     return rows;
@@ -784,20 +797,31 @@ export default function MenuCatalog() {
                   <UtensilsCrossed className="h-6 w-6" />
                 </div>
                 <div>
-                  <h1 className="text-2xl font-black tracking-tight">Menu Catalog</h1>
+                  <h1 className="text-2xl font-black tracking-tight">
+                    Menu Catalog
+                  </h1>
                   <p className="mt-1 max-w-md text-sm text-white/85">
-                    Manage your restaurant menu, add delicious items, combos and keep your menu updated.
+                    Manage your restaurant menu, add delicious items, combos and
+                    keep your menu updated.
                   </p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div className="rounded-2xl bg-white/15 px-4 py-3">
-                  <p className="text-[10px] font-bold uppercase text-white/80">Total Items</p>
-                  <p className="text-2xl font-black">{menuItems.items.length}</p>
+                  <p className="text-[10px] font-bold uppercase text-white/80">
+                    Total Items
+                  </p>
+                  <p className="text-2xl font-black">
+                    {menuItems.items.length}
+                  </p>
                 </div>
                 <div className="rounded-2xl bg-white/15 px-4 py-3">
-                  <p className="text-[10px] font-bold uppercase text-white/80">Total Combos</p>
-                  <p className="text-2xl font-black">{menuItems.combos.length}</p>
+                  <p className="text-[10px] font-bold uppercase text-white/80">
+                    Total Combos
+                  </p>
+                  <p className="text-2xl font-black">
+                    {menuItems.combos.length}
+                  </p>
                 </div>
               </div>
             </div>
@@ -805,12 +829,17 @@ export default function MenuCatalog() {
           <div className="rounded-3xl border border-rose-100 bg-gradient-to-b from-rose-50 to-white p-4 shadow-sm">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-sm font-black text-slate-900">AI Menu Import</p>
+                <p className="text-sm font-black text-slate-900">
+                  AI Menu Import
+                </p>
                 <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
-                  Add menu items using AI from menu images. Upload every page together.
+                  Add menu items using AI from menu images. Upload every page
+                  together.
                 </p>
               </div>
-              <span className="rounded-full bg-rose-500 px-2 py-0.5 text-[9px] font-black text-white">POPULAR</span>
+              <span className="rounded-full bg-rose-500 px-2 py-0.5 text-[9px] font-black text-white">
+                POPULAR
+              </span>
             </div>
             {isAiLocked && aiNextAvailableDate && (
               <p className="mt-2 text-[11px] font-bold text-amber-700">
@@ -825,13 +854,21 @@ export default function MenuCatalog() {
             <button
               type="button"
               onClick={() => {
-                if (isAiLocked) {
-                  showError("AI menu upload can be used only once every 30 days. Please wait until your next available date.");
+                if (isStarterPlan) {
+                  setShowUpgradePopup(true);
                   return;
                 }
+
+                if (isAiLocked) {
+                  showError(
+                    "AI menu upload can be used only once every 30 days. Please wait until your next available date.",
+                  );
+                  return;
+                }
+
                 setIsAiModalOpen(true);
               }}
-              disabled={!isApproved || isAiLocked}
+              disabled={!isApproved || isAiLocked }
               className="mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-500 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:opacity-50"
             >
               <Upload size={16} />
@@ -841,11 +878,23 @@ export default function MenuCatalog() {
         </div>
         <div className="mt-4 flex gap-2 overflow-x-auto no-scrollbar pb-1">
           {categoriesList.map((cat) => {
-            const count = cat === "ALL" ? allCatalogItems.length : cat === "COMBO" ? allCatalogItems.filter((item) => item.isCombo).length : allCatalogItems.filter((item) => item.category === cat).length;
+            const count =
+              cat === "ALL"
+                ? allCatalogItems.length
+                : cat === "COMBO"
+                  ? allCatalogItems.filter((item) => item.isCombo).length
+                  : allCatalogItems.filter((item) => item.category === cat)
+                      .length;
             const active = activeCategoryFilter === cat;
             return (
-              <button key={cat} type="button" onClick={() => setActiveCategoryFilter(cat)} className={`whitespace-nowrap rounded-2xl border px-3 py-2 text-xs font-black ${active ? "border-rose-500 bg-rose-500 text-white" : "border-slate-100 bg-white text-slate-600"}`}>
-                {cat === "ALL" ? "All Items" : cat === "COMBO" ? "Combos" : cat} {count}
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setActiveCategoryFilter(cat)}
+                className={`whitespace-nowrap rounded-2xl border px-3 py-2 text-xs font-black ${active ? "border-rose-500 bg-rose-500 text-white" : "border-slate-100 bg-white text-slate-600"}`}
+              >
+                {cat === "ALL" ? "All Items" : cat === "COMBO" ? "Combos" : cat}{" "}
+                {count}
               </button>
             );
           })}
@@ -853,297 +902,384 @@ export default function MenuCatalog() {
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <div className="relative min-w-[200px] flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-            <input value={menuSearch} onChange={(event) => setMenuSearch(event.target.value)} placeholder="Search menu items..." className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-rose-300" />
+            <input
+              value={menuSearch}
+              onChange={(event) => setMenuSearch(event.target.value)}
+              placeholder="Search menu items..."
+              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-3 text-sm outline-none focus:border-rose-300"
+            />
           </div>
           <label className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-xs font-bold text-slate-600">
             Sort:
-            <select value={sortMode} onChange={(event) => setSortMode(event.target.value)} className="bg-transparent outline-none">
+            <select
+              value={sortMode}
+              onChange={(event) => setSortMode(event.target.value)}
+              className="bg-transparent outline-none"
+            >
               <option value="default">Default</option>
               <option value="name">Name</option>
               <option value="price">Price</option>
             </select>
           </label>
-          {[["ALL", "All"], ["VEG", "Veg"], ["NONVEG", "Non-Veg"]].map(([key, label]) => (
-            <button key={key} type="button" onClick={() => setVegFilter(key)} className={`rounded-xl border px-3 py-2.5 text-xs font-black ${vegFilter === key ? "border-rose-500 bg-rose-500 text-white" : "border-slate-200 bg-white text-slate-600"}`}>{label}</button>
+          {[
+            ["ALL", "All"],
+            ["VEG", "Veg"],
+            ["NONVEG", "Non-Veg"],
+          ].map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setVegFilter(key)}
+              className={`rounded-xl border px-3 py-2.5 text-xs font-black ${vegFilter === key ? "border-rose-500 bg-rose-500 text-white" : "border-slate-200 bg-white text-slate-600"}`}
+            >
+              {label}
+            </button>
           ))}
           {/* <Link to="/counter" className="rounded-xl border border-rose-200 bg-white px-3 py-2.5 text-xs font-black text-rose-500">Arrange Menu</Link> */}
-          <button type="button" onClick={handleOpenAddModal} disabled={!isApproved} className="inline-flex items-center gap-1 rounded-xl bg-rose-500 px-3 py-2.5 text-xs font-black text-white disabled:opacity-50"><Plus size={14} /> Add Item</button>
+          <button
+            type="button"
+            onClick={handleOpenAddModal}
+            disabled={!isApproved}
+            className="inline-flex items-center gap-1 rounded-xl bg-rose-500 px-3 py-2.5 text-xs font-black text-white disabled:opacity-50"
+          >
+            <Plus size={14} /> Add Item
+          </button>
         </div>
-        <div className={`mt-4 grid items-start gap-4 ${isModalOpen ? "xl:grid-cols-[minmax(0,1fr)_340px]" : ""}`}>
+        <div
+          className={`mt-4 grid items-start gap-4 ${isModalOpen ? "xl:grid-cols-[minmax(0,1fr)_340px]" : ""}`}
+        >
           {filteredMenuItems.length === 0 ? (
             <div className="rounded-3xl border border-slate-100 bg-white px-6 py-16 text-center">
               <ChefHat className="mx-auto mb-2 h-8 w-8 text-slate-300" />
-              <p className="text-sm font-bold text-slate-800">No menu items found</p>
+              <p className="text-sm font-bold text-slate-800">
+                No menu items found
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
               {filteredMenuItems.map((item) => {
                 const image = resolveMediaUrl(item.image);
                 return (
-                  <div key={item._id} className="rounded-2xl border border-slate-100 bg-white p-2.5 shadow-sm">
+                  <div
+                    key={item._id}
+                    className="rounded-2xl border border-slate-100 bg-white p-2.5 shadow-sm"
+                  >
                     <div className="relative mb-2 h-28 overflow-hidden rounded-xl bg-slate-100">
-                      {image ? <img src={image} alt={item.name} className="h-full w-full object-cover" loading="lazy" decoding="async" /> : <div className="flex h-full items-center justify-center text-slate-300"><ImageIcon size={22} /></div>}
-                      {item.isCombo && <span className="absolute left-2 top-2 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-black text-white">Combo</span>}
+                      {image ? (
+                        <img
+                          src={image}
+                          alt={item.name}
+                          className="h-full w-full object-cover"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                      ) : (
+                        <div className="flex h-full items-center justify-center text-slate-300">
+                          <ImageIcon size={22} />
+                        </div>
+                      )}
+                      {item.isCombo && (
+                        <span className="absolute left-2 top-2 rounded-full bg-amber-500 px-2 py-0.5 text-[10px] font-black text-white">
+                          Combo
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5 px-0.5">
-                      <span className={`h-2 w-2 rounded-full ${item.isVeg === false ? "bg-red-500" : "bg-emerald-500"}`} />
-                      <h3 className="truncate text-sm font-bold text-slate-900">{item.name}</h3>
+                      <span
+                        className={`h-2 w-2 rounded-full ${item.isVeg === false ? "bg-red-500" : "bg-emerald-500"}`}
+                      />
+                      <h3 className="truncate text-sm font-bold text-slate-900">
+                        {item.name}
+                      </h3>
                     </div>
                     <div className="mt-1 flex items-center justify-between px-0.5">
-                      <p className="text-sm font-black text-slate-800">₹{Number(item.price || 0).toLocaleString("en-IN")}</p>
-                      <span className={`text-[10px] font-bold ${item.isAvailable === false ? "text-slate-400" : "text-emerald-600"}`}>{item.isAvailable === false ? "Hidden" : "Available"}</span>
+                      <p className="text-sm font-black text-slate-800">
+                        ₹{Number(item.price || 0).toLocaleString("en-IN")}
+                      </p>
+                      <span
+                        className={`text-[10px] font-bold ${item.isAvailable === false ? "text-slate-400" : "text-emerald-600"}`}
+                      >
+                        {item.isAvailable === false ? "Hidden" : "Available"}
+                      </span>
                     </div>
                     <div className="mt-2 flex gap-2">
-                      <button type="button" onClick={() => handleOpenEditModal(item)} className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl border border-slate-200 py-1.5 text-[11px] font-bold text-slate-600"><Edit2 size={12} /> Edit</button>
-                      <button type="button" onClick={() => handleDeleteClick(item)} className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl border border-rose-100 py-1.5 text-[11px] font-bold text-rose-500"><Trash2 size={12} /> Delete</button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenEditModal(item)}
+                        className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl border border-slate-200 py-1.5 text-[11px] font-bold text-slate-600"
+                      >
+                        <Edit2 size={12} /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteClick(item)}
+                        className="inline-flex flex-1 items-center justify-center gap-1 rounded-xl border border-rose-100 py-1.5 text-[11px] font-bold text-rose-500"
+                      >
+                        <Trash2 size={12} /> Delete
+                      </button>
                     </div>
-                    <p className="mt-1 truncate px-0.5 text-[10px] font-semibold text-slate-400">{item.category}</p>
+                    <p className="mt-1 truncate px-0.5 text-[10px] font-semibold text-slate-400">
+                      {item.category}
+                    </p>
                   </div>
                 );
               })}
             </div>
           )}
 
-        {isModalOpen && (
-        <aside className="sticky top-4 max-h-[calc(100vh-6rem)] overflow-y-auto rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="text-base font-black text-slate-900">Item Details</h3>
-            <button type="button" onClick={closeAndResetModal} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100" aria-label="Close item details">
-              <X size={16} />
-            </button>
-          </div>
+          {isModalOpen && (
+            <aside className="sticky top-4 max-h-[calc(100vh-6rem)] overflow-y-auto rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+              <div className="mb-3 flex items-center justify-between">
+                <h3 className="text-base font-black text-slate-900">
+                  Item Details
+                </h3>
+                <button
+                  type="button"
+                  onClick={closeAndResetModal}
+                  className="rounded-lg p-1 text-slate-400 hover:bg-slate-100"
+                  aria-label="Close item details"
+                >
+                  <X size={16} />
+                </button>
+              </div>
 
-          <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-6">
-            <button
-              type="button"
-              onClick={() => setFormMode("DISH")}
-              className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${formMode === "DISH" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-900"}`}
-            >
-              Add Dish
-            </button>
-            <button
-              type="button"
-              onClick={() => setFormMode("COMBO")}
-              className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${formMode === "COMBO" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-900"}`}
-            >
-              Add Combo
-            </button>
-          </div>
+              <div className="flex bg-slate-100 p-1.5 rounded-2xl mb-6">
+                <button
+                  type="button"
+                  onClick={() => setFormMode("DISH")}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${formMode === "DISH" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-900"}`}
+                >
+                  Add Dish
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormMode("COMBO")}
+                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${formMode === "COMBO" ? "bg-white text-slate-900 shadow-xs" : "text-slate-500 hover:text-slate-900"}`}
+                >
+                  Add Combo
+                </button>
+              </div>
 
-          {formMode === "COMBO" && (
-            <div className="space-y-3 mb-6">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Select Items for Combo
-              </label>
-              <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-2xl p-2 bg-slate-50 space-y-1">
-                {menuItems.items.map((item) => (
-                  <label
-                    key={item._id}
-                    className="flex items-center gap-3 p-2.5 hover:bg-white rounded-xl cursor-pointer text-sm transition-colors"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedItems.includes(item._id)}
-                      onChange={(e) =>
-                        toggleSelectedItem(item._id, e.target.checked)
-                      }
-                      className="rounded text-red-500 focus:ring-red-500/20"
-                    />
-                    <span className="flex-1 font-bold text-slate-800 text-xs">
-                      {item.name}
-                    </span>
-                    <span className="text-xs font-black text-slate-500">
-                      ₹{item.price}
-                    </span>
+              {formMode === "COMBO" && (
+                <div className="space-y-3 mb-6">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Select Items for Combo
                   </label>
-                ))}
-              </div>
+                  <div className="max-h-48 overflow-y-auto border border-slate-200 rounded-2xl p-2 bg-slate-50 space-y-1">
+                    {menuItems.items.map((item) => (
+                      <label
+                        key={item._id}
+                        className="flex items-center gap-3 p-2.5 hover:bg-white rounded-xl cursor-pointer text-sm transition-colors"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedItems.includes(item._id)}
+                          onChange={(e) =>
+                            toggleSelectedItem(item._id, e.target.checked)
+                          }
+                          className="rounded text-red-500 focus:ring-red-500/20"
+                        />
+                        <span className="flex-1 font-bold text-slate-800 text-xs">
+                          {item.name}
+                        </span>
+                        <span className="text-xs font-black text-slate-500">
+                          ₹{item.price}
+                        </span>
+                      </label>
+                    ))}
+                  </div>
 
-              <div className="flex justify-between items-center px-5 py-3.5 bg-red-50 rounded-2xl border border-red-100">
-                <span className="text-[11px] font-black uppercase tracking-wider text-red-600">
-                  Combo Total Price
-                </span>
-                <span className="text-base font-black text-red-700">
-                  ₹{comboCalculatedPrice}
-                </span>
-              </div>
-            </div>
-          )}
+                  <div className="flex justify-between items-center px-5 py-3.5 bg-red-50 rounded-2xl border border-red-100">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-red-600">
+                      Combo Total Price
+                    </span>
+                    <span className="text-base font-black text-red-700">
+                      ₹{comboCalculatedPrice}
+                    </span>
+                  </div>
+                </div>
+              )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <Input
-              label="Title"
-              required
-              placeholder={
-                formMode === "DISH"
-                  ? "e.g., Spicy Paneer Tikka"
-                  : "e.g., Weekend Special Combo"
-              }
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-
-            {/* 🆕 Veg / Non-Veg toggle */}
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Food Type
-              </label>
-              <div className="flex bg-slate-100 p-1.5 rounded-2xl">
-                <button
-                  type="button"
-                  onClick={() => setIsVeg(true)}
-                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                    isVeg
-                      ? "bg-white text-emerald-700 shadow-xs"
-                      : "text-slate-500 hover:text-slate-900"
-                  }`}
-                >
-                  <Leaf size={13} /> Veg
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsVeg(false)}
-                  className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
-                    !isVeg
-                      ? "bg-white text-red-700 shadow-xs"
-                      : "text-slate-500 hover:text-slate-900"
-                  }`}
-                >
-                  <Beef size={13} /> Non-Veg
-                </button>
-              </div>
-            </div>
-
-            {formMode === "DISH" && (
-              <Input
-                label="Category Classification"
-                required
-                placeholder="e.g., Starters, Main Course"
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              />
-            )}
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Input
-                label={
-                  formMode === "COMBO"
-                    ? "Calculated Price (INR)"
-                    : "Selling Price (INR)"
-                }
-                type="number"
-                required
-                readOnly={formMode === "COMBO"}
-                placeholder="250"
-                value={formMode === "COMBO" ? comboCalculatedPrice : price}
-                onChange={(e) => setPrice(e.target.value)}
-              />
-
-              {/* 🔑 File Input Field */}
-              <div className="space-y-1.5">
-                <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Upload Dish Image
-                </label>
-                <label className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer transition-all shadow-xs">
-                  <Upload size={15} />
-                  <span className="truncate">
-                    {imageFile ? imageFile.name : "Choose File..."}
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-            </div>
-
-            {/* Image Preview */}
-            {imagePreview && (
-              <div className="relative w-20 h-20 rounded-2xl overflow-hidden border border-slate-200">
-                <img
-                  src={
-                    imagePreview.startsWith("http") ||
-                    imagePreview.startsWith("blob:")
-                      ? imagePreview
-                      : resolveMediaUrl(imagePreview)
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <Input
+                  label="Title"
+                  required
+                  placeholder={
+                    formMode === "DISH"
+                      ? "e.g., Spicy Paneer Tikka"
+                      : "e.g., Weekend Special Combo"
                   }
-                  alt="Preview"
-                  className="w-full h-full object-cover"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
                 />
-              </div>
-            )}
 
-            <div className="space-y-1.5">
-              <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                Description
-              </label>
-              <textarea
-                rows="3"
-                placeholder="Culinary description..."
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm text-slate-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all resize-none shadow-xs"
-              />
-            </div>
+                {/* 🆕 Veg / Non-Veg toggle */}
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Food Type
+                  </label>
+                  <div className="flex bg-slate-100 p-1.5 rounded-2xl">
+                    <button
+                      type="button"
+                      onClick={() => setIsVeg(true)}
+                      className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        isVeg
+                          ? "bg-white text-emerald-700 shadow-xs"
+                          : "text-slate-500 hover:text-slate-900"
+                      }`}
+                    >
+                      <Leaf size={13} /> Veg
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsVeg(false)}
+                      className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                        !isVeg
+                          ? "bg-white text-red-700 shadow-xs"
+                          : "text-slate-500 hover:text-slate-900"
+                      }`}
+                    >
+                      <Beef size={13} /> Non-Veg
+                    </button>
+                  </div>
+                </div>
 
-            <button
-              type="button"
-              onClick={() => setItemAvailable((current) => !current)}
-              className="flex w-full items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700"
-            >
-              Item Available
-              <span className={`relative h-6 w-11 rounded-full ${itemAvailable ? "bg-emerald-500" : "bg-slate-300"}`}>
-                <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${itemAvailable ? "left-5" : "left-0.5"}`} />
-              </span>
-            </button>
-
-            <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={closeAndResetModal}
-                disabled={
-                  upsertMutation.isPending ||
-                  comboMutation.isPending ||
-                  updateComboMutation.isPending
-                }
-                className="px-5 py-3 rounded-2xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Cancel
-              </button>
-
-              <button
-                type="submit"
-                disabled={
-                  upsertMutation.isPending ||
-                  comboMutation.isPending ||
-                  updateComboMutation.isPending
-                }
-                className="min-w-[130px] flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-red-500 text-white font-bold text-xs hover:bg-red-600 transition cursor-pointer shadow-sm shadow-red-500/20 disabled:opacity-60 disabled:cursor-not-allowed"
-              >
-                {upsertMutation.isPending ||
-                comboMutation.isPending ||
-                updateComboMutation.isPending ? (
-                  <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-
-                    {editingItem
-                      ? "Updating..."
-                      : formMode === "COMBO"
-                        ? "Adding Combo..."
-                        : "Adding Dish..."}
-                  </>
-                ) : (
-                  <>
-                    {editingItem ? "Save Changes" : `Add ${formMode === "COMBO" ? "Combo" : "Dish"}`}
-                  </>
+                {formMode === "DISH" && (
+                  <Input
+                    label="Category Classification"
+                    required
+                    placeholder="e.g., Starters, Main Course"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                  />
                 )}
-              </button>
-            </div>
-          </form>
-                </aside>
-        )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <Input
+                    label={
+                      formMode === "COMBO"
+                        ? "Calculated Price (INR)"
+                        : "Selling Price (INR)"
+                    }
+                    type="number"
+                    required
+                    readOnly={formMode === "COMBO"}
+                    placeholder="250"
+                    value={formMode === "COMBO" ? comboCalculatedPrice : price}
+                    onChange={(e) => setPrice(e.target.value)}
+                  />
+
+                  {/* 🔑 File Input Field */}
+                  <div className="space-y-1.5">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      Upload Dish Image
+                    </label>
+                    <label className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-2xl border border-slate-200 bg-white text-xs font-bold text-slate-700 hover:bg-slate-50 cursor-pointer transition-all shadow-xs">
+                      <Upload size={15} />
+                      <span className="truncate">
+                        {imageFile ? imageFile.name : "Choose File..."}
+                      </span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleFileChange}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* Image Preview */}
+                {imagePreview && (
+                  <div className="relative w-20 h-20 rounded-2xl overflow-hidden border border-slate-200">
+                    <img
+                      src={
+                        imagePreview.startsWith("http") ||
+                        imagePreview.startsWith("blob:")
+                          ? imagePreview
+                          : resolveMediaUrl(imagePreview)
+                      }
+                      alt="Preview"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-1.5">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                    Description
+                  </label>
+                  <textarea
+                    rows="3"
+                    placeholder="Culinary description..."
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    className="w-full px-4 py-3 rounded-2xl border border-slate-200 bg-white text-sm text-slate-900 focus:border-red-500 focus:ring-4 focus:ring-red-500/10 transition-all resize-none shadow-xs"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setItemAvailable((current) => !current)}
+                  className="flex w-full items-center justify-between rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700"
+                >
+                  Item Available
+                  <span
+                    className={`relative h-6 w-11 rounded-full ${itemAvailable ? "bg-emerald-500" : "bg-slate-300"}`}
+                  >
+                    <span
+                      className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${itemAvailable ? "left-5" : "left-0.5"}`}
+                    />
+                  </span>
+                </button>
+
+                <div className="flex justify-end gap-3 pt-6 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={closeAndResetModal}
+                    disabled={
+                      upsertMutation.isPending ||
+                      comboMutation.isPending ||
+                      updateComboMutation.isPending
+                    }
+                    className="px-5 py-3 rounded-2xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Cancel
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={
+                      upsertMutation.isPending ||
+                      comboMutation.isPending ||
+                      updateComboMutation.isPending
+                    }
+                    className="min-w-[130px] flex items-center justify-center gap-2 px-6 py-3 rounded-2xl bg-red-500 text-white font-bold text-xs hover:bg-red-600 transition cursor-pointer shadow-sm shadow-red-500/20 disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {upsertMutation.isPending ||
+                    comboMutation.isPending ||
+                    updateComboMutation.isPending ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+
+                        {editingItem
+                          ? "Updating..."
+                          : formMode === "COMBO"
+                            ? "Adding Combo..."
+                            : "Adding Dish..."}
+                      </>
+                    ) : (
+                      <>
+                        {editingItem
+                          ? "Save Changes"
+                          : `Add ${formMode === "COMBO" ? "Combo" : "Dish"}`}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </aside>
+          )}
         </div>
 
         {/* AI Menu Upload Modal */}
@@ -1209,7 +1345,8 @@ export default function MenuCatalog() {
                       const allowed =
                         ["image/jpeg", "image/png", "image/webp"].includes(
                           file.type,
-                        ) && [".jpg", ".jpeg", ".png", ".webp"].includes(extension);
+                        ) &&
+                        [".jpg", ".jpeg", ".png", ".webp"].includes(extension);
 
                       if (!allowed) {
                         showError(
@@ -1219,16 +1356,17 @@ export default function MenuCatalog() {
                       }
 
                       if (file.size > MAX_AI_IMAGE_BYTES) {
-                        showError(
-                          "Each menu image must be 5 MB or smaller.",
-                        );
+                        showError("Each menu image must be 5 MB or smaller.");
                         return;
                       }
 
                       accepted.push(file);
                     }
 
-                    const merged = [...aiImageFiles.map((item) => item.file), ...accepted];
+                    const merged = [
+                      ...aiImageFiles.map((item) => item.file),
+                      ...accepted,
+                    ];
 
                     if (merged.length > MAX_AI_MENU_IMAGES) {
                       showError(
@@ -1363,6 +1501,28 @@ export default function MenuCatalog() {
             </div>
           </div>
         </Modal>
+        {showUpgradePopup && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+              <h2 className="text-xl font-black text-gray-900">
+                Upgrade Your Plan
+              </h2>
+
+              <p className="mt-3 text-sm leading-6 text-gray-600">
+                AI Menu is not available in the Starter plan. Please upgrade
+                your subscription plan to use this feature.
+              </p>
+
+              <button
+                type="button"
+                onClick={() => setShowUpgradePopup(false)}
+                className="mt-6 w-full rounded-xl bg-rose-500 py-3 text-sm font-bold text-white"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

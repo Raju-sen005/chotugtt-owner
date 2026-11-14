@@ -111,6 +111,35 @@ const SLOT_PRESETS = [
   },
 ];
 
+const CREATE_STEPS = [
+  { id: "basics", label: "When & Where", hint: "Date, hall, guests" },
+  { id: "customer", label: "Customer", hint: "Guest contact" },
+  { id: "menu", label: "Menu & Extras", hint: "Package or custom" },
+  { id: "billing", label: "Review", hint: "Price & confirm" },
+];
+
+const EVENT_NAME_DEFAULTS = {
+  BIRTHDAY: "Birthday Celebration",
+  ANNIVERSARY: "Anniversary Celebration",
+  KITTY_PARTY: "Kitty Party",
+  RING_CEREMONY: "Ring Ceremony",
+  CORPORATE_MEET: "Corporate Meet",
+  WEDDING: "Wedding Reception",
+  CONFERENCE: "Conference",
+  MEETING: "Private Meeting",
+  OTHER: "Private Event",
+};
+
+const emptyPackageForm = () => ({
+  name: "",
+  code: "",
+  description: "",
+  pricingType: "PER_PLATE",
+  price: "",
+  items: [],
+  isActive: true,
+});
+
 const ADDON_TYPES = [
   { value: "DECORATION", label: "Decoration" },
   { value: "DJ_SOUND", label: "DJ / Sound System" },
@@ -551,30 +580,90 @@ function TextArea({ label, value, onChange, rows = 3 }) {
   );
 }
 
-function Modal({ title, onClose, children, wide = false }) {
+function Modal({ title, subtitle, onClose, children, wide = false, footer }) {
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-3 backdrop-blur-[1px]">
+    <div
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 p-3 backdrop-blur-[2px]"
+      role="presentation"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose?.();
+      }}
+    >
       <div
-        className={`max-h-[94vh] w-full overflow-hidden rounded-2xl bg-white shadow-2xl ${
-          wide ? "max-w-6xl" : "max-w-md"
+        role="dialog"
+        aria-modal="true"
+        className={`flex max-h-[94vh] w-full flex-col overflow-hidden rounded-3xl border border-[var(--border)] bg-white shadow-2xl ${
+          wide ? "max-w-5xl" : "max-w-lg"
         }`}
       >
-        <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
-          <h2 className="text-base font-black text-[var(--text-primary)]">
-            {title}
-          </h2>
+        <div className="flex items-start justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
+          <div className="min-w-0">
+            <h2 className="text-base font-black text-[var(--text-primary)]">
+              {title}
+            </h2>
+            {subtitle ? (
+              <p className="mt-0.5 text-xs text-[var(--text-muted)]">
+                {subtitle}
+              </p>
+            ) : null}
+          </div>
           <button
             type="button"
             onClick={onClose}
             className="rounded-lg p-1.5 text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"
+            aria-label="Close"
           >
             <X size={18} />
           </button>
         </div>
-        <div className="max-h-[calc(94vh-65px)] overflow-y-auto p-5">
-          {children}
-        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
+        {footer ? (
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)] px-5 py-4">
+            {footer}
+          </div>
+        ) : null}
       </div>
+    </div>
+  );
+}
+
+function WizardSteps({ step }) {
+  return (
+    <div className="mb-5 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      {CREATE_STEPS.map((item, index) => {
+        const active = index === step;
+        const done = index < step;
+        return (
+          <div
+            key={item.id}
+            className={`rounded-2xl border px-3 py-2.5 ${
+              active
+                ? "border-[var(--primary)] bg-[var(--primary-light)]"
+                : done
+                  ? "border-emerald-200 bg-emerald-50"
+                  : "border-[var(--border)] bg-white"
+            }`}
+          >
+            <p
+              className={`text-[10px] font-black uppercase tracking-wide ${
+                active
+                  ? "text-[var(--primary)]"
+                  : done
+                    ? "text-emerald-700"
+                    : "text-[var(--text-muted)]"
+              }`}
+            >
+              Step {index + 1}
+            </p>
+            <p className="mt-0.5 text-xs font-black text-[var(--text-primary)]">
+              {item.label}
+            </p>
+            <p className="mt-0.5 hidden text-[10px] text-[var(--text-muted)] sm:block">
+              {item.hint}
+            </p>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -635,6 +724,7 @@ function Info({ title, value, sub, icon: Icon }) {
 }
 
 export default function EventManagement() {
+  const [workspace, setWorkspace] = useState("EVENTS");
   const [view, setView] = useState("LIST");
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -653,8 +743,10 @@ export default function EventManagement() {
 
   const [sections, setSections] = useState([]);
   const [packages, setPackages] = useState([]);
+  const [managedPackages, setManagedPackages] = useState([]);
   const [menuCatalog, setMenuCatalog] = useState([]);
   const [menuSearch, setMenuSearch] = useState("");
+  const [packageMenuSearch, setPackageMenuSearch] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -662,6 +754,8 @@ export default function EventManagement() {
   const [detailLoading, setDetailLoading] = useState(false);
   const [paymentSaving, setPaymentSaving] = useState(false);
   const [availabilityLoading, setAvailabilityLoading] = useState(false);
+  const [packageSaving, setPackageSaving] = useState(false);
+  const [packagesLoading, setPackagesLoading] = useState(false);
 
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({
@@ -673,9 +767,14 @@ export default function EventManagement() {
 
   const [formOpen, setFormOpen] = useState(false);
   const [editMode, setEditMode] = useState(false);
+  const [wizardStep, setWizardStep] = useState(0);
   const [form, setForm] = useState(emptyForm());
   // Keep the same id when a failed create is retried; this makes retries idempotent.
   const createRequestIdRef = useRef(null);
+
+  const [packageFormOpen, setPackageFormOpen] = useState(false);
+  const [editingPackageId, setEditingPackageId] = useState(null);
+  const [packageForm, setPackageForm] = useState(emptyPackageForm());
 
   const [selectedEvent, setSelectedEvent] = useState(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -776,6 +875,31 @@ export default function EventManagement() {
     }
   }, [monthStart, monthEnd]);
 
+  const parsePackageList = (response) => {
+    const data = response?.data?.data;
+    const list = Array.isArray(data)
+      ? data
+      : data?.packages || response?.data?.packages || [];
+    return Array.isArray(list) ? list : [];
+  };
+
+  const loadManagedPackages = useCallback(async () => {
+    try {
+      setPackagesLoading(true);
+      const response = await axios.get(`${API_BASE}/event-packages`, apiConfig);
+      const list = parsePackageList(response);
+      setManagedPackages(list);
+      setPackages(list.filter((item) => item?.isActive !== false));
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message || "Unable to load event packages.",
+      );
+      setManagedPackages([]);
+    } finally {
+      setPackagesLoading(false);
+    }
+  }, []);
+
   const loadMasters = useCallback(async () => {
     // Load each master independently so one failed endpoint does not blank
     // the other dropdowns. These paths match the supplied router contracts:
@@ -804,12 +928,7 @@ export default function EventManagement() {
     }
 
     if (packageResult.status === "fulfilled") {
-      const response = packageResult.value;
-      const data = response.data?.data;
-      const list = Array.isArray(data)
-        ? data
-        : data?.packages || response.data?.packages || [];
-      setPackages(Array.isArray(list) ? list : []);
+      setPackages(parsePackageList(packageResult.value));
     } else {
       console.warn(
         "Unable to load event packages:",
@@ -911,18 +1030,28 @@ export default function EventManagement() {
     return () => clearTimeout(timer);
   }, [loadMasters]);
 
+  useEffect(() => {
+    if (workspace !== "PACKAGES") return undefined;
+    const timer = setTimeout(() => {
+      loadManagedPackages();
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [workspace, loadManagedPackages]);
+
   const refreshAll = async () => {
     await Promise.all([
       loadEvents(true),
       loadStats(),
       loadCalendarEvents(),
       loadMasters(),
+      workspace === "PACKAGES" ? loadManagedPackages() : Promise.resolve(),
     ]);
   };
 
   const openCreate = () => {
     createRequestIdRef.current = requestId();
     setEditMode(false);
+    setWizardStep(0);
     const nextForm = emptyForm();
     // If no active package exists (or package loading failed), allow the user
     // to build a custom menu instead of trapping submission on an empty select.
@@ -931,6 +1060,7 @@ export default function EventManagement() {
       nextForm.menu.menuType = "CUSTOM";
       nextForm.pricing.pricingType = "FLAT";
     }
+    nextForm.eventName = EVENT_NAME_DEFAULTS.BIRTHDAY;
     setForm(nextForm);
     setFormOpen(true);
   };
@@ -938,8 +1068,51 @@ export default function EventManagement() {
   const openEdit = () => {
     if (!selectedEvent) return;
     setEditMode(true);
+    setWizardStep(0);
     setForm(normalizeEvent(selectedEvent));
     setFormOpen(true);
+  };
+
+  const openCreatePackage = () => {
+    setEditingPackageId(null);
+    setPackageForm(emptyPackageForm());
+    setPackageMenuSearch("");
+    setPackageFormOpen(true);
+  };
+
+  const openEditPackage = (pkg) => {
+    setEditingPackageId(pkg?._id || pkg?.id || null);
+    setPackageForm({
+      name: pkg?.name || "",
+      code: pkg?.code || "",
+      description: pkg?.description || "",
+      pricingType: pkg?.pricingType || "PER_PLATE",
+      price: pkg?.price ?? "",
+      items: (pkg?.items || []).map((item) => ({
+        menuItemId: item.menuItemId || item.itemId || "",
+        name: item.name || "",
+        quantity: item.quantity ?? 1,
+        price: item.price ?? 0,
+        notes: item.notes || "",
+      })),
+      isActive: pkg?.isActive !== false,
+    });
+    setPackageMenuSearch("");
+    setPackageFormOpen(true);
+  };
+
+  const applySelectedPackage = (packageId) => {
+    const pkg = packages.find(
+      (item) => String(item._id || item.id) === String(packageId),
+    );
+    setField("menu.packageId", packageId);
+    setField("menu.packageName", pkg?.name || "");
+    setField("menu.source", "PACKAGE");
+    setField("menu.menuType", "PACKAGE");
+    const type = pkg?.pricingType || "PER_PLATE";
+    setField("pricing.pricingType", type);
+    setField("pricing.perPlate", type === "PER_PLATE" ? Number(pkg?.price ?? 0) : 0);
+    setField("pricing.baseAmount", type === "FLAT" ? Number(pkg?.price ?? 0) : 0);
   };
 
   const openEvent = async (id) => {
@@ -985,13 +1158,7 @@ export default function EventManagement() {
     }
   };
 
-  const validateForm = () => {
-    const phone = String(form.customer.phone || "").replace(/\D/g, "");
-    const alternatePhone = String(form.customer.alternatePhone || "").replace(
-      /\D/g,
-      "",
-    );
-
+  const validateBasicsStep = () => {
     if (!form.eventName.trim()) return "Event name is required.";
     if (
       !EVENT_TYPES.some(
@@ -999,30 +1166,16 @@ export default function EventManagement() {
       )
     )
       return "Select a valid event type.";
-    if (!form.customer.name.trim()) return "Customer name is required.";
-
-    if (!/^[6-9]\d{9}$/.test(phone)) {
-      return "Enter a valid 10-digit Indian mobile number.";
-    }
-
-    if (alternatePhone && !/^[6-9]\d{9}$/.test(alternatePhone)) {
-      return "Enter a valid alternate mobile number.";
-    }
-
     if (!form.schedule.eventDate) return "Event date is required.";
-
     if (!form.schedule.startTime || !form.schedule.endTime) {
       return "Start and end time are required.";
     }
-
     if (form.schedule.endTime <= form.schedule.startTime) {
       return "End time must be after start time.";
     }
-
     if (!form.venue.sectionId) {
       return "Select a restaurant section / hall.";
     }
-
     if (
       !Number.isInteger(Number(form.guests.expected)) ||
       Number(form.guests.expected) < 1 ||
@@ -1030,29 +1183,44 @@ export default function EventManagement() {
     ) {
       return "Expected guests must be a whole number between 1 and 100000.";
     }
-
     if (
       !Number.isInteger(Number(form.guests.guaranteed)) ||
       Number(form.guests.guaranteed) < 0
     ) {
       return "Guaranteed guests must be a non-negative whole number.";
     }
-
     if (Number(form.guests.guaranteed) > Number(form.guests.expected)) {
       return "Guaranteed guests cannot exceed expected guests.";
     }
+    return null;
+  };
 
+  const validateCustomerStep = () => {
+    const phone = String(form.customer.phone || "").replace(/\D/g, "");
+    const alternatePhone = String(form.customer.alternatePhone || "").replace(
+      /\D/g,
+      "",
+    );
+    if (!form.customer.name.trim()) return "Customer name is required.";
+    if (!/^[6-9]\d{9}$/.test(phone)) {
+      return "Enter a valid 10-digit Indian mobile number.";
+    }
+    if (alternatePhone && !/^[6-9]\d{9}$/.test(alternatePhone)) {
+      return "Enter a valid alternate mobile number.";
+    }
+    return null;
+  };
+
+  const validateMenuStep = () => {
     if (form.menu.source === "PACKAGE" && !form.menu.packageId) {
       return "Select an event package.";
     }
-
     if (
       form.menu.source === "CUSTOM" &&
       !form.menu.items.some((item) => item.name.trim())
     ) {
       return "Add at least one custom menu item.";
     }
-
     if (form.menu.source === "CUSTOM") {
       for (const item of form.menu.items.filter((entry) => entry.name.trim())) {
         const quantity = Number(item.quantity);
@@ -1065,48 +1233,6 @@ export default function EventManagement() {
         }
       }
     }
-
-    if (Number(form.pricing.discountValue) < 0) {
-      return "Discount cannot be negative.";
-    }
-
-    if (
-      form.pricing.discountType === "PERCENTAGE" &&
-      Number(form.pricing.discountValue) > 100
-    ) {
-      return "Discount percentage cannot exceed 100%.";
-    }
-
-    if (Number(form.pricing.taxValue) < 0) {
-      return "Tax cannot be negative.";
-    }
-
-    if (
-      form.pricing.taxType === "PERCENTAGE" &&
-      Number(form.pricing.taxValue) > 100
-    ) {
-      return "Tax percentage cannot exceed 100%.";
-    }
-
-    if (
-      !Number.isFinite(Number(form.payment.advanceAmount)) ||
-      Number(form.payment.advanceAmount) < 0
-    ) {
-      return "Advance cannot be negative.";
-    }
-    if (
-      !editMode &&
-      Number(form.payment.advanceAmount) > Number(pricingPreview.total)
-    ) {
-      return "Advance cannot exceed the estimated event total.";
-    }
-    if (
-      form.pricing.discountType === "FLAT" &&
-      Number(form.pricing.discountValue) > Number(pricingPreview.subtotal)
-    ) {
-      return "Flat discount cannot exceed the subtotal.";
-    }
-
     for (const addon of form.addons) {
       if (!addon.name.trim()) return "Every add-on needs a name.";
       if (
@@ -1134,8 +1260,163 @@ export default function EventManagement() {
         return "Add-on price cannot be negative.";
       }
     }
-
     return null;
+  };
+
+  const validateBillingStep = () => {
+    if (Number(form.pricing.discountValue) < 0) {
+      return "Discount cannot be negative.";
+    }
+    if (
+      form.pricing.discountType === "PERCENTAGE" &&
+      Number(form.pricing.discountValue) > 100
+    ) {
+      return "Discount percentage cannot exceed 100%.";
+    }
+    if (Number(form.pricing.taxValue) < 0) {
+      return "Tax cannot be negative.";
+    }
+    if (
+      form.pricing.taxType === "PERCENTAGE" &&
+      Number(form.pricing.taxValue) > 100
+    ) {
+      return "Tax percentage cannot exceed 100%.";
+    }
+    if (
+      !Number.isFinite(Number(form.payment.advanceAmount)) ||
+      Number(form.payment.advanceAmount) < 0
+    ) {
+      return "Advance cannot be negative.";
+    }
+    if (
+      !editMode &&
+      Number(form.payment.advanceAmount) > Number(pricingPreview.total)
+    ) {
+      return "Advance cannot exceed the estimated event total.";
+    }
+    if (
+      form.pricing.discountType === "FLAT" &&
+      Number(form.pricing.discountValue) > Number(pricingPreview.subtotal)
+    ) {
+      return "Flat discount cannot exceed the subtotal.";
+    }
+    return null;
+  };
+
+  const validateStep = (step) => {
+    if (step === 0) return validateBasicsStep();
+    if (step === 1) return validateCustomerStep();
+    if (step === 2) return validateMenuStep();
+    if (step === 3) return validateBillingStep();
+    return null;
+  };
+
+  const validateForm = () =>
+    validateBasicsStep() ||
+    validateCustomerStep() ||
+    validateMenuStep() ||
+    validateBillingStep();
+
+  const goNextStep = () => {
+    const error = validateStep(wizardStep);
+    if (error) {
+      toast.error(error);
+      return;
+    }
+    setWizardStep((current) => Math.min(current + 1, CREATE_STEPS.length - 1));
+  };
+
+  const goPrevStep = () => {
+    setWizardStep((current) => Math.max(current - 1, 0));
+  };
+
+  const submitPackage = async () => {
+    if (packageSaving) return;
+    const name = String(packageForm.name || "").trim();
+    const price = Number(packageForm.price);
+    if (!name) {
+      toast.error("Package name is required.");
+      return;
+    }
+    if (!Number.isFinite(price) || price < 0) {
+      toast.error("Enter a valid package price.");
+      return;
+    }
+    const items = (packageForm.items || [])
+      .filter((item) => String(item.name || "").trim())
+      .map((item) => ({
+        menuItemId: item.menuItemId || null,
+        name: String(item.name).trim(),
+        quantity: Number(item.quantity || 1),
+        price: Number(item.price || 0),
+        notes: String(item.notes || "").trim(),
+      }));
+    for (const item of items) {
+      if (!Number.isFinite(item.quantity) || item.quantity <= 0) {
+        toast.error(`Invalid quantity for ${item.name}.`);
+        return;
+      }
+      if (!Number.isFinite(item.price) || item.price < 0) {
+        toast.error(`Invalid price for ${item.name}.`);
+        return;
+      }
+    }
+
+    try {
+      setPackageSaving(true);
+      const payload = {
+        name,
+        code: String(packageForm.code || "").trim(),
+        description: String(packageForm.description || "").trim(),
+        pricingType: packageForm.pricingType || "PER_PLATE",
+        price,
+        items,
+        isActive: packageForm.isActive !== false,
+      };
+
+      if (editingPackageId) {
+        await axios.patch(
+          `${API_BASE}/event-packages/${editingPackageId}`,
+          payload,
+          apiConfig,
+        );
+        toast.success("Package updated.");
+      } else {
+        await axios.post(`${API_BASE}/event-packages`, payload, apiConfig);
+        toast.success("Package created.");
+      }
+
+      setPackageFormOpen(false);
+      setEditingPackageId(null);
+      setPackageForm(emptyPackageForm());
+      await Promise.all([loadMasters(), loadManagedPackages()]);
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message || "Unable to save event package.",
+      );
+    } finally {
+      setPackageSaving(false);
+    }
+  };
+
+  const togglePackageActive = async (pkg) => {
+    const id = pkg?._id || pkg?.id;
+    if (!id) return;
+    try {
+      await axios.patch(
+        `${API_BASE}/event-packages/${id}`,
+        { isActive: pkg?.isActive === false },
+        apiConfig,
+      );
+      toast.success(
+        pkg?.isActive === false ? "Package activated." : "Package deactivated.",
+      );
+      await Promise.all([loadMasters(), loadManagedPackages()]);
+    } catch (error) {
+      toast.error(
+        error?.response?.data?.message || "Unable to update package status.",
+      );
+    }
   };
 
   const checkAvailability = async () => {
@@ -1414,6 +1695,12 @@ export default function EventManagement() {
       String(section?._id || section?.id) === String(form.venue.sectionId),
   );
 
+  const activePackages = packages.filter((item) => item?.isActive !== false);
+  const showBasics = wizardStep === 0;
+  const showCustomer = wizardStep === 1;
+  const showMenu = wizardStep === 2;
+  const showBilling = wizardStep === 3;
+
   return (
     <div className="-m-4 min-h-full bg-[var(--background)] p-4 font-sans text-slate-900 md:-m-6 md:p-5 lg:-m-8 lg:p-5">
       <div className="relative mb-4 overflow-hidden rounded-3xl bg-gradient-to-r from-[var(--primary)] via-[var(--primary)] to-[var(--secondary)] p-5 text-white shadow-sm">
@@ -1429,8 +1716,8 @@ export default function EventManagement() {
                 Event Management
               </h1>
               <p className="mt-1 max-w-xl text-sm text-white/85">
-                Manage bookings, schedules, guests, venues and event payments
-                from one place.
+                Create packages once, then book events in a few fast steps —
+                schedule, guest, menu, and payment.
               </p>
             </div>
           </div>
@@ -1447,21 +1734,51 @@ export default function EventManagement() {
               />
               Refresh
             </button>
-            <button
-              type="button"
-              onClick={openCreate}
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-black text-[var(--primary)] shadow-sm transition hover:bg-rose-50"
-            >
-              <Plus size={16} /> Create Event
-            </button>
+            {workspace === "PACKAGES" ? (
+              <button
+                type="button"
+                onClick={openCreatePackage}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-black text-[var(--primary)] shadow-sm transition hover:bg-rose-50"
+              >
+                <Plus size={16} /> New Package
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={openCreate}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-xs font-black text-[var(--primary)] shadow-sm transition hover:bg-rose-50"
+              >
+                <Plus size={16} /> Quick Book Event
+              </button>
+            )}
           </div>
         </div>
-        <div className="relative mt-4 flex flex-wrap gap-x-5 gap-y-1 border-white/20 pt-3 text-[11px] font-semibold text-white/85">
-          {/* <span>{Number(stats.totalEvents || 0).toLocaleString("en-IN")} total events</span>
-          <span>{Number(stats.upcomingEvents || 0).toLocaleString("en-IN")} upcoming</span>
-          <span>{Number(stats.totalGuests || 0).toLocaleString("en-IN")} guests</span> */}
+        <div className="relative mt-4 inline-flex rounded-2xl border border-white/20 bg-white/10 p-1">
+          {[
+            { id: "EVENTS", label: "Events", icon: CalendarDays },
+            { id: "PACKAGES", label: "Packages", icon: Package },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const active = workspace === tab.id;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setWorkspace(tab.id)}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-black transition ${
+                  active
+                    ? "bg-white text-[var(--primary)] shadow-sm"
+                    : "text-white/85 hover:bg-white/10"
+                }`}
+              >
+                <Icon size={14} />
+                {tab.label}
+              </button>
+            );
+          })}
         </div>
       </div>
+      {workspace === "EVENTS" && (
       <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           title="Total Events"
@@ -1488,7 +1805,142 @@ export default function EventManagement() {
           icon={WalletCards}
         />
       </div>
+      )}
 
+      {workspace === "PACKAGES" && (
+        <div className="mb-6 space-y-4">
+          <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-base font-black text-slate-900">
+                  Event Packages
+                </h2>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  Save reusable banquet menus so booking an event takes seconds.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={openCreatePackage}
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-xs font-black text-white"
+              >
+                <Plus size={15} /> Create Package
+              </button>
+            </div>
+          </div>
+
+          {packagesLoading ? (
+            <div className="flex justify-center rounded-2xl border border-slate-100 bg-white py-16">
+              <Loader2 className="animate-spin text-[var(--primary)]" size={28} />
+            </div>
+          ) : managedPackages.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-16 text-center">
+              <Package className="mx-auto mb-3 text-slate-300" size={32} />
+              <p className="font-black text-slate-800">No packages yet</p>
+              <p className="mt-1 text-sm text-slate-500">
+                Create your first package (e.g. Veg Buffet ₹799/plate) then book
+                events from it.
+              </p>
+              <button
+                type="button"
+                onClick={openCreatePackage}
+                className="mt-4 inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] px-4 py-2.5 text-xs font-black text-white"
+              >
+                <Plus size={15} /> Create first package
+              </button>
+            </div>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+              {managedPackages.map((pkg) => {
+                const id = pkg._id || pkg.id;
+                const active = pkg.isActive !== false;
+                return (
+                  <div
+                    key={id}
+                    className={`rounded-2xl border bg-white p-4 shadow-sm ${
+                      active ? "border-slate-100" : "border-slate-200 opacity-75"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <p className="text-sm font-black text-slate-900">
+                          {pkg.name}
+                        </p>
+                        <p className="mt-0.5 text-[11px] font-bold uppercase tracking-wide text-slate-400">
+                          {pkg.code || "PKG"} ·{" "}
+                          {(pkg.pricingType || "PER_PLATE") === "PER_PLATE"
+                            ? "Per plate"
+                            : "Flat"}
+                        </p>
+                      </div>
+                      <span
+                        className={`rounded-full border px-2 py-0.5 text-[10px] font-black ${
+                          active
+                            ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                            : "border-slate-200 bg-slate-50 text-slate-500"
+                        }`}
+                      >
+                        {active ? "Active" : "Inactive"}
+                      </span>
+                    </div>
+                    <p className="mt-3 text-xl font-black text-slate-900">
+                      {money(pkg.price)}
+                      {(pkg.pricingType || "PER_PLATE") === "PER_PLATE" ? (
+                        <span className="text-xs font-bold text-slate-400">
+                          {" "}
+                          / plate
+                        </span>
+                      ) : null}
+                    </p>
+                    {pkg.description ? (
+                      <p className="mt-2 line-clamp-2 text-xs text-slate-500">
+                        {pkg.description}
+                      </p>
+                    ) : null}
+                    <p className="mt-2 text-[11px] font-semibold text-slate-400">
+                      {(pkg.items || []).length} menu item
+                      {(pkg.items || []).length === 1 ? "" : "s"}
+                    </p>
+                    <div className="mt-4 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openEditPackage(pkg)}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold"
+                      >
+                        <Edit3 size={14} /> Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => togglePackageActive(pkg)}
+                        className="rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold"
+                      >
+                        {active ? "Deactivate" : "Activate"}
+                      </button>
+                      {active ? (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setWorkspace("EVENTS");
+                            openCreate();
+                            // Pre-select package after create form state settles.
+                            setTimeout(() => applySelectedPackage(id), 0);
+                          }}
+                          className="rounded-xl bg-[var(--primary-light)] px-3 py-2 text-xs font-bold text-[var(--primary-dark)]"
+                        >
+                          Book with this
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {workspace === "EVENTS" && (
+      <>
       <div className="mb-4 rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-1 flex-col gap-3 md:flex-row">
@@ -1827,14 +2279,72 @@ export default function EventManagement() {
           </div>
         </div>
       )}
+      </>
+      )}
 
       {formOpen && (
         <Modal
-          title={editMode ? "Edit Event" : "Create Event"}
+          title={editMode ? "Edit Event" : "Quick Book Event"}
+          subtitle={
+            editMode
+              ? "Update booking details"
+              : `${CREATE_STEPS[wizardStep].label} · Step ${wizardStep + 1} of ${CREATE_STEPS.length}`
+          }
           onClose={() => setFormOpen(false)}
           wide
+          footer={
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <button
+                type="button"
+                onClick={() => setFormOpen(false)}
+                className="rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-bold"
+              >
+                Cancel
+              </button>
+              <div className="flex flex-wrap gap-2">
+                {wizardStep > 0 ? (
+                  <button
+                    type="button"
+                    onClick={goPrevStep}
+                    className="rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-bold"
+                  >
+                    Back
+                  </button>
+                ) : null}
+                {wizardStep < CREATE_STEPS.length - 1 ? (
+                  <button
+                    type="button"
+                    onClick={goNextStep}
+                    className="rounded-xl bg-[var(--primary)] px-5 py-2.5 text-sm font-bold text-white"
+                  >
+                    Continue
+                  </button>
+                ) : (
+                  <button
+                    disabled={saving}
+                    type="button"
+                    onClick={() => submitEvent()}
+                    aria-busy={saving}
+                    className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60"
+                  >
+                    {saving && <Loader2 size={16} className="animate-spin" />}
+                    {saving
+                      ? editMode
+                        ? "Saving Changes…"
+                        : "Creating Event…"
+                      : editMode
+                        ? "Save Changes"
+                        : "Confirm Booking"}
+                  </button>
+                )}
+              </div>
+            </div>
+          }
         >
           <form noValidate onSubmit={submitEvent} className="space-y-5">
+            <WizardSteps step={wizardStep} />
+
+            {showCustomer && (
             <FormSection title="Customer Details">
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
                 <Field
@@ -1845,7 +2355,7 @@ export default function EventManagement() {
                 />
 
                 <Field
-                  label="Verified Phone Number"
+                  label="Mobile Number"
                   value={form.customer.phone}
                   onChange={(value) =>
                     setField(
@@ -1898,21 +2408,54 @@ export default function EventManagement() {
                 onChange={(value) => setField("customer.address", value)}
               />
             </FormSection>
+            )}
 
-            <FormSection title="Event Details">
+            {showBasics && (
+            <>
+            <FormSection title="When & Where">
+              <div className="space-y-2">
+                <p className="text-xs font-bold text-[var(--text-secondary)]">
+                  Event type *
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {EVENT_TYPES.map((type) => {
+                    const active = form.eventType === type.value;
+                    return (
+                      <button
+                        key={type.value}
+                        type="button"
+                        onClick={() => {
+                          const previousDefault =
+                            EVENT_NAME_DEFAULTS[form.eventType];
+                          setField("eventType", type.value);
+                          if (
+                            !form.eventName.trim() ||
+                            form.eventName === previousDefault
+                          ) {
+                            setField(
+                              "eventName",
+                              EVENT_NAME_DEFAULTS[type.value] || type.label,
+                            );
+                          }
+                        }}
+                        className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${
+                          active
+                            ? "border-[var(--primary)] bg-[var(--primary)] text-white"
+                            : "border-[var(--border)] bg-white text-slate-600 hover:border-[var(--primary)]/40"
+                        }`}
+                      >
+                        {type.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                 <Field
                   label="Event Name"
                   value={form.eventName}
                   onChange={(value) => setField("eventName", value)}
-                  required
-                />
-
-                <SelectField
-                  label="Event Type"
-                  value={form.eventType}
-                  onChange={(value) => setField("eventType", value)}
-                  options={EVENT_TYPES}
                   required
                 />
 
@@ -1924,12 +2467,30 @@ export default function EventManagement() {
                   required
                 />
 
-                <SelectField
-                  label="Time Slot"
-                  value={form.schedule.slotType}
-                  onChange={applySlot}
-                  options={SLOT_PRESETS}
-                />
+                <div className="md:col-span-2">
+                  <p className="mb-1.5 text-xs font-bold text-[var(--text-secondary)]">
+                    Time slot
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {SLOT_PRESETS.map((slot) => {
+                      const active = form.schedule.slotType === slot.value;
+                      return (
+                        <button
+                          key={slot.value}
+                          type="button"
+                          onClick={() => applySlot(slot.value)}
+                          className={`rounded-xl border px-3 py-2 text-xs font-bold transition ${
+                            active
+                              ? "border-[var(--primary)] bg-[var(--primary-light)] text-[var(--primary-dark)]"
+                              : "border-[var(--border)] bg-white text-slate-600"
+                          }`}
+                        >
+                          {slot.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               <div className="grid gap-3 md:grid-cols-3">
@@ -2065,87 +2626,115 @@ export default function EventManagement() {
                 />
               </div>
             </FormSection>
+            </>
+            )}
 
+            {showMenu && (
+            <>
             <FormSection title="Food Package / Custom Menu">
-              <div className="grid gap-3 md:grid-cols-3">
-                <SelectField
-                  label="Menu Source"
-                  value={form.menu.source}
-                  onChange={(value) => {
-                    setField("menu.source", value);
-                    setField(
-                      "menu.menuType",
-                      value === "PACKAGE" ? "PACKAGE" : "CUSTOM",
-                    );
-                  }}
-                  options={[
-                    {
-                      value: "PACKAGE",
-                      label: "Saved Package",
-                    },
-                    {
-                      value: "CUSTOM",
-                      label: "Custom Items",
-                    },
-                  ]}
-                />
-
-                {form.menu.source === "PACKAGE" && (
-                  <SelectField
-                    label="Event Package"
-                    value={form.menu.packageId}
-                    onChange={(value) => {
-                      const pkg = packages.find(
-                        (item) => String(item._id || item.id) === String(value),
-                      );
-
-                      setField("menu.packageId", value);
-
-                      setField("menu.packageName", pkg?.name || "");
-
-                      const type = pkg?.pricingType || "PER_PLATE";
-
-                      setField("pricing.pricingType", type);
-
-                      setField(
-                        "pricing.perPlate",
-                        type === "PER_PLATE" ? Number(pkg?.price ?? 0) : 0,
-                      );
-
-                      setField(
-                        "pricing.baseAmount",
-                        type === "FLAT" ? Number(pkg?.price ?? 0) : 0,
-                      );
-                    }}
-                    options={packages
-                      .filter((pkg) => pkg.isActive !== false)
-                      .map((pkg) => ({
-                        value: pkg._id || pkg.id,
-                        label: `${pkg.name} — ${money(pkg.price ?? 0)}${
-                          (pkg.pricingType || "PER_PLATE") === "PER_PLATE"
-                            ? "/plate"
-                            : ""
-                        }`,
-                      }))}
-                    required
-                  />
-                )}
-
-                <SelectField
-                  label="Menu Type"
-                  value={form.menu.menuType}
-                  onChange={(value) => setField("menu.menuType", value)}
-                  options={["PACKAGE", "CUSTOM", "BUFFET", "PLATED", "OTHER"]}
-                />
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { value: "PACKAGE", label: "Saved Package" },
+                  { value: "CUSTOM", label: "Custom Menu" },
+                ].map((option) => {
+                  const active = form.menu.source === option.value;
+                  return (
+                    <button
+                      key={option.value}
+                      type="button"
+                      onClick={() => {
+                        setField("menu.source", option.value);
+                        setField(
+                          "menu.menuType",
+                          option.value === "PACKAGE" ? "PACKAGE" : "CUSTOM",
+                        );
+                        if (option.value === "CUSTOM") {
+                          setField("pricing.pricingType", "FLAT");
+                        }
+                      }}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-black ${
+                        active
+                          ? "border-[var(--primary)] bg-[var(--primary)] text-white"
+                          : "border-[var(--border)] bg-white text-slate-600"
+                      }`}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
               </div>
 
               {form.menu.source === "PACKAGE" && (
-                <div className="flex items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm">
-                  <Package size={16} />
-                  <span className="font-bold">
-                    {form.menu.packageName || "Select package"}
-                  </span>
+                <div className="grid gap-2 sm:grid-cols-2">
+                  {activePackages.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500 sm:col-span-2">
+                      No active packages yet.{" "}
+                      <button
+                        type="button"
+                        className="font-bold text-[var(--primary)]"
+                        onClick={() => {
+                          setFormOpen(false);
+                          setWorkspace("PACKAGES");
+                          openCreatePackage();
+                        }}
+                      >
+                        Create a package
+                      </button>{" "}
+                      or switch to Custom Menu.
+                    </div>
+                  ) : (
+                    activePackages.map((pkg) => {
+                      const id = pkg._id || pkg.id;
+                      const selected =
+                        String(form.menu.packageId) === String(id);
+                      return (
+                        <button
+                          key={id}
+                          type="button"
+                          onClick={() => applySelectedPackage(id)}
+                          className={`rounded-2xl border p-3 text-left transition ${
+                            selected
+                              ? "border-[var(--primary)] bg-[var(--primary-light)] shadow-sm"
+                              : "border-[var(--border)] bg-white hover:border-[var(--primary)]/35"
+                          }`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-sm font-black text-slate-900">
+                              {pkg.name}
+                            </p>
+                            {selected ? (
+                              <CheckCircle2
+                                size={16}
+                                className="shrink-0 text-[var(--primary)]"
+                              />
+                            ) : null}
+                          </div>
+                          <p className="mt-1 text-base font-black text-slate-900">
+                            {money(pkg.price)}
+                            {(pkg.pricingType || "PER_PLATE") === "PER_PLATE"
+                              ? " / plate"
+                              : ""}
+                          </p>
+                          <p className="mt-1 text-[11px] text-slate-500">
+                            {(pkg.items || []).length} items ·{" "}
+                            {(pkg.pricingType || "PER_PLATE") === "PER_PLATE"
+                              ? "Per plate"
+                              : "Flat price"}
+                          </p>
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
+              )}
+
+              {form.menu.source === "CUSTOM" && (
+                <SelectField
+                  label="Menu Style"
+                  value={form.menu.menuType}
+                  onChange={(value) => setField("menu.menuType", value)}
+                  options={["CUSTOM", "BUFFET", "PLATED", "OTHER"]}
+                />
               )}
 
               {form.menu.source === "CUSTOM" && (
@@ -2400,7 +2989,11 @@ export default function EventManagement() {
                 Add Service
               </button>
             </FormSection>
+            </>
+            )}
 
+            {showBilling && (
+            <>
             <FormSection title="Billing & Advance">
               <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
                 {form.menu.source === "PACKAGE" ? (
@@ -2585,34 +3178,281 @@ export default function EventManagement() {
                 onChange={(value) => setField("internalNotes", value)}
               />
             </FormSection>
+            </>
+            )}
+          </form>
+        </Modal>
+      )}
 
-            <div className="flex justify-end gap-2 border-t border-[var(--border)] pt-4">
+      {packageFormOpen && (
+        <Modal
+          title={editingPackageId ? "Edit Package" : "Create Package"}
+          subtitle="Reusable banquet menu with fixed per-plate or flat pricing"
+          onClose={() => {
+            if (!packageSaving) setPackageFormOpen(false);
+          }}
+          wide
+          footer={
+            <div className="flex justify-end gap-2">
               <button
                 type="button"
-                onClick={() => setFormOpen(false)}
+                disabled={packageSaving}
+                onClick={() => setPackageFormOpen(false)}
                 className="rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-bold"
               >
                 Cancel
               </button>
-
               <button
-                disabled={saving}
                 type="button"
-                onClick={() => submitEvent()}
-                aria-busy={saving}
+                disabled={packageSaving}
+                onClick={submitPackage}
                 className="inline-flex items-center gap-2 rounded-xl bg-[var(--primary)] px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60"
               >
-                {saving && <Loader2 size={16} className="animate-spin" />}
-                {saving
-                  ? editMode
-                    ? "Saving Changes…"
-                    : "Creating Event…"
-                  : editMode
-                    ? "Save Changes"
-                    : "Create Event"}
+                {packageSaving && (
+                  <Loader2 size={16} className="animate-spin" />
+                )}
+                {editingPackageId ? "Save Package" : "Create Package"}
               </button>
             </div>
-          </form>
+          }
+        >
+          <div className="space-y-5">
+            <FormSection title="Package Details">
+              <div className="grid gap-3 md:grid-cols-2">
+                <Field
+                  label="Package Name"
+                  value={packageForm.name}
+                  onChange={(value) =>
+                    setPackageForm((current) => ({ ...current, name: value }))
+                  }
+                  required
+                />
+                <Field
+                  label="Code (optional)"
+                  value={packageForm.code}
+                  onChange={(value) =>
+                    setPackageForm((current) => ({ ...current, code: value }))
+                  }
+                />
+                <SelectField
+                  label="Pricing Type"
+                  value={packageForm.pricingType}
+                  onChange={(value) =>
+                    setPackageForm((current) => ({
+                      ...current,
+                      pricingType: value,
+                    }))
+                  }
+                  options={[
+                    { value: "PER_PLATE", label: "Per Plate" },
+                    { value: "FLAT", label: "Flat Amount" },
+                  ]}
+                />
+                <Field
+                  label={
+                    packageForm.pricingType === "FLAT"
+                      ? "Flat Price (₹)"
+                      : "Price Per Plate (₹)"
+                  }
+                  type="number"
+                  min="0"
+                  value={packageForm.price}
+                  onChange={(value) =>
+                    setPackageForm((current) => ({ ...current, price: value }))
+                  }
+                  required
+                />
+              </div>
+              <TextArea
+                label="Description"
+                value={packageForm.description}
+                onChange={(value) =>
+                  setPackageForm((current) => ({
+                    ...current,
+                    description: value,
+                  }))
+                }
+              />
+              <label className="inline-flex items-center gap-2 text-xs font-semibold">
+                <input
+                  type="checkbox"
+                  checked={packageForm.isActive !== false}
+                  onChange={(event) =>
+                    setPackageForm((current) => ({
+                      ...current,
+                      isActive: event.target.checked,
+                    }))
+                  }
+                />
+                Package is active and available for booking
+              </label>
+            </FormSection>
+
+            <FormSection title="Menu Items (optional)">
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-3">
+                <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-xs font-bold text-slate-600">
+                    Add from restaurant menu
+                  </p>
+                  <input
+                    type="search"
+                    value={packageMenuSearch}
+                    onChange={(event) =>
+                      setPackageMenuSearch(event.target.value)
+                    }
+                    placeholder="Search dishes…"
+                    className="w-full rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--primary)] sm:max-w-xs"
+                  />
+                </div>
+                <div className="max-h-48 space-y-2 overflow-y-auto">
+                  {menuCatalog
+                    .filter((item) => item?.isAvailable !== false)
+                    .filter((item) =>
+                      `${item.name || ""} ${item.category || ""}`
+                        .toLowerCase()
+                        .includes(packageMenuSearch.trim().toLowerCase()),
+                    )
+                    .slice(0, 40)
+                    .map((item) => (
+                      <button
+                        key={item._id}
+                        type="button"
+                        onClick={() => {
+                          setPackageForm((current) => {
+                            const exists = current.items.some(
+                              (row) =>
+                                String(row.menuItemId || "") ===
+                                String(item._id),
+                            );
+                            if (exists) return current;
+                            return {
+                              ...current,
+                              items: [
+                                ...current.items,
+                                {
+                                  menuItemId: item._id,
+                                  name: item.name,
+                                  quantity: 1,
+                                  price: Number(item.price || 0),
+                                  notes: "",
+                                },
+                              ],
+                            };
+                          });
+                        }}
+                        className="flex w-full items-center justify-between rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-left text-sm hover:border-[var(--primary)]/40"
+                      >
+                        <span className="font-semibold text-slate-800">
+                          {item.name}
+                        </span>
+                        <span className="font-bold text-slate-600">
+                          {money(item.price)}
+                        </span>
+                      </button>
+                    ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {packageForm.items.map((item, index) => (
+                  <div
+                    key={`${item.menuItemId || item.name}-${index}`}
+                    className="grid gap-2 rounded-xl border border-[var(--border)] p-3 md:grid-cols-5"
+                  >
+                    <Field
+                      label="Item"
+                      value={item.name}
+                      onChange={(value) =>
+                        setPackageForm((current) => ({
+                          ...current,
+                          items: current.items.map((row, rowIndex) =>
+                            rowIndex === index ? { ...row, name: value } : row,
+                          ),
+                        }))
+                      }
+                    />
+                    <Field
+                      label="Qty"
+                      type="number"
+                      min="0.01"
+                      value={item.quantity}
+                      onChange={(value) =>
+                        setPackageForm((current) => ({
+                          ...current,
+                          items: current.items.map((row, rowIndex) =>
+                            rowIndex === index
+                              ? { ...row, quantity: value }
+                              : row,
+                          ),
+                        }))
+                      }
+                    />
+                    <Field
+                      label="Price"
+                      type="number"
+                      min="0"
+                      value={item.price}
+                      onChange={(value) =>
+                        setPackageForm((current) => ({
+                          ...current,
+                          items: current.items.map((row, rowIndex) =>
+                            rowIndex === index ? { ...row, price: value } : row,
+                          ),
+                        }))
+                      }
+                    />
+                    <Field
+                      label="Notes"
+                      value={item.notes}
+                      onChange={(value) =>
+                        setPackageForm((current) => ({
+                          ...current,
+                          items: current.items.map((row, rowIndex) =>
+                            rowIndex === index ? { ...row, notes: value } : row,
+                          ),
+                        }))
+                      }
+                    />
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setPackageForm((current) => ({
+                          ...current,
+                          items: current.items.filter(
+                            (_, rowIndex) => rowIndex !== index,
+                          ),
+                        }))
+                      }
+                      className="mt-5 inline-flex h-10 items-center justify-center rounded-xl border border-red-200 text-red-600"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+                <button
+                  type="button"
+                  onClick={() =>
+                    setPackageForm((current) => ({
+                      ...current,
+                      items: [
+                        ...current.items,
+                        {
+                          menuItemId: "",
+                          name: "",
+                          quantity: 1,
+                          price: 0,
+                          notes: "",
+                        },
+                      ],
+                    }))
+                  }
+                  className="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold"
+                >
+                  <Plus size={15} /> Add custom item
+                </button>
+              </div>
+            </FormSection>
+          </div>
         </Modal>
       )}
 

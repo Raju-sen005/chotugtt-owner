@@ -180,7 +180,7 @@ const currency = (value) =>
     maximumFractionDigits: 2,
   })}`;
 
-const SELLABLE_PLANS = ["TRIAL", "BASIC", "PREMIUM", "PRO"];
+const SELLABLE_PLANS = ["TRIAL", "STARTER", "BASIC", "PREMIUM", "PRO"];
 
 const formatPlan = (plan) => {
   const value = String(plan || "").trim();
@@ -928,6 +928,7 @@ export default function SuperAdminPanel() {
                 {subscriptionModal.field === "subscriptionPlan" ? (
                   <>
                     <option value="TRIAL">Trial</option>
+                    <option value="STARTER">Starter</option>
                     <option value="BASIC">Basic</option>
                     <option value="PREMIUM">Premium</option>
                     <option value="PRO">Pro</option>
@@ -943,7 +944,7 @@ export default function SuperAdminPanel() {
               {subscriptionModal.field === "subscriptionPlan" && (
                 <p className="mt-2 text-xs text-stone-500">
                   Saving a plan sets it active from the server: Trial 7 days,
-                  Basic 1 year, Premium 1 year.
+                  Starter 1 year, Basic 1 year, Premium 1 year, Pro 1 year.
                 </p>
               )}
             </div>
@@ -2238,6 +2239,7 @@ export default function SuperAdminPanel() {
                   >
                     <option value="all">All plans</option>
                     <option value="TRIAL">Trial</option>
+                    <option value="STARTER">Starter</option>
                     <option value="BASIC">Basic</option>
                     <option value="PREMIUM">Premium</option>
                     <option value="PRO">Pro</option>

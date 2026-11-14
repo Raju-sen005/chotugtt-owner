@@ -1,15 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import {
   ArrowRight,
   Check,
+  ChevronLeft,
+  ChevronRight,
   // ChefHat,
   CircleCheck,
   Clock3,
   Loader2,
   LockKeyhole,
-  LogOut,
+  // LogOut,
   Printer,
   ShieldCheck,
   Sparkles,
@@ -48,6 +51,19 @@ const PLAN_COPY = Object.freeze({
     popular: false,
     buttonText: "Start 7-day free trial",
   },
+  STARTER: {
+    description: "A simple yearly plan for getting started with ChotuGTT.",
+    features: [
+      "Counter POS",
+      "Table QR ordering",
+      "Live orders and KOT",
+      "Offers and menu management",
+      "Valid for 1 year only",
+    ],
+    icon: Sparkles,
+    popular: false,
+    buttonText: "Choose Starter",
+  },
   BASIC: {
     description:
       "One year of restaurant operations, ordering, billing, and AI menu tools.",
@@ -60,6 +76,11 @@ const PLAN_COPY = Object.freeze({
       "Live orders and KOT",
       "Offers and menu management",
       "Valid for 1 year only",
+    ],
+    highlightedFeatures: [
+      "Captain app",
+      "AI menu upload",
+      "Analysis and business reports",
     ],
     icon: Sparkles,
     popular: true,
@@ -79,22 +100,22 @@ const PLAN_COPY = Object.freeze({
     popular: false,
     buttonText: "Choose Premium",
   },
- PRO: {
-  title: "Pro",
-  subtitle: "Everything in ChotuGTT",
-  description:
-    "All current features plus every new feature released in the future.",
-  features: [
-    "All current ChotuGTT features",
-    "All Premium features",
-    "All future features",
-    "Advanced features and upgrades",
-    "Priority access to new capabilities",
-  ],
-  icon: ShieldCheck,
-  popular: false,
-  buttonText: "Choose Pro",
-},
+  // PRO: {
+  //   title: "Pro",
+  //   subtitle: "Everything in ChotuGTT",
+  //   description:
+  //     "All current features plus every new feature released in the future.",
+  //   features: [
+  //     "All current ChotuGTT features",
+  //     "All Premium features",
+  //     "All future features",
+  //     "Advanced features and upgrades",
+  //     "Priority access to new capabilities",
+  //   ],
+  //   icon: ShieldCheck,
+  //   popular: false,
+  //   buttonText: "Choose Pro",
+  // },
 });
 
 /*
@@ -244,7 +265,8 @@ const formatDuration = (plan) => {
 */
 
 export default function SubscriptionCheckout() {
-  const { refreshSession, user, logout } = useAuth();
+  const navigate = useNavigate();
+  const { refreshSession, user } = useAuth();
 
   const [plans, setPlans] = useState([]);
   const [plansLoading, setPlansLoading] = useState(true);
@@ -272,6 +294,7 @@ export default function SubscriptionCheckout() {
   */
 
   const planList = plans;
+  const planSliderRef = useRef(null);
 
   /*
   |--------------------------------------------------------------------------
@@ -413,36 +436,15 @@ export default function SubscriptionCheckout() {
     window.location.replace("/");
   }, [clearPaymentTimeout]);
 
-  const handleStartTrial = useCallback(async () => {
+  const handleStartTrial = useCallback(() => {
     if (loadingPlan) {
       return;
     }
 
-    setLoadingPlan("TRIAL");
     setError("");
-    setPaymentStage("Starting your 7-day trial...");
 
-    try {
-      await axios.post(
-        `${import.meta.env.VITE_APP_API_BASE}/payments/start-trial`,
-        {},
-        { withCredentials: true },
-      );
-
-      redirectToDashboard();
-    } catch (trialError) {
-      if (!mountedRef.current) {
-        return;
-      }
-
-      setError(
-        trialError?.response?.data?.message ||
-          "Unable to start the free trial.",
-      );
-      setPaymentStage("");
-      setLoadingPlan(null);
-    }
-  }, [loadingPlan, redirectToDashboard]);
+    navigate("/?auth=signup&plan=TRIAL");
+  }, [loadingPlan, navigate]);
 
   /*
   |--------------------------------------------------------------------------
@@ -451,419 +453,27 @@ export default function SubscriptionCheckout() {
   */
 
   const handlePayment = useCallback(
-    async (planCode) => {
-      /*
-        |--------------------------------------------------------------------------
-        | Prevent double payment initiation.
-        |--------------------------------------------------------------------------
-        */
-
+    (planCode) => {
+      // Prevent multiple clicks
       if (loadingPlan) {
         return;
       }
 
+      // Validate selected plan
       const selectedPlan = plans.find((plan) => plan.code === planCode);
 
-      if (!selectedPlan || selectedPlan.trial) {
+      if (!selectedPlan) {
         setError("Invalid subscription plan selected.");
-
         return;
       }
 
-      /*
-        |--------------------------------------------------------------------------
-        | Razorpay readiness
-        |--------------------------------------------------------------------------
-        */
-
-      if (!razorpayReady || !window.Razorpay) {
-        setError(
-          "Secure payment gateway is still loading. Please wait a moment and try again.",
-        );
-
-        return;
-      }
-
-      setLoadingPlan(planCode);
-
+      // Clear any previous error
       setError("");
 
-      setPaymentStage("Creating secure payment order...");
-
-      try {
-        /*
-          |--------------------------------------------------------------------------
-          | STEP 1
-          | Create backend payment order
-          |--------------------------------------------------------------------------
-          |
-          | IMPORTANT:
-          |
-          | We send ONLY the plan.
-          |
-          | Backend derives:
-          | - authenticated owner
-          | - restaurant
-          | - amount
-          | - currency
-          | - validity
-          |
-          |--------------------------------------------------------------------------
-          */
-
-        const idempotencyKey = createIdempotencyKey(planCode);
-
-        const createOrderResponse = await axios.post(
-          "/payments/create-order",
-          {
-            plan: planCode,
-          },
-          {
-            withCredentials: true,
-
-            timeout: PAYMENT_TIMEOUT_MS,
-
-            headers: {
-              "Content-Type": "application/json",
-
-              "Idempotency-Key": idempotencyKey,
-            },
-          },
-        );
-
-        const responseData = createOrderResponse?.data;
-
-        if (!responseData?.success) {
-          throw new Error(
-            responseData?.message || "Unable to create payment order.",
-          );
-        }
-
-        const paymentData = responseData?.data;
-
-        const { keyId, orderId, amount, currency, transactionId } =
-          paymentData || {};
-
-        /*
-          |--------------------------------------------------------------------------
-          | Validate backend response
-          |--------------------------------------------------------------------------
-          */
-
-        if (!keyId || !orderId || !transactionId || !amount || !currency) {
-          throw new Error("Invalid payment order received from server.");
-        }
-
-        if (String(currency).toUpperCase() !== PAYMENT_CURRENCY) {
-          throw new Error("Unsupported payment currency received from server.");
-        }
-
-        /*
-          |--------------------------------------------------------------------------
-          | STEP 2
-          | Open Razorpay
-          |--------------------------------------------------------------------------
-          */
-
-        setPaymentStage("Opening secure checkout...");
-
-        const options = {
-          key: keyId,
-
-          amount,
-
-          currency,
-
-          name: "ChotuGTT",
-
-          description: `ChotuGTT - ${formatDuration(selectedPlan)} Subscription`,
-
-          order_id: orderId,
-
-          /*
-            |--------------------------------------------------------------------------
-            | Payment success handler
-            |--------------------------------------------------------------------------
-            */
-
-          handler: async (razorpayResponse) => {
-            try {
-              setPaymentStage("Verifying your payment...");
-
-              setError("");
-
-              /*
-                  |--------------------------------------------------------------------------
-                  | Validate Razorpay response
-                  |--------------------------------------------------------------------------
-                  */
-
-              const {
-                razorpay_order_id,
-                razorpay_payment_id,
-                razorpay_signature,
-              } = razorpayResponse || {};
-
-              if (
-                !razorpay_order_id ||
-                !razorpay_payment_id ||
-                !razorpay_signature
-              ) {
-                throw new Error(
-                  "Incomplete payment response received from Razorpay.",
-                );
-              }
-
-              /*
-                  |--------------------------------------------------------------------------
-                  | STEP 3
-                  | Verify payment on backend
-                  |--------------------------------------------------------------------------
-                  */
-
-              const verifyResponse = await axios.post(
-                "/payments/verify",
-                {
-                  razorpay_order_id,
-
-                  razorpay_payment_id,
-
-                  razorpay_signature,
-
-                  transactionId,
-                },
-                {
-                  withCredentials: true,
-
-                  timeout: PAYMENT_TIMEOUT_MS,
-
-                  headers: {
-                    "Content-Type": "application/json",
-                  },
-                },
-              );
-
-              const verifyData = verifyResponse?.data;
-
-              if (!verifyData?.success) {
-                throw new Error(
-                  verifyData?.message || "Payment verification failed.",
-                );
-              }
-
-              /*
-                  |--------------------------------------------------------------------------
-                  | SUCCESS
-                  |--------------------------------------------------------------------------
-                  |
-                  | Backend has verified and activated the subscription.
-                  |
-                  | Full reload ensures:
-                  |
-                  | /auth/me
-                  |     ↓
-                  | latest DB subscription
-                  |     ↓
-                  | dashboard
-                  |--------------------------------------------------------------------------
-                  */
-
-              setPaymentStage("Subscription activated. Opening dashboard...");
-
-              clearPaymentTimeout();
-
-              // Refresh the authenticated user exactly once after
-              // backend payment verification. This updates the
-              // AuthContext with the newly ACTIVE subscription.
-              await refreshSession();
-
-              if (!mountedRef.current) {
-                return;
-              }
-
-              // Only a successful, backend-verified payment reaches
-              // this point. Navigate to dashboard once; there is no
-              // polling/reload loop on the subscription page.
-              redirectToDashboard();
-            } catch (verifyError) {
-              console.error("Payment verification failed:", verifyError);
-
-              if (!mountedRef.current) {
-                return;
-              }
-
-              setError(
-                verifyError?.response?.data?.message ||
-                  verifyError?.message ||
-                  "Payment was received, but verification could not be completed. If money was deducted, please contact support.",
-              );
-
-              setPaymentStage("");
-
-              setLoadingPlan(null);
-            }
-          },
-
-          /*
-            |--------------------------------------------------------------------------
-            | Razorpay Prefill
-            |--------------------------------------------------------------------------
-            */
-
-          prefill: {
-            name: "",
-
-            email: "",
-
-            contact: "",
-          },
-
-          /*
-            |--------------------------------------------------------------------------
-            | Notes
-            |--------------------------------------------------------------------------
-            |
-            | Do NOT send tenant identity from frontend.
-            |--------------------------------------------------------------------------
-            */
-
-          notes: {
-            plan: planCode,
-            duration: selectedPlan.durationMonths
-              ? `${selectedPlan.durationMonths}_MONTHS`
-              : `${selectedPlan.durationDays}_DAYS`,
-          },
-
-          /*
-            |--------------------------------------------------------------------------
-            | Theme
-            |--------------------------------------------------------------------------
-            */
-
-          theme: {
-            color: "#E11D48",
-          },
-
-          /*
-            |--------------------------------------------------------------------------
-            | Modal
-            |--------------------------------------------------------------------------
-            */
-
-          modal: {
-            escape: true,
-
-            ondismiss: () => {
-              clearPaymentTimeout();
-
-              if (!mountedRef.current) {
-                return;
-              }
-
-              setLoadingPlan(null);
-
-              setPaymentStage("");
-
-              razorpayInstanceRef.current = null;
-            },
-          },
-        };
-
-        /*
-          |--------------------------------------------------------------------------
-          | Create Razorpay instance
-          |--------------------------------------------------------------------------
-          */
-
-        const razorpay = new window.Razorpay(options);
-
-        razorpayInstanceRef.current = razorpay;
-
-        /*
-          |--------------------------------------------------------------------------
-          | Payment Failure
-          |--------------------------------------------------------------------------
-          */
-
-        razorpay.on("payment.failed", (response) => {
-          console.error("Razorpay payment failed:", response);
-
-          clearPaymentTimeout();
-
-          if (!mountedRef.current) {
-            return;
-          }
-
-          setError(
-            response?.error?.description || "Payment failed. Please try again.",
-          );
-
-          setPaymentStage("");
-
-          setLoadingPlan(null);
-
-          razorpayInstanceRef.current = null;
-        });
-
-        /*
-          |--------------------------------------------------------------------------
-          | Open Razorpay
-          |--------------------------------------------------------------------------
-          */
-
-        razorpay.open();
-
-        /*
-          |--------------------------------------------------------------------------
-          | Safety timeout
-          |--------------------------------------------------------------------------
-          |
-          | This does NOT cancel the Razorpay transaction.
-          | It only prevents the UI from remaining indefinitely in loading state.
-          |--------------------------------------------------------------------------
-          */
-
-        clearPaymentTimeout();
-
-        paymentTimeoutRef.current = window.setTimeout(() => {
-          if (!mountedRef.current) {
-            return;
-          }
-
-          setLoadingPlan(null);
-
-          setPaymentStage("");
-
-          setError("Payment session timed out. Please try again.");
-        }, PAYMENT_TIMEOUT_MS);
-      } catch (paymentError) {
-        console.error("Subscription payment error:", paymentError);
-
-        clearPaymentTimeout();
-
-        if (!mountedRef.current) {
-          return;
-        }
-
-        setError(
-          paymentError?.response?.data?.message ||
-            paymentError?.message ||
-            "Unable to start payment. Please try again.",
-        );
-
-        setPaymentStage("");
-
-        setLoadingPlan(null);
-      }
+      // Redirect to Register page
+      navigate(`/?auth=signup&plan=${encodeURIComponent(planCode)}`);
     },
-    [
-      clearPaymentTimeout,
-      loadingPlan,
-      razorpayReady,
-      redirectToDashboard,
-      refreshSession,
-      plans,
-    ],
+    [loadingPlan, plans, navigate],
   );
 
   /*
@@ -955,7 +565,7 @@ export default function SubscriptionCheckout() {
               </div>
             )}
 
-            <button
+            {/* <button
               type="button"
               onClick={async () => {
                 try {
@@ -969,7 +579,7 @@ export default function SubscriptionCheckout() {
             >
               <LogOut size={16} />
               <span className="hidden sm:inline">Sign out</span>
-            </button>
+            </button> */}
           </div>
         </div>
       </header>
@@ -995,10 +605,10 @@ export default function SubscriptionCheckout() {
           </h1>
 
           <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
-            Trial lasts 7 days, then the restaurant account is blocked. Basic is
-            ₹4,000 for 1 year. Premium is ₹8,000 for 1 year with one thermal
-            printer. Pro is ₹12,000 for 1 year with all current and future
-            ChotuGTT features.
+            Trial lasts 7 days, then the restaurant account is blocked. Starter,
+            Basic, Premium, and Pro plans are available for your restaurant.
+            Premium includes one thermal printer. Pro includes all current and
+            future ChotuGTT features.
           </p>
 
           {/* Secure indicators */}
@@ -1068,7 +678,7 @@ export default function SubscriptionCheckout() {
             </button>
           </div>
         )}
-        <div
+        {/* <div
           role="alert"
           className="mx-auto mt-8 flex max-w-2xl items-start gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-4 text-left text-sm text-rose-700"
         >
@@ -1079,141 +689,213 @@ export default function SubscriptionCheckout() {
 
             <p className="mt-1 text-xs leading-5 text-rose-600">{error}</p>
           </div>
-        </div>
+        </div> */}
 
         {/* ============================================================
             PLANS
             ============================================================ */}
 
-        <section className="mx-auto mt-10 grid max-w-6xl gap-5 lg:grid-cols-3">
-          {plansLoading && (
-            <div className="col-span-full flex items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-8 text-sm font-semibold text-slate-600">
-              <Loader2 size={18} className="animate-spin text-rose-600" />
-              Loading plans...
+        <section className="mx-auto mt-10 max-w-6xl">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-black tracking-tight text-slate-950 sm:text-2xl">
+                Plans made for your restaurant
+              </h2>
+              <p className="mt-1 text-xs font-medium text-slate-500 sm:text-sm">
+                Compare plans and choose what fits your business.
+              </p>
             </div>
-          )}
-
-          {planList.map((plan) => {
-            const Icon = plan.icon;
-            const isLoading = loadingPlan === plan.code;
-            const isDisabled =
-              isBusy ||
-              plansLoading ||
-              (plan.trial && hasActiveSubscription) ||
-              (!plan.trial && (!razorpayReady || isInitializing));
-            const durationLabel = formatDuration(plan);
-
-            return (
-              <article
-                key={plan.code}
-                className={`relative flex flex-col rounded-[1.75rem] border bg-white p-6 shadow-sm ${
-                  plan.popular
-                    ? "border-slate-900 shadow-xl shadow-slate-200"
-                    : "border-slate-200"
-                }`}
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="Previous plans"
+                onClick={() =>
+                  planSliderRef.current?.scrollBy({
+                    left: -360,
+                    behavior: "smooth",
+                  })
+                }
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50"
               >
-                {plan.popular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-950 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-white">
-                      <Sparkles size={12} className="text-rose-400" />
-                      Most used
-                    </div>
-                  </div>
-                )}
+                <ChevronLeft size={18} />
+              </button>
+              <button
+                type="button"
+                aria-label="Next plans"
+                onClick={() =>
+                  planSliderRef.current?.scrollBy({
+                    left: 360,
+                    behavior: "smooth",
+                  })
+                }
+                className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm transition hover:border-slate-400 hover:bg-slate-50"
+              >
+                <ChevronRight size={18} />
+              </button>
+            </div>
+          </div>
 
-                <div className="flex items-center gap-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
-                    <Icon size={20} />
-                  </div>
-                  <div>
-                    <h2 className="text-xl font-black text-slate-950">
-                      {plan.name}
-                    </h2>
-                    <p className="text-[11px] font-semibold text-slate-400">
-                      {durationLabel}
-                    </p>
-                  </div>
-                </div>
+          <div
+            ref={planSliderRef}
+            className="flex snap-x snap-mandatory gap-5 overflow-x-auto overscroll-x-contain scroll-smooth pb-6 pt-3 [scrollbar-width:thin] [scrollbar-color:#cbd5e1_transparent]"
+          >
+            {plansLoading && (
+              <div className="col-span-full flex items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-8 text-sm font-semibold text-slate-600">
+                <Loader2 size={18} className="animate-spin text-rose-600" />
+                Loading plans...
+              </div>
+            )}
 
-                <div className="mt-5">
-                  <p className="text-4xl font-black tracking-tight text-slate-950">
-                    {plan.trial ? "Free" : formatPrice(plan.amount)}
-                  </p>
-                  <p className="mt-1 text-xs font-bold text-rose-600">
-                    {plan.trial
-                      ? "Then the account is blocked"
-                      : `Valid for ${durationLabel}`}
-                  </p>
-                </div>
+            {planList.map((plan) => {
+              const Icon = plan.icon;
+              const isLoading = loadingPlan === plan.code;
+              const isDisabled =
+                isBusy ||
+                plansLoading ||
+                (plan.trial && hasActiveSubscription) ||
+                (!plan.trial && (!razorpayReady || isInitializing));
+              const durationLabel = formatDuration(plan);
 
-                {Array.isArray(plan.components) &&
-                  plan.components.length > 0 && (
-                    <div className="mt-4 space-y-1 rounded-xl bg-slate-50 px-3 py-3">
-                      {plan.components.map((component) => (
-                        <div
-                          key={component.label}
-                          className="flex items-center justify-between text-[11px] font-semibold text-slate-600"
-                        >
-                          <span>{component.label}</span>
-                          <span>{formatPrice(component.amount)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-
-                <p className="mt-4 text-xs leading-5 text-slate-500">
-                  {plan.description}
-                </p>
-
-                <div className="mt-5 space-y-2">
-                  {plan.features.map((feature) => (
-                    <div key={feature} className="flex items-start gap-2">
-                      <Check
-                        size={14}
-                        className="mt-0.5 shrink-0 text-emerald-600"
-                      />
-                      <span className="text-xs font-semibold leading-5 text-slate-600">
-                        {feature}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-
-                <button
-                  type="button"
-                  onClick={() =>
-                    plan.trial ? handleStartTrial() : handlePayment(plan.code)
-                  }
-                  disabled={isDisabled}
-                  className={`mt-6 flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-black text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
+              return (
+                <article
+                  key={plan.code}
+                  className={`relative flex min-w-0 flex-[0_0_100%] snap-start flex-col rounded-[1.75rem] border bg-white p-6 shadow-sm transition-shadow hover:shadow-lg sm:flex-[0_0_calc(50%-0.625rem)] lg:flex-[0_0_calc(33.333%-0.833rem)] ${
                     plan.popular
-                      ? "bg-slate-950 hover:bg-slate-800"
-                      : "bg-rose-600 hover:bg-rose-700"
+                      ? "border-slate-900 shadow-xl shadow-slate-200"
+                      : "border-slate-200"
                   }`}
                 >
-                  {isLoading ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      {plan.trial ? "Starting trial..." : "Opening checkout..."}
-                    </>
-                  ) : (
-                    <>
-                      {plan.buttonText}
-                      <ArrowRight size={16} />
-                    </>
+                  {plan.popular && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                      <div className="inline-flex items-center gap-1.5 rounded-full bg-slate-950 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-white">
+                        <Sparkles size={12} className="text-rose-400" />
+                        Most used
+                      </div>
+                    </div>
                   )}
-                </button>
 
-                <p className="mt-3 text-center text-[10px] font-semibold text-slate-400">
-                  {plan.trial
-                    ? hasActiveSubscription
-                      ? "Trial is only for a restaurant with no active plan."
-                      : "No payment required. One trial per restaurant."
-                    : "Razorpay checkout. Amount is confirmed by the server."}
-                </p>
-              </article>
-            );
-          })}
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-rose-50 text-rose-600">
+                      <Icon size={20} />
+                    </div>
+                    <div>
+                      <h2 className="text-xl font-black text-slate-950">
+                        {plan.name}
+                      </h2>
+                      <p className="text-[11px] font-semibold text-slate-400">
+                        {durationLabel}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="mt-5">
+                    <p className="text-4xl font-black tracking-tight text-slate-950">
+                      {plan.trial ? "Free" : formatPrice(plan.amount)}
+                    </p>
+                    <p className="mt-1 text-xs font-bold text-rose-600">
+                      {plan.trial
+                        ? "Then the account is blocked"
+                        : `Valid for ${durationLabel}`}
+                    </p>
+                  </div>
+
+                  {Array.isArray(plan.components) &&
+                    plan.components.length > 0 && (
+                      <div className="mt-4 space-y-1 rounded-xl bg-slate-50 px-3 py-3">
+                        {plan.components.map((component) => (
+                          <div
+                            key={component.label}
+                            className="flex items-center justify-between text-[11px] font-semibold text-slate-600"
+                          >
+                            <span>{component.label}</span>
+                            <span>{formatPrice(component.amount)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                  <p className="mt-4 text-xs leading-5 text-slate-500">
+                    {plan.description}
+                  </p>
+
+                  <div className="mt-5 space-y-2">
+                    {plan.features.map((feature) => {
+                      const isHighlighted =
+                        plan.highlightedFeatures?.includes(feature);
+
+                      return (
+                        <div
+                          key={feature}
+                          className={`flex items-start gap-2 rounded-xl px-3 py-2 transition ${
+                            isHighlighted
+                              ? "border border-orange-200 bg-orange-50"
+                              : ""
+                          }`}
+                        >
+                          <Check
+                            size={isHighlighted ? 16 : 14}
+                            strokeWidth={isHighlighted ? 3 : 2}
+                            className={`mt-0.5 shrink-0 ${
+                              isHighlighted
+                                ? "text-emerald-600"
+                                : "text-emerald-600"
+                            }`}
+                          />
+
+                          <span
+                            className={`text-xs leading-5 ${
+                              isHighlighted
+                                ? "font-extrabold text-slate-600"
+                                : "font-semibold text-slate-600"
+                            }`}
+                          >
+                            {feature}
+                          </span>
+
+                          {/* {isHighlighted && (
+          <span className="ml-auto shrink-0 rounded-full bg-orange-100 px-2 py-0.5 text-[9px] font-black text-orange-700">
+            FEATURED
+          </span>
+        )} */}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handlePayment(plan.code)}
+                    disabled={isDisabled}
+                    className={`mt-6 flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-3.5 text-sm font-black text-white transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                      plan.popular
+                        ? "bg-slate-950 hover:bg-slate-800"
+                        : "bg-rose-600 hover:bg-rose-700"
+                    }`}
+                  >
+                    {isLoading ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        {plan.trial ? "Starting trial..." : "Redirecting..."}
+                      </>
+                    ) : (
+                      <>
+                        {plan.buttonText}
+                        <ArrowRight size={16} />
+                      </>
+                    )}
+                  </button>
+
+                  <p className="mt-3 text-center text-[10px] font-semibold text-slate-400">
+                    {plan.trial
+                      ? hasActiveSubscription
+                        ? "Trial is only for a restaurant with no active plan."
+                        : "No payment required. One trial per restaurant."
+                      : "Choose your plan and continue to registration."}
+                  </p>
+                </article>
+              );
+            })}
+          </div>
         </section>
 
         {/* ============================================================

@@ -96,7 +96,11 @@ export default function RegisterTenant({ onSwitchToLogin }) {
 
     try {
       const formData = new FormData();
+      const selectedPlan = new URLSearchParams(window.location.search).get(
+        "plan",
+      );
 
+      formData.append("subscriptionPlan", selectedPlan || "TRIAL");
       formData.append("restaurantName", restaurantName.trim());
       formData.append("slug", generatedSlug);
       formData.append("name", name.trim());

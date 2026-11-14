@@ -91,17 +91,6 @@ export default function Sidebar({ closeMobileSidebar }) {
     subscriptionActive &&
     String(subscriptionPlan).toUpperCase() === "PRO";
 
-  console.log("EVENT MANAGEMENT DEBUG", {
-    role: user?.role,
-    subscriptionPlan: user?.subscriptionPlan,
-    restaurantSubscriptionPlan: user?.restaurant?.subscriptionPlan,
-    subscriptionStatus: user?.subscriptionStatus,
-    subscriptionExpiresAt: user?.subscriptionExpiresAt,
-    restaurantSubscriptionExpiresAt: user?.restaurant?.subscriptionExpiresAt,
-    subscriptionActive,
-    showEventManagement,
-  });
-
   const navItems = isSuperAdmin
     ? [
         {
