@@ -101,6 +101,9 @@ export default function RestaurantProfile() {
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [themeColor, setThemeColor] = useState("#EF4444");
+  const [automaticMode, setAutomaticMode] = useState(false);
+  const [automaticModeSaving, setAutomaticModeSaving] = useState(false);
+  const [automaticModeError, setAutomaticModeError] = useState("");
   const [street, setStreet] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("");
@@ -159,6 +162,35 @@ export default function RestaurantProfile() {
   // zero error recovery — if the PATCH failed, the UI kept showing the new
   // template as "selected" even though the server never saved it, which is
   // exactly the "sometimes applies, sometimes doesn't" bug.
+  const handleAutomaticModeToggle = async () => {
+    if (automaticModeSaving) return;
+    const previous = automaticMode;
+    const next = !previous;
+    setAutomaticModeError("");
+    setAutomaticModeSaving(true);
+    setAutomaticMode(next);
+
+    try {
+      await axios.patch(
+        `${import.meta.env.VITE_APP_API_BASE}/restaurant/profile`,
+        { automaticMode: next },
+        { withCredentials: true },
+      );
+      queryClient.invalidateQueries({ queryKey: ["restaurant-profile"] });
+      queryClient.invalidateQueries({
+        queryKey: ["restaurant-profile-auto-mode"],
+      });
+    } catch (error) {
+      setAutomaticMode(previous);
+      setAutomaticModeError(
+        error.response?.data?.message ||
+          "Failed to update Automatic Mode. Please try again.",
+      );
+    } finally {
+      setAutomaticModeSaving(false);
+    }
+  };
+
   const handleBillTemplateChange = async (template) => {
     if (isProBillTemplate(template.id)) {
       setPaymentTemplate(template);
@@ -246,6 +278,7 @@ export default function RestaurantProfile() {
           ? restaurant.themeColor || "#EF4444"
           : prev,
       );
+      setAutomaticMode(restaurant.automaticMode === true);
       setStreet((prev) =>
         prev !== (restaurant.address?.street || "")
           ? restaurant.address?.street || ""
@@ -1107,6 +1140,46 @@ export default function RestaurantProfile() {
                     <input required type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="Email address" className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-8 pr-3 text-sm font-semibold outline-none focus:border-rose-300 focus:bg-white" />
                   </div>
                 </label>
+              </div>
+            </section>
+
+            <section className="rounded-3xl border border-slate-100 bg-white p-4 shadow-sm">
+              <h2 className="mb-4 flex items-center gap-2 text-sm font-black text-slate-900">
+                Automatic Order Mode
+              </h2>
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-slate-800">
+                    Auto-accept new orders and print KOT
+                  </p>
+                  <p className="mt-1 text-xs leading-relaxed text-slate-500">
+                    When enabled, Table QR, Room QR, Captain and POS orders are
+                    accepted immediately and the existing KOT print flow runs
+                    without an Accept click. Items are never marked Ready or
+                    Served automatically. Turn off to restore manual acceptance.
+                  </p>
+                  {automaticModeError ? (
+                    <p className="mt-2 text-xs font-semibold text-rose-600">
+                      {automaticModeError}
+                    </p>
+                  ) : null}
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={automaticMode}
+                  disabled={automaticModeSaving}
+                  onClick={handleAutomaticModeToggle}
+                  className={`relative h-8 w-14 shrink-0 rounded-full transition focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 disabled:opacity-60 ${
+                    automaticMode ? "bg-rose-500" : "bg-slate-300"
+                  }`}
+                >
+                  <span
+                    className={`absolute top-1 h-6 w-6 rounded-full bg-white shadow transition ${
+                      automaticMode ? "left-7" : "left-1"
+                    }`}
+                  />
+                </button>
               </div>
             </section>
 

@@ -1,11 +1,18 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { AlertCircle, ShoppingBag } from "lucide-react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useSocket } from "../context/SocketContext";
 import { useAuth } from "../context/AuthContext";
+import {
+  resolveAutoKotItems,
+  shouldAutoPrintNewOrder,
+  shouldAutoPrintRunningOrder,
+  stripAutoKotMeta,
+} from "../features/orders/autoKotPrint";
+import { resolveItemSpecialInstructions } from "../features/orders/itemSpecialInstructions";
 
 const getOrderRestaurantId = (order) => {
   if (!order?.restaurantId) {
@@ -36,6 +43,23 @@ export default function GlobalOrderAlert() {
       : user?.restaurantId;
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const apiBase = String(import.meta.env.VITE_APP_API_BASE || "").replace(
+    /\/+$/,
+    "",
+  );
+
+  const { data: restaurantProfile } = useQuery({
+    queryKey: ["restaurant-profile-auto-mode", restaurantId],
+    queryFn: async () => {
+      const res = await axios.get(`${apiBase}/restaurant/profile`, {
+        withCredentials: true,
+      });
+      return res.data?.data || null;
+    },
+    enabled: Boolean(restaurantId),
+    staleTime: 60_000,
+  });
+  const automaticModeEnabled = restaurantProfile?.automaticMode === true;
 
   const [orderAlert, setOrderAlert] = useState(null);
 
@@ -420,8 +444,35 @@ export default function GlobalOrderAlert() {
       return;
     }
 
-    const handleNewOrder = (order) => {
+    const navigateAutoPrint = (order, items, kotType) => {
+      recentAlertsRef.current.clear();
+      setOrderAlert(null);
+      navigate("/orders", {
+        state: {
+          autoPrintKOT: {
+            order,
+            items,
+            kotType,
+          },
+        },
+        replace: true,
+      });
+    };
+
+    const handleNewOrder = (payload) => {
+      const { order, meta } = stripAutoKotMeta(payload);
+
       if (!isSameTenantOrder(order, restaurantId)) {
+        return;
+      }
+
+      /*
+       * Automatic Mode: order is already ACCEPTED server-side.
+       * Route to LiveOrderMonitor's existing printKOT path — no Accept click.
+       */
+      if (shouldAutoPrintNewOrder(meta, order)) {
+        const items = resolveAutoKotItems(order, meta);
+        navigateAutoPrint(order, items, meta.kotType || "NEW");
         return;
       }
 
@@ -447,6 +498,19 @@ export default function GlobalOrderAlert() {
         return;
       }
 
+      if (
+        shouldAutoPrintRunningOrder(
+          {
+            automaticMode: payload?.automaticMode ?? automaticModeEnabled,
+            autoPrintKot: payload?.autoPrintKot,
+          },
+          newItems,
+        )
+      ) {
+        navigateAutoPrint(order, newItems, payload?.kotType || "RUNNING");
+        return;
+      }
+
       showAlert(
         {
           ...order,
@@ -469,7 +533,13 @@ export default function GlobalOrderAlert() {
 
       socket.off("RUNNING_ORDER_UPDATED", handleRunningOrderUpdated);
     };
-  }, [socket, restaurantId, showAlert]);
+  }, [
+    socket,
+    restaurantId,
+    showAlert,
+    navigate,
+    automaticModeEnabled,
+  ]);
 
   /*
    * --------------------------------------------------
@@ -807,6 +877,11 @@ export default function GlobalOrderAlert() {
                           >
                             {item?.name || "Unnamed item"}
                           </p>
+                          {resolveItemSpecialInstructions(item) ? (
+                            <p className="mt-0.5 truncate text-[11px] italic text-slate-400">
+                              {resolveItemSpecialInstructions(item)}
+                            </p>
+                          ) : null}
 
                           <div className="mt-0.5 flex flex-wrap items-center gap-2">
                             {item?.price != null && (

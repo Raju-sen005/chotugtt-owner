@@ -180,7 +180,14 @@ const currency = (value) =>
     maximumFractionDigits: 2,
   })}`;
 
-const SELLABLE_PLANS = ["TRIAL", "STARTER", "BASIC", "PREMIUM", "PRO"];
+const SELLABLE_PLANS = [
+  "TRIAL",
+  "STARTER",
+  "BASIC",
+  "PREMIUM",
+  "PRO",
+  "PLUS",
+];
 
 const formatPlan = (plan) => {
   const value = String(plan || "").trim();
@@ -932,6 +939,7 @@ export default function SuperAdminPanel() {
                     <option value="BASIC">Basic</option>
                     <option value="PREMIUM">Premium</option>
                     <option value="PRO">Pro</option>
+                    <option value="PLUS">Plus</option>
                   </>
                 ) : (
                   <>
@@ -943,8 +951,10 @@ export default function SuperAdminPanel() {
               </SelectField>
               {subscriptionModal.field === "subscriptionPlan" && (
                 <p className="mt-2 text-xs text-stone-500">
-                  Saving a plan sets it active from the server: Trial 7 days,
-                  Starter 1 year, Basic 1 year, Premium 1 year, Pro 1 year.
+                  Saving a plan sets it active from the server: Trial 7 days;
+                  Starter, Basic, Premium, Pro, and Plus are 1 year each. Pro
+                  and Plus are independent — Plus is Room Management, Pro is
+                  restaurant software / Event Management.
                 </p>
               )}
             </div>
@@ -2030,6 +2040,12 @@ export default function SuperAdminPanel() {
                             tone: "bg-amber-400",
                           },
                           {
+                            label: "Starter",
+                            value:
+                              platformAnalytics.subscriptions?.starter || 0,
+                            tone: "bg-stone-400",
+                          },
+                          {
                             label: "Basic",
                             value: platformAnalytics.subscriptions?.basic || 0,
                             tone: "bg-red-500",
@@ -2044,6 +2060,11 @@ export default function SuperAdminPanel() {
                             label: "Pro",
                             value: platformAnalytics.subscriptions?.pro || 0,
                             tone: "bg-blue-500",
+                          },
+                          {
+                            label: "Plus",
+                            value: platformAnalytics.subscriptions?.plus || 0,
+                            tone: "bg-emerald-500",
                           },
                         ].map((row) => (
                           <div key={row.label}>
@@ -2243,6 +2264,7 @@ export default function SuperAdminPanel() {
                     <option value="BASIC">Basic</option>
                     <option value="PREMIUM">Premium</option>
                     <option value="PRO">Pro</option>
+                    <option value="PLUS">Plus</option>
                   </SelectField>
 
                   <SelectField

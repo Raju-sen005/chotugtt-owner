@@ -30,6 +30,21 @@ const StaffManagement = lazy(
   () => import("../features/profile/StaffManagement"),
 );
 const EventManagement = lazy(() => import("../components/EventManagement"));
+const RoomsManagement = lazy(
+  () => import("../features/rooms/RoomsManagement"),
+);
+const GuestManagement = lazy(
+  () => import("../features/guests/GuestManagement"),
+);
+const BookingManagement = lazy(
+  () => import("../features/bookings/BookingManagement"),
+);
+const RoomQrManagement = lazy(
+  () => import("../features/roomQr/RoomQrManagement"),
+);
+const FolioManagement = lazy(
+  () => import("../features/folios/FolioManagement"),
+);
 const SupplyAdmin = lazy(() => import("../features/supply/SupplyAdmin"));
 
 const SupplyStore = lazy(() => import("../features/supply/SupplyStore"));
@@ -274,6 +289,11 @@ export default function MerchantLayout() {
                   <Route path="/profile" element={<Profile />} />
 
                   <Route path="/events" element={<EventManagement />} />
+                  <Route path="/rooms" element={<RoomsManagement />} />
+                  <Route path="/guests" element={<GuestManagement />} />
+                  <Route path="/bookings" element={<BookingManagement />} />
+                  <Route path="/room-qr" element={<RoomQrManagement />} />
+                  <Route path="/room-folios" element={<FolioManagement />} />
                   <Route path="/staff" element={<StaffManagement />} />
 
                   <Route path="*" element={<Navigate to="/" replace />} />

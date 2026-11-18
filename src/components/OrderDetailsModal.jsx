@@ -7,6 +7,7 @@ import {
   MapPin,
   AlertCircle,
 } from "lucide-react";
+import { resolveItemSpecialInstructions } from "../features/orders/itemSpecialInstructions";
 
 export default function OrderDetailsModal({
   order,
@@ -325,11 +326,11 @@ export default function OrderDetailsModal({
                           </span>
                         )}
 
-                        {item?.notes && (
+                        {resolveItemSpecialInstructions(item) ? (
                           <span className="text-[10px] text-slate-400 block italic">
-                            Note: {item.notes}
+                            Note: {resolveItemSpecialInstructions(item)}
                           </span>
-                        )}
+                        ) : null}
                       </div>
                     </div>
                   </div>

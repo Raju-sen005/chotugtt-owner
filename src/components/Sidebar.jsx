@@ -17,10 +17,20 @@ import {
   Crown,
   CheckCircle2,
   CalendarDays,
-  ShoppingBasket,
+  // ShoppingBasket,
   Package,
+  BedDouble,
+  ContactRound,
+  CalendarCheck2,
+  QrCode,
+  FileText,
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { hasRoomManagementAccess } from "../features/rooms/roomsAccess";
+import { hasGuestManagementAccess } from "../features/guests/guestsAccess";
+import { hasRoomBookingAccess } from "../features/bookings/bookingsAccess";
+import { hasRoomQrAccess } from "../features/roomQr/roomQrAccess";
+import { hasRoomFolioAccess } from "../features/folios/folioAccess";
 
 const NAV_ITEMS = [
   { to: "/", icon: LayoutGrid, label: "Overview" },
@@ -91,6 +101,26 @@ export default function Sidebar({ closeMobileSidebar }) {
     subscriptionActive &&
     String(subscriptionPlan).toUpperCase() === "PRO";
 
+  // PLUS-only ROOM_MANAGEMENT (PRO must not receive Rooms access)
+  const showRoomsManagement =
+    !isSuperAdmin && hasRoomManagementAccess(user);
+
+  // PLUS-only GUEST_MANAGEMENT (PRO must not receive Guests access)
+  const showGuestManagement =
+    !isSuperAdmin && hasGuestManagementAccess(user);
+
+  // PLUS-only room booking (backend gates via ROOM_MANAGEMENT; PRO denied)
+  const showBookingManagement =
+    !isSuperAdmin && hasRoomBookingAccess(user);
+
+  // PLUS-only ROOM_QR_ORDERING (OWNER/MANAGER actions enforced on page)
+  const showRoomQrManagement =
+    !isSuperAdmin && hasRoomQrAccess(user);
+
+  // PLUS-only ROOM_FOLIO (PRO denied; role actions enforced on page)
+  const showRoomFolioManagement =
+    !isSuperAdmin && hasRoomFolioAccess(user);
+
   const navItems = isSuperAdmin
     ? [
         {
@@ -106,12 +136,57 @@ export default function Sidebar({ closeMobileSidebar }) {
       ]
     : [
         ...NAV_ITEMS,
-        ...(canAccessSupply
+        // ...(canAccessSupply
+        //   ? [
+        //       {
+        //         to: "/supply",
+        //         icon: ShoppingBasket,
+        //         label: "Supply",
+        //       },
+        //     ]
+        //   : []),
+        ...(showRoomsManagement
           ? [
               {
-                to: "/supply",
-                icon: ShoppingBasket,
-                label: "Supply",
+                to: "/rooms",
+                icon: BedDouble,
+                label: "Rooms",
+              },
+            ]
+          : []),
+        ...(showBookingManagement
+          ? [
+              {
+                to: "/bookings",
+                icon: CalendarCheck2,
+                label: "Bookings",
+              },
+            ]
+          : []),
+        ...(showRoomQrManagement
+          ? [
+              {
+                to: "/room-qr",
+                icon: QrCode,
+                label: "Room QR",
+              },
+            ]
+          : []),
+        ...(showRoomFolioManagement
+          ? [
+              {
+                to: "/room-folios",
+                icon: FileText,
+                label: "Room Billing",
+              },
+            ]
+          : []),
+        ...(showGuestManagement
+          ? [
+              {
+                to: "/guests",
+                icon: ContactRound,
+                label: "Guests",
               },
             ]
           : []),

@@ -45,7 +45,7 @@ const PLAN_COPY = Object.freeze({
       "7 days only, once per restaurant",
       "Full workspace during the trial",
       "Account is blocked when the 7 days end",
-      "Choose Basic, Premium, or Pro to continue",
+      "Choose Starter, Basic, Premium, Pro, or Plus to continue",
     ],
     icon: Clock3,
     popular: false,
@@ -100,23 +100,47 @@ const PLAN_COPY = Object.freeze({
     popular: false,
     buttonText: "Choose Premium",
   },
-  // PRO: {
-  //   title: "Pro",
-  //   subtitle: "Everything in ChotuGTT",
-  //   description:
-  //     "All current features plus every new feature released in the future.",
-  //   features: [
-  //     "All current ChotuGTT features",
-  //     "All Premium features",
-  //     "All future features",
-  //     "Advanced features and upgrades",
-  //     "Priority access to new capabilities",
-  //   ],
-  //   icon: ShieldCheck,
-  //   popular: false,
-  //   buttonText: "Choose Pro",
-  // },
+  PRO: {
+    description:
+      "All current restaurant software features plus Event Management and future software upgrades. Does not include Hotel / Room Management (Plus).",
+    features: [
+      "Everything in Premium software",
+      "Event Management",
+      "WhatsApp bill and advanced analytics",
+      "All future restaurant software features",
+      "Valid for 1 year only",
+      "Room Management requires Plus separately",
+    ],
+    highlightedFeatures: ["Event Management", "All future restaurant software features"],
+    icon: ShieldCheck,
+    popular: false,
+    buttonText: "Choose Pro",
+  },
+  PLUS: {
+    description:
+      "Independent Hotel / Room Management plan. Rooms, bookings, guests, room QR ordering, and folio. Does not include Event Management or full POS Pro features.",
+    features: [
+      "Rooms Management",
+      "Room Billing",
+      "Guest Management",
+      "Room QR ordering",
+      "Room Folio billing",
+      "Valid for 1 year only",
+      "Event Management requires Pro separately",
+    ],
+    highlightedFeatures: [
+      "Rooms Management",
+      "Room QR ordering",
+      "Room Folio billing",
+    ],
+    icon: Sparkles,
+    popular: false,
+    buttonText: "Choose Plus",
+  },
 });
+
+/** Exported for unit tests — display copy keys only; amounts come from API. */
+export { PLAN_COPY };
 
 /*
 |--------------------------------------------------------------------------
@@ -606,9 +630,10 @@ export default function SubscriptionCheckout() {
 
           <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
             Trial lasts 7 days, then the restaurant account is blocked. Starter,
-            Basic, Premium, and Pro plans are available for your restaurant.
-            Premium includes one thermal printer. Pro includes all current and
-            future ChotuGTT features.
+            Basic, Premium, Pro, and Plus plans are available for your
+            restaurant. Premium includes one thermal printer. Pro covers
+            restaurant software and Event Management. Plus is the independent
+            Hotel / Room Management plan.
           </p>
 
           {/* Secure indicators */}
@@ -666,7 +691,8 @@ export default function SubscriptionCheckout() {
             </p>
             <p className="mt-1 text-xs leading-5 text-emerald-700">
               The free trial cannot replace this subscription. Continue to the
-              dashboard, or choose Basic, Premium, or Pro below to extend it.
+              dashboard, or choose Starter, Basic, Premium, Pro, or Plus below
+              to extend it.
             </p>
             <button
               type="button"

@@ -29,6 +29,26 @@ import {
 } from "../../constants/billTemplates";
 import { printThermalHtml } from "../../utils/thermalPrint";
 import { printOrderBill } from "../../utils/printOrderBill";
+import {
+  isRoomFolioOrder,
+  orderPlaceLabel,
+  orderTypeLabel,
+  roomNumberFromOrder,
+} from "./roomOrderLive";
+import {
+  buildKotPrintJobKey,
+  claimKotPrintJob,
+  releaseKotPrintJob,
+  resolveAutoKotItems,
+  shouldAutoPrintNewOrder,
+  shouldAutoPrintRunningOrder,
+  stripAutoKotMeta,
+} from "./autoKotPrint";
+import {
+  isRoomFolioReleaseBlockedByReadiness,
+  isTableBillBlockedByReadiness,
+} from "./orderBillingGates";
+import { resolveItemSpecialInstructions } from "./itemSpecialInstructions";
 
 // Shared status → badge style map (used by both the desktop row and mobile card
 // so ACCEPTED / COMPLETED / REJECTED are visually distinct at a glance)
@@ -75,16 +95,6 @@ function timeAgo(value) {
   return `${Math.round(hours / 24)} d ago`;
 }
 
-function orderPlaceLabel(order) {
-  if (order?.tableNumber === "PARCEL") return "PARCEL";
-  return order?.tableNumber ? `TABLE ${order.tableNumber}` : "TABLE";
-}
-
-function orderTypeLabel(order) {
-  if (order?.tableNumber === "PARCEL") return "Counter Parcel";
-  return "Dine In";
-}
-
 async function translateToHindi(text) {
   if (!text || typeof text !== "string") return "";
 
@@ -119,15 +129,21 @@ const OrderRow = memo(function OrderRow({
   onStatusChange,
   onView,
   onClear,
+  onCompleteForFolio,
   onCancelItem,
   onItemReadyStatus,
   onSelect,
   isSelected,
+  automaticMode = false,
 }) {
   const hasMergedTables = order.mergedTables && order.mergedTables.length > 0;
-  const hasUnservedItems = (order.items || []).some(
-    (item) => item?.status !== "REJECTED" && item?.itemReadyStatus !== "SERVED",
-  );
+  const roomOrder = isRoomFolioOrder(order);
+  const tableBillBlocked = isTableBillBlockedByReadiness(order, {
+    automaticMode,
+  });
+  const folioReleaseBlocked = isRoomFolioReleaseBlockedByReadiness(order, {
+    automaticMode,
+  });
   const label = kitchenLabel(order);
   const preview = activeOrderItems(order).slice(0, 1);
   const extra = Math.max(0, activeOrderItems(order).length - preview.length);
@@ -147,9 +163,16 @@ const OrderRow = memo(function OrderRow({
         </p>
       </td>
       <td className="px-4 py-3 whitespace-nowrap">
-        <p className="text-xs font-black text-slate-800">
-          {orderPlaceLabel(order)}
-        </p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          {roomOrder && (
+            <span className="inline-flex items-center rounded-md bg-teal-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-teal-700 border border-teal-200/70">
+              ROOM
+            </span>
+          )}
+          <p className="text-xs font-black text-slate-800">
+            {orderPlaceLabel(order)}
+          </p>
+        </div>
         <p className="text-[11px] text-slate-400">{orderTypeLabel(order)}</p>
         {hasMergedTables && (
           <p className="mt-1 inline-flex items-center gap-1 text-[10px] font-bold text-amber-700">
@@ -165,14 +188,24 @@ const OrderRow = memo(function OrderRow({
       </td>
       <td className="px-4 py-3">
         <div className="flex items-center gap-2">
-          {preview.map((item, index) => (
-            <span
-              key={item?._id || index}
-              className="max-w-[120px] truncate rounded-lg bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-600"
-            >
-              {item.quantity}x {item.name}
-            </span>
-          ))}
+          {preview.map((item, index) => {
+            const note = resolveItemSpecialInstructions(item);
+            return (
+              <span
+                key={item?._id || index}
+                className="max-w-[160px] rounded-lg bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-600"
+              >
+                <span className="block truncate">
+                  {item.quantity}x {item.name}
+                </span>
+                {note ? (
+                  <span className="mt-0.5 block truncate text-[10px] font-medium italic text-slate-400">
+                    {note}
+                  </span>
+                ) : null}
+              </span>
+            );
+          })}
           {extra > 0 && (
             <span className="text-[11px] font-bold text-slate-400">
               +{extra} more
@@ -222,26 +255,50 @@ const OrderRow = memo(function OrderRow({
               </button>
             </>
           )}
-          {order.status === "ACCEPTED" && order.tableNumber !== "N/A" && (
+          {order.status === "ACCEPTED" &&
+            order.tableNumber !== "N/A" &&
+            !roomOrder && (
             <button
               type="button"
-              disabled={hasUnservedItems}
+              disabled={tableBillBlocked}
               onClick={() => {
-                if (!hasUnservedItems) onClear(order);
+                if (!tableBillBlocked) onClear(order);
               }}
               className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold ${
-                hasUnservedItems
+                tableBillBlocked
                   ? "cursor-not-allowed bg-slate-100 text-slate-400"
                   : "bg-emerald-500 text-white"
               }`}
               title={
-                hasUnservedItems
+                tableBillBlocked
                   ? "All active items must be SERVED before billing"
                   : "Generate Bill & Clear Table"
               }
             >
               <Check size={12} />{" "}
-              {hasUnservedItems ? "Serve first" : "Complete"}
+              {tableBillBlocked ? "Serve first" : "Complete"}
+            </button>
+          )}
+          {order.status === "ACCEPTED" && roomOrder && (
+            <button
+              type="button"
+              disabled={folioReleaseBlocked}
+              onClick={() => {
+                if (!folioReleaseBlocked) onCompleteForFolio?.(order);
+              }}
+              className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold ${
+                folioReleaseBlocked
+                  ? "cursor-not-allowed bg-slate-100 text-slate-400"
+                  : "bg-teal-600 text-white"
+              }`}
+              title={
+                folioReleaseBlocked
+                  ? "Serve all items, then release to Room Folio"
+                  : "Release kitchen-complete order to Room Folio (no table bill)"
+              }
+            >
+              <Check size={12} />{" "}
+              {folioReleaseBlocked ? "Serve first" : "To Folio"}
             </button>
           )}
           {order.status === "ACCEPTED" && (
@@ -300,14 +357,20 @@ const OrderCard = memo(function OrderCard({
   onStatusChange,
   onView,
   onClear,
+  onCompleteForFolio,
   onCancelItem,
   onItemReadyStatus,
+  automaticMode = false,
 }) {
   const hasMergedTables = order.mergedTables && order.mergedTables.length > 0;
+  const roomOrder = isRoomFolioOrder(order);
   const [showAllItems, setShowAllItems] = useState(false);
-  const hasUnservedItems = (order.items || []).some(
-    (item) => item?.status !== "REJECTED" && item?.itemReadyStatus !== "SERVED",
-  );
+  const tableBillBlocked = isTableBillBlockedByReadiness(order, {
+    automaticMode,
+  });
+  const folioReleaseBlocked = isRoomFolioReleaseBlockedByReadiness(order, {
+    automaticMode,
+  });
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-4 space-y-3">
       <div className="flex justify-between items-start gap-2">
@@ -316,7 +379,12 @@ const OrderCard = memo(function OrderCard({
             {order.orderId}
           </p>
           <p className="text-sm font-black text-slate-900 mt-0.5 flex items-center gap-1.5 flex-wrap">
-            Table {order.tableNumber}
+            {roomOrder && (
+              <span className="inline-flex items-center rounded-md bg-teal-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-teal-700 border border-teal-200/70">
+                ROOM
+              </span>
+            )}
+            {orderPlaceLabel(order)}
             {hasMergedTables && (
               <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200/60 px-1.5 py-0.5 rounded-md text-[9px] font-black uppercase tracking-wider">
                 <Users size={9} /> +{order.mergedTables.join(", ")}
@@ -344,34 +412,41 @@ const OrderCard = memo(function OrderCard({
                 }
                 className="flex items-center justify-between gap-2"
               >
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span
-                    className={`truncate ${
-                      item.status === "REJECTED"
-                        ? "line-through text-rose-400 opacity-50"
-                        : ""
-                    }`}
-                  >
-                    • {item.quantity}x {item.name}
-                  </span>
-
-                  {item.status !== "REJECTED" && (
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 min-w-0">
                     <span
-                      className={`shrink-0 text-[8px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-md border ${
-                        item.itemReadyStatus === "SERVED"
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200"
-                          : item.itemReadyStatus === "READY"
-                            ? "bg-blue-50 text-blue-700 border-blue-200"
-                            : "bg-amber-50 text-amber-700 border-amber-200"
+                      className={`truncate ${
+                        item.status === "REJECTED"
+                          ? "line-through text-rose-400 opacity-50"
+                          : ""
                       }`}
                     >
-                      {item.itemReadyStatus === "SERVED"
-                        ? "Served"
-                        : item.itemReadyStatus === "READY"
-                          ? "Ready"
-                          : "Preparing"}
+                      • {item.quantity}x {item.name}
                     </span>
-                  )}
+
+                    {item.status !== "REJECTED" && (
+                      <span
+                        className={`shrink-0 text-[8px] font-black uppercase tracking-wide px-1.5 py-0.5 rounded-md border ${
+                          item.itemReadyStatus === "SERVED"
+                            ? "bg-emerald-50 text-emerald-700 border-emerald-200"
+                            : item.itemReadyStatus === "READY"
+                              ? "bg-blue-50 text-blue-700 border-blue-200"
+                              : "bg-amber-50 text-amber-700 border-amber-200"
+                        }`}
+                      >
+                        {item.itemReadyStatus === "SERVED"
+                          ? "Served"
+                          : item.itemReadyStatus === "READY"
+                            ? "Ready"
+                            : "Preparing"}
+                      </span>
+                    )}
+                  </div>
+                  {resolveItemSpecialInstructions(item) ? (
+                    <p className="mt-0.5 truncate pl-2 text-[10px] italic text-slate-400">
+                      {resolveItemSpecialInstructions(item)}
+                    </p>
+                  ) : null}
                 </div>
 
                 {Boolean(item?._id) &&
@@ -471,28 +546,51 @@ const OrderCard = memo(function OrderCard({
         )}
 
         <div className="flex items-center gap-2">
-          {order.status === "ACCEPTED" && order.tableNumber !== "N/A" && (
+          {order.status === "ACCEPTED" &&
+            order.tableNumber !== "N/A" &&
+            !roomOrder && (
             <button
-              disabled={hasUnservedItems}
+              disabled={tableBillBlocked}
               onClick={() => {
-                if (hasUnservedItems) {
+                if (tableBillBlocked) {
                   return;
                 }
 
                 onClear(order);
               }}
               className={`p-2 rounded-xl transition shadow-2xs ${
-                hasUnservedItems
+                tableBillBlocked
                   ? "bg-slate-200 text-slate-400 cursor-not-allowed"
                   : "bg-slate-900 text-white hover:bg-slate-800 cursor-pointer"
               }`}
               title={
-                hasUnservedItems
+                tableBillBlocked
                   ? "All active items must be SERVED before billing"
                   : "Generate Bill & Clear Table"
               }
             >
               <IndianRupee size={15} strokeWidth={2.5} />
+            </button>
+          )}
+          {order.status === "ACCEPTED" && roomOrder && (
+            <button
+              disabled={folioReleaseBlocked}
+              onClick={() => {
+                if (folioReleaseBlocked) return;
+                onCompleteForFolio?.(order);
+              }}
+              className={`p-2 rounded-xl transition shadow-2xs ${
+                folioReleaseBlocked
+                  ? "bg-slate-200 text-slate-400 cursor-not-allowed"
+                  : "bg-teal-600 text-white hover:bg-teal-700 cursor-pointer"
+              }`}
+              title={
+                folioReleaseBlocked
+                  ? "Serve all items, then release to Room Folio"
+                  : "Release to Room Folio (no table bill)"
+              }
+            >
+              <Check size={15} strokeWidth={2.5} />
             </button>
           )}
           <button
@@ -577,6 +675,8 @@ export default function LiveOrderMonitor() {
   const [showStatusPopup, setShowStatusPopup] = useState(false);
   const [statusPopupType, setStatusPopupType] = useState("");
   const [statusPopupOrderId, setStatusPopupOrderId] = useState(null);
+  const [automaticMode, setAutomaticMode] = useState(false);
+  const [kotPrintFailures, setKotPrintFailures] = useState({});
   const [kotItems, setKotItems] = useState([]);
   const [cancelledKotItems, setCancelledKotItems] = useState([]);
   const [cancelItemData, setCancelItemData] = useState(null);
@@ -867,15 +967,21 @@ export default function LiveOrderMonitor() {
   });
 
   const printKOT = useCallback(
-    async ({ order, items, kotType = "NEW", cancelledItems = [] }) => {
+    async ({
+      order,
+      items,
+      kotType = "NEW",
+      cancelledItems = [],
+      dedupe = false,
+    }) => {
       if (!order?._id) {
         showError("Invalid order.");
-        return;
+        return false;
       }
 
       if (!Array.isArray(items) || !items.length) {
         showError("No new items available for KOT.");
-        return;
+        return false;
       }
 
       const normalizedKotType =
@@ -891,7 +997,17 @@ export default function LiveOrderMonitor() {
 
       if (!activeItems.length) {
         showError("No active items available for KOT.");
-        return;
+        return false;
+      }
+
+      const jobKey = buildKotPrintJobKey({
+        orderId: order._id,
+        items: activeItems,
+        kotType: normalizedKotType,
+      });
+
+      if (dedupe && !claimKotPrintJob(jobKey)) {
+        return false;
       }
 
       const isRunningOrder = normalizedKotType === "RUNNING";
@@ -925,13 +1041,15 @@ export default function LiveOrderMonitor() {
             const translatedVariant = item.variant
               ? await translateToHindi(item.variant)
               : "";
-            const translatedNotes = item.notes
-              ? await translateToHindi(item.notes)
+            const sourceNotes = resolveItemSpecialInstructions(item);
+            const translatedNotes = sourceNotes
+              ? await translateToHindi(sourceNotes)
               : "";
             return {
               ...item,
               name: translatedName,
               variant: translatedVariant,
+              specialInstructions: translatedNotes,
               notes: translatedNotes,
             };
           }),
@@ -976,10 +1094,10 @@ export default function LiveOrderMonitor() {
               }
 
               ${
-                item.notes
+                resolveItemSpecialInstructions(item)
                   ? `
                     <div class="item-meta note-text">
-                      Note: ${escapeHtml(item.notes)}
+                      Note: ${escapeHtml(resolveItemSpecialInstructions(item))}
                     </div>
                   `
                   : ""
@@ -1568,27 +1686,7 @@ export default function LiveOrderMonitor() {
 
     </div>
 
-    <!-- ==========================
-         SPECIAL INSTRUCTIONS
-    =========================== -->
-
-    ${
-      order.notes
-        ? `
-          <div class="notes">
-
-            <div class="notes-title">
-              Special Instructions
-            </div>
-
-            <div class="note">
-              ${escapeHtml(order.notes)}
-            </div>
-
-          </div>
-        `
-        : ""
-    }
+    <!-- Item-level special instructions are printed under each item name. -->
 
     <!-- ==========================
          FOOTER
@@ -1618,8 +1716,19 @@ export default function LiveOrderMonitor() {
         await printThermalHtml(windowContent);
       } catch (error) {
         console.error("KOT print failed:", error);
+        if (dedupe) releaseKotPrintJob(jobKey);
+        setKotPrintFailures((prev) => ({
+          ...prev,
+          [String(order._id)]: {
+            message:
+              "KOT could not be printed. Order stays accepted — retry from View KOT.",
+            items: activeItems,
+            kotType: normalizedKotType,
+            at: Date.now(),
+          },
+        }));
         showError("KOT could not be printed. Check the printer and try again.");
-        return;
+        return false;
       }
 
       try {
@@ -1645,6 +1754,11 @@ export default function LiveOrderMonitor() {
           setCancelledKotItems([]);
           setSelectedOrder(null);
         }
+        setKotPrintFailures((prev) => {
+          const next = { ...prev };
+          delete next[String(order._id)];
+          return next;
+        });
         queryClient.invalidateQueries({
           queryKey: ["live-orders", restaurantId],
         });
@@ -1656,16 +1770,36 @@ export default function LiveOrderMonitor() {
               ? "Running Order KOT Printed Successfully"
               : "New Order KOT Printed Successfully",
         );
+        return true;
       } catch (error) {
         console.error("Failed to mark KOT printed:", error);
-
+        // Print succeeded; keep dedupe claim so retries don't double-print paper.
         showError(
           error.response?.data?.message ||
             "KOT printed, but tracking update failed.",
         );
+        return true;
       }
     },
     [apiBase, queryClient, restaurantId, showError, showSuccess],
+  );
+
+  const queueAutomaticKotPrint = useCallback(
+    async ({ order, items, kotType }) => {
+      if (!order?._id) return;
+      const printable = (items || []).filter(
+        (item) => item?.status !== "REJECTED",
+      );
+      if (!printable.length) return;
+
+      await printKOT({
+        order,
+        items: printable,
+        kotType: kotType || "NEW",
+        dedupe: true,
+      });
+    },
+    [printKOT],
   );
 
   useEffect(() => {
@@ -1694,6 +1828,7 @@ export default function LiveOrderMonitor() {
           order: autoPrintKOT.order,
           items: autoPrintKOT.items,
           kotType: autoPrintKOT.kotType || "NEW",
+          dedupe: true,
         });
       } catch (error) {
         console.error("❌ Auto KOT print failed:", error);
@@ -1741,6 +1876,7 @@ export default function LiveOrderMonitor() {
             upiQrCode: d.upiQrCode || d.qrCodeUrl || "",
             googleReviewQrCode: d.googleReviewQrCode || "",
           });
+          setAutomaticMode(d.automaticMode === true);
           if (d.billTemplate) setSelectedBillTemplate(d.billTemplate);
         }
       })
@@ -1863,21 +1999,22 @@ export default function LiveOrderMonitor() {
     // ==========================================
     // NEW ORDER
     // ==========================================
-    const handleNewOrder = (newOrder) => {
-      if (!sameTenant(newOrder)) return;
+    const handleNewOrder = (payload) => {
+      const { order: cleaned, meta } = stripAutoKotMeta(payload);
+      if (!sameTenant(cleaned)) return;
 
       queryClient.setQueryData(["live-orders", restaurantId], (old = []) => {
         const exists = old.some(
-          (o) => String(o?._id) === String(newOrder?._id),
+          (o) => String(o?._id) === String(cleaned?._id),
         );
 
         if (exists) {
           return old.map((o) =>
-            String(o?._id) === String(newOrder?._id) ? newOrder : o,
+            String(o?._id) === String(cleaned?._id) ? cleaned : o,
           );
         }
 
-        return [newOrder, ...old];
+        return [cleaned, ...old];
       });
 
       queryClient.invalidateQueries({
@@ -1885,6 +2022,14 @@ export default function LiveOrderMonitor() {
       });
 
       setCurrentPage(1);
+
+      if (shouldAutoPrintNewOrder(meta, cleaned)) {
+        void queueAutomaticKotPrint({
+          order: cleaned,
+          items: resolveAutoKotItems(cleaned, meta),
+          kotType: meta.kotType || "NEW",
+        });
+      }
     };
 
     // ==========================================
@@ -1941,6 +2086,7 @@ export default function LiveOrderMonitor() {
        * in the blocking running-order popup.
        */
       const updatedOrder = payload?.order ?? null;
+      const newItems = Array.isArray(payload?.items) ? payload.items : [];
 
       if (!updatedOrder?._id) {
         console.warn(
@@ -1977,6 +2123,22 @@ export default function LiveOrderMonitor() {
 
       // Keep existing UX: updated order appears on page 1.
       setCurrentPage(1);
+
+      if (
+        shouldAutoPrintRunningOrder(
+          {
+            automaticMode: payload?.automaticMode,
+            autoPrintKot: payload?.autoPrintKot,
+          },
+          newItems,
+        )
+      ) {
+        void queueAutomaticKotPrint({
+          order: updatedOrder,
+          items: newItems,
+          kotType: payload?.kotType || "RUNNING",
+        });
+      }
     };
 
     const handleItemReadyStatusUpdated = (payload) => {
@@ -2051,7 +2213,7 @@ export default function LiveOrderMonitor() {
       );
       socket.io.off("reconnect", handleReconnect);
     };
-  }, [socket, restaurantId, queryClient]);
+  }, [socket, restaurantId, queryClient, queueAutomaticKotPrint]);
 
   // ==========================================================
   // ITEM READY / SERVED STATUS
@@ -2408,26 +2570,78 @@ export default function LiveOrderMonitor() {
   }, [manualDiscountPreview.finalTotal]);
 
   // Bill & WhatsApp clear table handler added from TableMonitor
-  const handleBillAndWhatsApp = useCallback((order) => {
-    setBillOrder(order);
+  const handleBillAndWhatsApp = useCallback(
+    (order) => {
+      if (isRoomFolioOrder(order)) {
+        showError(
+          "Room orders settle on the Room Folio. Use Release to Room Folio — not Generate Bill.",
+        );
+        return;
+      }
+      setBillOrder(order);
 
-    setSelectedPaymentMethod(null);
+      setSelectedPaymentMethod(null);
 
-    // Existing split state
-    setSplitMode(false);
-    setSplitCollectMethod("CASH");
-    setSplitAmount("");
-    setIsSplitSubmitting(false);
+      // Existing split state
+      setSplitMode(false);
+      setSplitCollectMethod("CASH");
+      setSplitAmount("");
+      setIsSplitSubmitting(false);
 
-    // Existing mixed payment state
-    setMixedCashAmount("");
-    setMixedUpiAmount("");
-    setIsMixedSubmitting(false);
+      // Existing mixed payment state
+      setMixedCashAmount("");
+      setMixedUpiAmount("");
+      setIsMixedSubmitting(false);
 
-    // Manual owner discount
-    setManualDiscountType("");
-    setManualDiscountValue("");
-  }, []);
+      // Manual owner discount
+      setManualDiscountType("");
+      setManualDiscountValue("");
+    },
+    [showError],
+  );
+
+  const handleCompleteForFolio = useCallback(
+    async (order) => {
+      if (!order?._id || !isRoomFolioOrder(order)) return;
+      if (
+        isRoomFolioReleaseBlockedByReadiness(order, { automaticMode })
+      ) {
+        showError("Serve all active items before releasing to the Room Folio.");
+        return;
+      }
+      try {
+        await axios.patch(
+          `${apiBase}/orders/${order._id}/complete-for-folio`,
+          {},
+          {
+            withCredentials: true,
+            headers: { "Idempotency-Key": crypto.randomUUID() },
+          },
+        );
+        await queryClient.invalidateQueries({
+          queryKey: ["liveOrders", restaurantId],
+        });
+        showSuccess(
+          "Room order released to folio. Collect payment on Room Folio.",
+        );
+        setDetailOrderId(null);
+        setDetailClosed(true);
+      } catch (error) {
+        showError(
+          error?.response?.data?.message ||
+            "Could not release room order to folio.",
+        );
+      }
+    },
+    [
+      apiBase,
+      automaticMode,
+      queryClient,
+      restaurantId,
+      showError,
+      showSuccess,
+    ],
+  );
 
   const confirmSplitBill = useCallback(async () => {
     if (!billOrder) return;
@@ -4209,6 +4423,11 @@ export default function LiveOrderMonitor() {
                 <p className="mt-1.5 max-w-xl text-sm leading-relaxed text-white/75">
                   Manage incoming orders, table occupancy statuses, and kitchen
                   execution queue.
+                  {automaticMode ? (
+                    <span className="ml-1 font-semibold text-amber-200">
+                      Automatic Mode ON — new orders auto-accept and print KOT.
+                    </span>
+                  ) : null}
                 </p>
               </div>
             </div>
@@ -4275,6 +4494,45 @@ export default function LiveOrderMonitor() {
             </div>
           </div>
         </div>
+
+        {Object.keys(kotPrintFailures).length > 0 ? (
+          <div className="mt-4 space-y-2" role="alert">
+            {Object.entries(kotPrintFailures).map(([orderId, failure]) => {
+              const liveOrder = orders.find(
+                (o) => String(o?._id) === String(orderId),
+              );
+              return (
+                <div
+                  key={orderId}
+                  className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950"
+                >
+                  <div className="min-w-0">
+                    <p className="font-bold">
+                      KOT print failed
+                      {liveOrder?.orderId ? ` · #${liveOrder.orderId}` : ""}
+                    </p>
+                    <p className="text-xs text-amber-800">
+                      {failure.message} Order remains ACCEPTED.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 px-3 py-2 text-xs font-bold text-white hover:bg-amber-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                    onClick={() => {
+                      if (liveOrder) {
+                        handleView(liveOrder);
+                      } else {
+                        showError("Open the order and use Print KOT to retry.");
+                      }
+                    }}
+                  >
+                    <Printer size={14} /> Retry KOT
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        ) : null}
 
         <div className="mt-4 grid grid-cols-2 gap-3 xl:grid-cols-5">
           {[
@@ -4380,9 +4638,11 @@ export default function LiveOrderMonitor() {
                     <OrderCard
                       key={order._id}
                       order={order}
+                      automaticMode={automaticMode}
                       onStatusChange={handleStatusClick}
                       onView={handleView}
                       onClear={handleBillAndWhatsApp}
+                      onCompleteForFolio={handleCompleteForFolio}
                       onCancelItem={handleCancelItem}
                       onItemReadyStatus={handleItemReadyStatus}
                     />
@@ -4406,6 +4666,7 @@ export default function LiveOrderMonitor() {
                         <OrderRow
                           key={order._id}
                           order={order}
+                          automaticMode={automaticMode}
                           isSelected={
                             String(detailOrder?._id) === String(order._id)
                           }
@@ -4416,6 +4677,7 @@ export default function LiveOrderMonitor() {
                           onStatusChange={handleStatusClick}
                           onView={handleView}
                           onClear={handleBillAndWhatsApp}
+                          onCompleteForFolio={handleCompleteForFolio}
                           onCancelItem={handleCancelItem}
                           onItemReadyStatus={handleItemReadyStatus}
                         />
@@ -4504,6 +4766,11 @@ export default function LiveOrderMonitor() {
                       <p className="truncate font-bold text-slate-800">
                         {item.name}
                       </p>
+                      {resolveItemSpecialInstructions(item) ? (
+                        <p className="truncate italic text-slate-400">
+                          {resolveItemSpecialInstructions(item)}
+                        </p>
+                      ) : null}
                       <p className="text-slate-400">
                         ₹{item.price} · {item.itemReadyStatus || "PREPARING"}
                       </p>
@@ -4596,18 +4863,39 @@ export default function LiveOrderMonitor() {
                   </button>
                 )}
                 {detailOrder.status === "ACCEPTED" &&
-                  detailOrder.tableNumber !== "N/A" && (
+                  detailOrder.tableNumber !== "N/A" &&
+                  !isRoomFolioOrder(detailOrder) && (
                     <button
                       type="button"
-                      disabled={activeOrderItems(detailOrder).some(
-                        (item) => item.itemReadyStatus !== "SERVED",
-                      )}
+                      disabled={isTableBillBlockedByReadiness(detailOrder, {
+                        automaticMode,
+                      })}
                       onClick={() => handleBillAndWhatsApp(detailOrder)}
                       className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-500 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
                     >
                       <IndianRupee size={16} /> Generate Bill
                     </button>
                   )}
+                {detailOrder.status === "ACCEPTED" &&
+                  isRoomFolioOrder(detailOrder) && (
+                    <button
+                      type="button"
+                      disabled={isRoomFolioReleaseBlockedByReadiness(
+                        detailOrder,
+                        { automaticMode },
+                      )}
+                      onClick={() => handleCompleteForFolio(detailOrder)}
+                      className="flex w-full items-center justify-center gap-2 rounded-2xl bg-teal-600 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500"
+                    >
+                      <Check size={16} /> Release to Room Folio
+                    </button>
+                  )}
+                {isRoomFolioOrder(detailOrder) && (
+                  <p className="text-[11px] text-teal-700 font-semibold text-center">
+                    Room {roomNumberFromOrder(detailOrder) || ""} — settle on
+                    Room Folio (CASH / UPI / MIXED). No separate table bill.
+                  </p>
+                )}
                 <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"

@@ -6,6 +6,7 @@ import AuthGate from "./features/auth/AuthGate";
 
 const MerchantLayout = lazy(() => import("./layouts/MerchantLayout"));
 const PublicMenu = lazy(() => import("./features/public/PublicMenu"));
+const RoomMenu = lazy(() => import("./features/public/RoomMenu"));
 const SubscriptionCheckout = lazy(
   () => import("./components/SubscriptionCheckout"),
 );
@@ -61,6 +62,17 @@ export default function App() {
       |
       */}
         <Route path="/catalog/:restaurantId" element={<PublicMenu />} />
+
+        {/*
+      |--------------------------------------------------------------------------
+      | Guest Room QR Menu (Phase C)
+      |--------------------------------------------------------------------------
+      |
+      | Public — no merchant auth. Token is validated by the backend.
+      | Ordering eligibility is enforced server-side on every placeOrder.
+      |
+      */}
+        <Route path="/room-menu/:token" element={<RoomMenu />} />
 
         {/*
       |--------------------------------------------------------------------------

@@ -47,6 +47,11 @@ import { useSocket } from "../context/SocketContext";
 import { getSelectedBillTemplate } from "../constants/billTemplates";
 import { orderCategoryNames, sortMenuEntries } from "../utils/menuOrder";
 import { requireApiBase, resolveMediaUrl } from "../utils/mediaUrl";
+import {
+  SPECIAL_INSTRUCTIONS_MAX,
+  createCartLineId,
+  normalizeSpecialInstructions,
+} from "../features/orders/itemSpecialInstructions";
 
 function categoryIcon(name) {
   const value = String(name || "").toLowerCase();
@@ -871,34 +876,47 @@ export default function CounterPOS() {
 
   // Quick lookup so product cards can show "already in cart" quantity badges
   const cartQtyMap = useMemo(() => {
-    return Object.fromEntries(cart.map((i) => [i._id, i.quantity]));
+    const map = {};
+    for (const line of cart) {
+      const catalogId = String(line._id);
+      map[catalogId] = (map[catalogId] || 0) + Number(line.quantity || 0);
+    }
+    return map;
   }, [cart]);
 
   const addToCart = (product) => {
-    const cartId = product._id;
+    const catalogId = product._id;
     setCart((prev) => {
-      const exist = prev.find((i) => i._id === cartId);
+      const exist = prev.find(
+        (i) =>
+          i._id === catalogId &&
+          !normalizeSpecialInstructions(i.specialInstructions || ""),
+      );
       if (exist) {
         return prev.map((i) =>
-          i._id === cartId ? { ...i, quantity: i.quantity + 1 } : i,
+          i.cartLineId === exist.cartLineId
+            ? { ...i, quantity: i.quantity + 1 }
+            : i,
         );
       }
       return [
         ...prev,
         {
           ...product,
+          cartLineId: createCartLineId(),
           quantity: 1,
+          specialInstructions: "",
           itemModel: product.catalogType === "COMBO" ? "Combo" : "MenuItem",
         },
       ];
     });
   };
 
-  const updateQty = (id, delta) => {
+  const updateQty = (cartLineId, delta) => {
     setCart((prev) =>
       prev
         .map((i) =>
-          i._id === id
+          i.cartLineId === cartLineId
             ? { ...i, quantity: Math.max(1, i.quantity + delta) }
             : i,
         )
@@ -906,8 +924,60 @@ export default function CounterPOS() {
     );
   };
 
-  const removeFromCart = (id) => {
-    setCart((prev) => prev.filter((i) => i._id !== id));
+  const removeFromCart = (cartLineId) => {
+    setCart((prev) => prev.filter((i) => i.cartLineId !== cartLineId));
+  };
+
+  const updateCartLineInstructions = (cartLineId, nextRaw) => {
+    setCart((prev) =>
+      prev.map((i) =>
+        i.cartLineId === cartLineId
+          ? {
+              ...i,
+              specialInstructions: String(nextRaw || "").slice(
+                0,
+                SPECIAL_INSTRUCTIONS_MAX,
+              ),
+            }
+          : i,
+      ),
+    );
+  };
+
+  const commitCartLineInstructions = (cartLineId) => {
+    setCart((prev) => {
+      const line = prev.find((i) => i.cartLineId === cartLineId);
+      if (!line) return prev;
+      const nextInstructions = normalizeSpecialInstructions(
+        line.specialInstructions,
+      );
+      const duplicate = prev.find(
+        (i) =>
+          i.cartLineId !== cartLineId &&
+          i._id === line._id &&
+          normalizeSpecialInstructions(i.specialInstructions) ===
+            nextInstructions,
+      );
+      if (duplicate) {
+        return prev
+          .map((i) => {
+            if (i.cartLineId === duplicate.cartLineId) {
+              return {
+                ...i,
+                specialInstructions: nextInstructions,
+                quantity: i.quantity + line.quantity,
+              };
+            }
+            return i;
+          })
+          .filter((i) => i.cartLineId !== cartLineId);
+      }
+      return prev.map((i) =>
+        i.cartLineId === cartLineId
+          ? { ...i, specialInstructions: nextInstructions }
+          : i,
+      );
+    });
   };
   const subtotal = cart.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
@@ -1048,7 +1118,7 @@ export default function CounterPOS() {
       });
 
       if (bestDiscount > 0) {
-        map[item._id] = bestDiscount;
+        map[item.cartLineId || item._id] = bestDiscount;
         totalDiscount += bestDiscount;
       }
     });
@@ -1617,7 +1687,10 @@ export default function CounterPOS() {
           price: i.price,
           quantity: i.quantity,
           itemModel: i.itemModel,
-          discount: itemDiscountMap[i._id] || 0,
+          discount: itemDiscountMap[i.cartLineId || i._id] || 0,
+          specialInstructions: normalizeSpecialInstructions(
+            i.specialInstructions || "",
+          ),
         })),
 
         subtotal,
@@ -1681,7 +1754,10 @@ export default function CounterPOS() {
             price: i.price,
             quantity: i.quantity,
             itemModel: i.itemModel,
-            discount: itemDiscountMap[i._id] || 0, // 🆕 per-item discount
+            discount: itemDiscountMap[i.cartLineId || i._id] || 0, // 🆕 per-item discount
+            specialInstructions: normalizeSpecialInstructions(
+              i.specialInstructions || "",
+            ),
           })),
           subtotal,
           discount: appliedDiscount,
@@ -1740,7 +1816,10 @@ export default function CounterPOS() {
 
           itemModel: i.itemModel,
 
-          discount: itemDiscountMap[i._id] || 0,
+          discount: itemDiscountMap[i.cartLineId || i._id] || 0,
+          specialInstructions: normalizeSpecialInstructions(
+            i.specialInstructions || "",
+          ),
         })),
       };
 
@@ -2237,39 +2316,66 @@ export default function CounterPOS() {
                   <div className="space-y-3">
                     {cart.map((item) => {
                       const image = menuImage(item.image);
+                      const lineId = item.cartLineId || item._id;
+                      const draft = String(item.specialInstructions || "");
+                      const lineDiscount =
+                        itemDiscountMap[lineId] || itemDiscountMap[item._id] || 0;
                       return (
-                        <div key={item._id} className="flex items-center gap-2">
-                          <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-slate-100">
-                            {image ? (
-                              <img src={image} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" />
-                            ) : (
-                              <div className="flex h-full items-center justify-center text-slate-300">
-                                <UtensilsCrossed className="h-4 w-4" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-xs font-bold text-slate-900">{item.name}</p>
-                            <p className="text-[11px] font-semibold text-slate-400">₹{item.price}</p>
-                            {itemDiscountMap[item._id] > 0 && (
-                              <p className="text-[10px] font-bold text-emerald-600">-₹{itemDiscountMap[item._id]} offer</p>
-                            )}
-                          </div>
-                          <div className="flex items-center gap-1 rounded-full border border-slate-200 px-1 py-0.5">
-                            <button type="button" onClick={() => updateQty(item._id, -1)} className="p-1 text-slate-500">
-                              <Minus className="h-3 w-3" />
+                        <div key={lineId} className="space-y-1.5">
+                          <div className="flex items-center gap-2">
+                            <div className="h-12 w-12 shrink-0 overflow-hidden rounded-xl bg-slate-100">
+                              {image ? (
+                                <img src={image} alt="" className="h-full w-full object-cover" loading="lazy" decoding="async" />
+                              ) : (
+                                <div className="flex h-full items-center justify-center text-slate-300">
+                                  <UtensilsCrossed className="h-4 w-4" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate text-xs font-bold text-slate-900">{item.name}</p>
+                              <p className="text-[11px] font-semibold text-slate-400">₹{item.price}</p>
+                              {lineDiscount > 0 && (
+                                <p className="text-[10px] font-bold text-emerald-600">-₹{lineDiscount} offer</p>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 rounded-full border border-slate-200 px-1 py-0.5">
+                              <button type="button" onClick={() => updateQty(lineId, -1)} className="p-1 text-slate-500">
+                                <Minus className="h-3 w-3" />
+                              </button>
+                              <span className="w-4 text-center text-xs font-black">{item.quantity}</span>
+                              <button type="button" onClick={() => updateQty(lineId, 1)} className="p-1 text-slate-500">
+                                <Plus className="h-3 w-3" />
+                              </button>
+                            </div>
+                            <p className="w-12 text-right text-xs font-black text-slate-800">
+                              ₹{(item.price * item.quantity).toFixed(0)}
+                            </p>
+                            <button type="button" onClick={() => removeFromCart(lineId)} className="text-slate-300 hover:text-rose-500">
+                              <Trash2 className="h-3.5 w-3.5" />
                             </button>
-                            <span className="w-4 text-center text-xs font-black">{item.quantity}</span>
-                            <button type="button" onClick={() => updateQty(item._id, 1)} className="p-1 text-slate-500">
-                              <Plus className="h-3 w-3" />
-                            </button>
                           </div>
-                          <p className="w-12 text-right text-xs font-black text-slate-800">
-                            ₹{(item.price * item.quantity).toFixed(0)}
-                          </p>
-                          <button type="button" onClick={() => removeFromCart(item._id)} className="text-slate-300 hover:text-rose-500">
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
+                          <div className="pl-14">
+                            <div className="mb-0.5 flex items-center justify-between gap-2">
+                              <label className="text-[10px] font-bold text-slate-400">
+                                Special instructions
+                              </label>
+                              <span className="text-[10px] text-slate-400">
+                                {draft.length}/{SPECIAL_INSTRUCTIONS_MAX}
+                              </span>
+                            </div>
+                            <textarea
+                              rows={2}
+                              maxLength={SPECIAL_INSTRUCTIONS_MAX}
+                              value={draft}
+                              onChange={(e) =>
+                                updateCartLineInstructions(lineId, e.target.value)
+                              }
+                              onBlur={() => commitCartLineInstructions(lineId)}
+                              placeholder="e.g. less spicy, no onions..."
+                              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-1.5 text-[11px] text-slate-700 outline-none focus:border-slate-400 resize-none"
+                            />
+                          </div>
                         </div>
                       );
                     })}

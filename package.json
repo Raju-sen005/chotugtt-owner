@@ -7,7 +7,22 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:room-qr": "node --test src/features/roomQr/roomQrPublicUrl.node.test.js src/features/roomQr/roomQrAccess.node.test.js src/features/roomQr/roomQrPrint.node.test.js src/features/public/RoomMenu.node.test.js src/features/public/roomMenuUx.node.test.js",
+    "test:room-menu": "node --test src/features/public/RoomMenu.node.test.js src/features/public/roomMenuUx.node.test.js src/features/public/qrOrderingSession.node.test.js",
+    "test:room-live-billing": "node --test src/features/orders/roomOrderLive.node.test.js",
+    "test:folio-invoice": "node --test src/features/folios/printFolioInvoice.node.test.js",
+    "test:room-cache": "node --test src/features/rooms/roomManagementCache.node.test.js",
+    "test:room-number-sort": "node --test src/features/rooms/roomNumberSort.node.test.js",
+    "test:booking-checkout-nav": "node --test src/features/bookings/bookingsCheckoutNav.node.test.js",
+    "test:folio-checkout": "node --test src/features/folios/folioCheckoutFlow.node.test.js src/features/folios/folioBillingTabs.node.test.js src/features/bookings/bookingsCheckoutNav.node.test.js src/features/folios/printFolioInvoice.node.test.js",
+    "test:qr-ordering-session": "node --test src/features/public/qrOrderingSession.node.test.js",
+    "test:public-menu": "node --test src/features/public/PublicMenu.node.test.js src/features/public/publicMenuUx.node.test.js src/features/public/qrOrderingSession.node.test.js",
+    "test:automatic-mode": "node --test src/features/orders/autoKotPrint.node.test.js src/features/orders/automaticMode.source.node.test.js src/features/orders/orderBillingGates.node.test.js",
+    "test:special-instructions": "node --test src/features/orders/itemSpecialInstructions.node.test.js",
+    "test:room-availability": "node --test src/features/bookings/bookingAvailability.node.test.js",
+    "test:guest-booking-ux": "node --test src/features/guests/guestsAccess.node.test.js src/features/guests/guestDocumentUpload.node.test.js src/features/bookings/bookingIdentityDocs.node.test.js src/features/bookings/bookingFormUx.node.test.js",
+    "test:subscription-visibility": "node --test src/components/subscriptionPlanVisibility.node.test.js"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.1",
