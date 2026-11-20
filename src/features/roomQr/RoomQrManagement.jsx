@@ -298,7 +298,7 @@ export default function RoomQrManagement() {
     const restaurantName =
       user?.restaurant?.name ||
       user?.restaurantName ||
-      "ChotuGTT";
+      "Transserve";
     const result = printRoomQrFromCanvas({
       canvas: qrCanvasRef.current,
       publicUrl: activeQr?.publicUrl,
@@ -389,11 +389,10 @@ export default function RoomQrManagement() {
             <Crown className="mt-0.5 h-6 w-6 text-amber-600" />
             <div>
               <h2 className="text-base font-bold text-amber-900">
-                PLUS feature required
+                This feature is not included in your current plan.
               </h2>
               <p className="mt-1 text-sm text-amber-800">
-                Room QR Ordering requires an active PLUS plan with
-                ROOM_QR_ORDERING. PRO does not include this feature.
+                Contact your administrator to enable this feature.
               </p>
             </div>
           </div>

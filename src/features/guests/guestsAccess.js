@@ -1,6 +1,6 @@
 /**
- * PLUS + GUEST_MANAGEMENT access helpers (Milestone 6B.1).
- * Backend gates GUEST_MANAGEMENT as PLUS-only (not via PRO allFeatures).
+ * GUEST_MANAGEMENT access helpers.
+ * Entitlement from backend availableFeatures (not plan-string PLUS checks).
  */
 
 import {
@@ -8,6 +8,10 @@ import {
   normalizePlan,
   isFeatureNotAvailable,
 } from "../rooms/roomsAccess";
+import {
+  FEATURE_KEYS,
+  hasAvailableFeature,
+} from "../subscription/featureAccess";
 
 export {
   ALLOWED_DOCUMENT_ACCEPT,
@@ -30,12 +34,14 @@ export {
 } from "./guestProfileDisplay";
 
 /**
- * Active PLUS subscription entitles GUEST_MANAGEMENT.
- * PRO / other plans → false.
+ * Active subscription + GUEST_MANAGEMENT entitlement.
  */
 export function hasGuestManagementAccess(user) {
   if (!user || user.role === "SUPERADMIN") return false;
-  return isSubscriptionActive(user) && normalizePlan(user) === "PLUS";
+  return (
+    isSubscriptionActive(user) &&
+    hasAvailableFeature(user, FEATURE_KEYS.GUEST_MANAGEMENT)
+  );
 }
 
 export function canWriteGuests(user) {
@@ -52,7 +58,7 @@ export function getGuestApiErrorMessage(error, fallback = "Request failed") {
   if (data?.code === "FEATURE_NOT_AVAILABLE") {
     return (
       data.message ||
-      "Guest Management requires an active PLUS subscription."
+      "This feature is not included in your current plan."
     );
   }
   // Blob error responses may need parsing by caller

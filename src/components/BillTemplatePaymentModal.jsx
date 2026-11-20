@@ -40,7 +40,7 @@ export default function BillTemplatePaymentModal({ template, onClose, onSuccess 
         key: order.keyId,
         amount: order.amount,
         currency: order.currency,
-        name: "ChotuGTT",
+        name: "Transserve",
         description: `${template.name} bill template license`,
         order_id: order.orderId,
         prefill: { name: order.restaurantName },

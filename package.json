@@ -22,7 +22,9 @@
     "test:special-instructions": "node --test src/features/orders/itemSpecialInstructions.node.test.js",
     "test:room-availability": "node --test src/features/bookings/bookingAvailability.node.test.js",
     "test:guest-booking-ux": "node --test src/features/guests/guestsAccess.node.test.js src/features/guests/guestDocumentUpload.node.test.js src/features/bookings/bookingIdentityDocs.node.test.js src/features/bookings/bookingFormUx.node.test.js",
-    "test:subscription-visibility": "node --test src/components/subscriptionPlanVisibility.node.test.js"
+    "test:subscription-visibility": "node --test src/components/subscriptionPlanVisibility.node.test.js",
+    "test:sidebar-hotel": "node --test src/components/sidebarHotelNav.node.test.js",
+    "test:subscription-renewal-ux": "node --test src/components/subscriptionRenewalPhase3c1.node.test.js src/features/subscription/commercialCatalog.node.test.js"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.1",

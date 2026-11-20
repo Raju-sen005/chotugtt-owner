@@ -22,6 +22,12 @@ import { useSocket } from "../../context/SocketContext";
 import { useAuth } from "../../context/AuthContext";
 import { orderCategoryNames, sortMenuEntries } from "../../utils/menuOrder";
 import { resolveMediaUrl } from "../../utils/mediaUrl";
+import {
+  FEATURE_KEYS,
+  hasAvailableFeature,
+  isFeatureNotAvailableError,
+} from "../subscription/featureAccess";
+import { isSubscriptionActive } from "../rooms/roomsAccess";
 
 export default function MenuCatalog() {
   const queryClient = useQueryClient();
@@ -83,21 +89,27 @@ export default function MenuCatalog() {
   });
 
   const isApproved = restaurantProfile?.isApproved === true;
-  const currentPlan = String(restaurantProfile?.subscriptionPlan || "")
-    .trim()
-    .toUpperCase();
-
-  const isStarterPlan = currentPlan === "STARTER";
+  const canUseAiMenu =
+    isSubscriptionActive(user) &&
+    hasAvailableFeature(user, FEATURE_KEYS.AI_MENU);
   const [showUpgradePopup, setShowUpgradePopup] = useState(false);
   const { data: aiStatus } = useQuery({
     queryKey: ["ai-menu-status", restaurantId],
     queryFn: async () => {
-      const res = await axios.get(
-        `${import.meta.env.VITE_APP_API_BASE}/menu/admin/menu/ai-status`,
-        { withCredentials: true },
-      );
-      return res.data.data;
+      try {
+        const res = await axios.get(
+          `${import.meta.env.VITE_APP_API_BASE}/menu/admin/menu/ai-status`,
+          { withCredentials: true },
+        );
+        return res.data.data;
+      } catch (error) {
+        if (isFeatureNotAvailableError(error)) {
+          return { locked: true, featureUnavailable: true };
+        }
+        throw error;
+      }
     },
+    enabled: !!restaurantId && canUseAiMenu,
     staleTime: 60_000,
   });
 
@@ -790,7 +802,7 @@ export default function MenuCatalog() {
       </div> */}
       <div className="-m-4 bg-[var(--background)] p-4 font-sans md:-m-6 md:p-5 lg:-m-8 lg:p-5">
         <div className="grid items-stretch gap-3 xl:grid-cols-[minmax(0,1fr)_280px]">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[var(--primary)] via-[var(--primary)] to-[var(--secondary)] p-5 text-white">
+          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-rose-500 via-rose-500 to-orange-400 p-5 text-white">
             <div className="relative z-10 flex flex-wrap items-start justify-between gap-4">
               <div className="flex items-start gap-3">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
@@ -854,7 +866,7 @@ export default function MenuCatalog() {
             <button
               type="button"
               onClick={() => {
-                if (isStarterPlan) {
+                if (!canUseAiMenu) {
                   setShowUpgradePopup(true);
                   return;
                 }

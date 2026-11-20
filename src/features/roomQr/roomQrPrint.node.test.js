@@ -28,13 +28,13 @@ describe("[Unit] escapeHtml", () => {
 });
 
 describe("[Unit] buildRoomQrPrintHtml", () => {
-  it("includes ChotuGTT branding, room number, QR image, A4 CSS, and guest hint", () => {
+  it("includes Transserve branding, room number, QR image, A4 CSS, and guest hint", () => {
     const html = buildRoomQrPrintHtml({
       restaurantName: `Joe's <Inn>`,
       roomNumber: "12",
       dataUrl: "data:image/png;base64,abc",
     });
-    assert.match(html, /ChotuGTT/);
+    assert.match(html, /Transserve/);
     assert.match(html, /Joe&#039;s &lt;Inn&gt;/);
     assert.match(html, /Room 12/);
     assert.match(html, /data:image\/png;base64,abc/);

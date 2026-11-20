@@ -3,6 +3,12 @@ import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
 import AuthShell, { AuthField, authInputClass } from "./AuthShell";
+import {
+  buildWelcomePayloadFromPendingResponse,
+  clearPendingRegistration,
+  writeWelcomePayload,
+} from "./pendingRegistration";
+import { resolveMerchantHomePath } from "../../components/sidebarHotelNav";
 
 export default function Login({ onSwitchToSignup }) {
   const { login } = useAuth();
@@ -13,6 +19,22 @@ export default function Login({ onSwitchToSignup }) {
   const [authError, setAuthError] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
+  const goToWelcome = (responseData) => {
+    const welcome = buildWelcomePayloadFromPendingResponse(
+      responseData,
+      email,
+    );
+    if (welcome) {
+      writeWelcomePayload(welcome);
+    } else {
+      writeWelcomePayload({
+        approvalStatus: "PENDING_APPROVAL",
+        ownerEmail: email,
+      });
+    }
+    navigate("/registration-success", { replace: true });
+  };
+
   const handleLoginSubmit = async (e) => {
     e.preventDefault();
 
@@ -21,6 +43,13 @@ export default function Login({ onSwitchToSignup }) {
       setIsLoggingIn(true);
 
       const response = await login(email, password);
+
+      if (response && response.requiresApproval) {
+        goToWelcome(response);
+        return;
+      }
+
+      clearPendingRegistration();
 
       if (response && response.requiresSubscription) {
         navigate("/subscription-checkout", {
@@ -31,9 +60,16 @@ export default function Login({ onSwitchToSignup }) {
         return;
       }
 
-      navigate("/");
+      // Hotel-only plans land on /rooms; others Overview; SUPERADMIN /super-admin.
+      const authenticatedUser = response?.data || null;
+      navigate(resolveMerchantHomePath(authenticatedUser), { replace: true });
     } catch (err) {
       const responseData = err.response?.data;
+
+      if (responseData?.requiresApproval || responseData?.code === "PENDING_APPROVAL") {
+        goToWelcome(responseData);
+        return;
+      }
 
       if (responseData && responseData.requiresSubscription) {
         navigate("/subscription-checkout", {
@@ -62,7 +98,7 @@ export default function Login({ onSwitchToSignup }) {
       ]}
       footer={
         <>
-          New to ChotuGTT?{" "}
+          New to Transserve?{" "}
           <button
             type="button"
             onClick={onSwitchToSignup}

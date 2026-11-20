@@ -13,7 +13,7 @@ import { QRCodeCanvas } from "qrcode.react";
 import { useMemo, useRef } from "react";
 import { QR_STANDEE_THEMES } from "./qrStandeeThemes";
 
-// const DEMO_URL = "https://chotugtt.com";
+// const DEMO_URL = "https://Transserve.com";
 
 function ThemePreview({
   theme,
@@ -227,7 +227,7 @@ function ThemePreview({
             >
               Powered by{" "}
               <span className="font-black" style={{ color: primary }}>
-                ChotuGTT
+                Transserve
               </span>
             </p>
           </div>

@@ -9,6 +9,7 @@ import {
   ClipboardList,
   RefreshCw,
 } from "lucide-react";
+import { asDisplayText, displayPhone } from "../../utils/displayText";
 
 const API = import.meta.env.VITE_APP_API_BASE;
 const dataOf = (r) => r?.data?.data ?? r?.data?.items ?? r?.data ?? [];
@@ -650,7 +651,7 @@ export default function SupplyAdmin() {
       <header className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-stone-200 bg-white px-5 py-5 shadow-sm">
         <div>
           <p className="text-xs font-bold uppercase tracking-wider text-red-600">
-            ChotuGTT · Super Admin
+            Transserve · Super Admin
           </p>
           <h1 className="text-2xl font-bold tracking-tight text-stone-900">
             Supply Management
@@ -1786,12 +1787,18 @@ export default function SupplyAdmin() {
                       <p className="text-xs font-medium text-slate-500">
                         Contact Number
                       </p>
-                      {selectedOrder.deliveryAddress?.phone ? (
+                      {displayPhone(
+                        selectedOrder.deliveryAddress?.phone,
+                        "",
+                      ) ? (
                         <a
-                          href={`tel:${selectedOrder.deliveryAddress.phone}`}
+                          href={`tel:${displayPhone(selectedOrder.deliveryAddress?.phone, "")}`}
                           className="mt-1 inline-block font-semibold text-blue-600 hover:underline"
                         >
-                          {selectedOrder.deliveryAddress.phone}
+                          {displayPhone(
+                            selectedOrder.deliveryAddress?.phone,
+                            "",
+                          )}
                         </a>
                       ) : (
                         <p className="mt-1 font-semibold text-slate-400">
@@ -1805,7 +1812,10 @@ export default function SupplyAdmin() {
                         Address
                       </p>
                       <p className="mt-1 font-medium leading-6 text-slate-800">
-                        {selectedOrder.deliveryAddress?.addressLine || "—"}
+                        {asDisplayText(
+                          selectedOrder.deliveryAddress?.addressLine,
+                          "—",
+                        )}
                       </p>
                     </div>
 

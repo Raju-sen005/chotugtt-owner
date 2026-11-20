@@ -1,7 +1,12 @@
 /**
- * PLUS + ROOM_MANAGEMENT access helpers for Rooms Management (Milestone 6A).
- * PRO must not receive access — backend also gates ROOM_MANAGEMENT as PLUS-only.
+ * ROOM_MANAGEMENT access helpers.
+ * Entitlement comes from backend availableFeatures (not plan-string PLUS checks).
  */
+
+import {
+  FEATURE_KEYS,
+  hasAvailableFeature,
+} from "../subscription/featureAccess";
 
 export const ROOM_TYPES = Object.freeze([
   "Standard",
@@ -50,12 +55,14 @@ export function isSubscriptionActive(user) {
 }
 
 /**
- * Active PLUS subscription entitles ROOM_MANAGEMENT.
- * PRO / STARTER / BASIC / PREMIUM / TRIAL → false.
+ * Active subscription + ROOM_MANAGEMENT entitlement.
  */
 export function hasRoomManagementAccess(user) {
   if (!user || user.role === "SUPERADMIN") return false;
-  return isSubscriptionActive(user) && normalizePlan(user) === "PLUS";
+  return (
+    isSubscriptionActive(user) &&
+    hasAvailableFeature(user, FEATURE_KEYS.ROOM_MANAGEMENT)
+  );
 }
 
 export function normalizeRoomStatus(value) {
@@ -79,7 +86,7 @@ export function getApiErrorMessage(error, fallback = "Request failed") {
   if (data?.code === "FEATURE_NOT_AVAILABLE") {
     return (
       data.message ||
-      "Rooms Management requires an active PLUS subscription."
+      "This feature is not included in your current plan."
     );
   }
   return data?.message || error?.message || fallback;

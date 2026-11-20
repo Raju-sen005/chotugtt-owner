@@ -38,17 +38,17 @@ export default function AuthShell({
             <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[var(--primary)] shadow-sm">
               {/* <ChefHat size={22} strokeWidth={2.25} /> */}
               <img
-                src="/ChotuGTT__1_-removebg-preview.png"
-                alt="ChotuGTT Logo"
-                className="h-6 w-6"
+                src="/Untitled.svg"
+                alt="Transserve"
+                className="h-7 w-7"
               />
             </span>
             <div className="leading-tight">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/70">
-                Restaurant
-              </p>
-              <p className="text-lg font-black tracking-tight">
-                Chotu<span className="text-white">GTT</span>
+              {/* <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/70">
+                Hospitality
+              </p> */}
+              <p className="text-lg font-black tracking-tight text-white">
+                Transserve
               </p>
             </div>
           </div>
@@ -70,7 +70,7 @@ export default function AuthShell({
         </div>
 
         <p className="relative hidden px-10 pb-10 text-xs text-white/55 lg:block">
-          Menu, orders, and billing for your restaurant.
+          A Complete Restaurant & Hospitality Platform
         </p>
       </aside>
 

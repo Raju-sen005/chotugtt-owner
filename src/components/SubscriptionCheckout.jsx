@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import CommercialCatalogPreview from "../features/subscription/CommercialCatalogPreview";
 import {
   ArrowRight,
   Check,
@@ -38,6 +39,12 @@ const RAZORPAY_SCRIPT_URL = "https://checkout.razorpay.com/v1/checkout.js";
 */
 
 const PLAN_COPY = Object.freeze({
+  /*
+  | PLAN_COPY legacy entries are renewal-only display helpers for existing
+  | OWNER accounts still on STARTER/BASIC/PREMIUM/PRO/PLUS. New acquisition
+  | uses CommercialCatalogPreview (11 commercial plans). Do not surface these
+  | as new-customer marketing options.
+  */
   TRIAL: {
     description:
       "Try the full restaurant workspace free for 7 days. The account is blocked when the trial ends.",
@@ -45,14 +52,15 @@ const PLAN_COPY = Object.freeze({
       "7 days only, once per restaurant",
       "Full workspace during the trial",
       "Account is blocked when the 7 days end",
-      "Choose Starter, Basic, Premium, Pro, or Plus to continue",
+      "Continue with a current Restaurant, Hotel, or Resort plan after trial",
     ],
     icon: Clock3,
     popular: false,
     buttonText: "Start 7-day free trial",
   },
   STARTER: {
-    description: "A simple yearly plan for getting started with ChotuGTT.",
+    description:
+      "Legacy yearly starter plan (existing customers / renewal only).",
     features: [
       "Counter POS",
       "Table QR ordering",
@@ -62,11 +70,11 @@ const PLAN_COPY = Object.freeze({
     ],
     icon: Sparkles,
     popular: false,
-    buttonText: "Choose Starter",
+    buttonText: "Renew Starter",
   },
   BASIC: {
     description:
-      "One year of restaurant operations, ordering, billing, and AI menu tools.",
+      "Legacy yearly Basic plan (existing customers / renewal only).",
     features: [
       "Counter POS",
       "Table QR ordering",
@@ -84,11 +92,11 @@ const PLAN_COPY = Object.freeze({
     ],
     icon: Sparkles,
     popular: true,
-    buttonText: "Choose Basic",
+    buttonText: "Renew Basic",
   },
   PREMIUM: {
     description:
-      "Basic for 1 year, plus one thermal printer. Nothing beyond that year and printer.",
+      "Legacy Premium plan with printer entitlement (existing customers / renewal only).",
     features: [
       "Everything in Basic",
       "Counter POS, table QR, and captain app",
@@ -98,27 +106,25 @@ const PLAN_COPY = Object.freeze({
     ],
     icon: Printer,
     popular: false,
-    buttonText: "Choose Premium",
+    buttonText: "Renew Premium",
   },
   PRO: {
     description:
-      "All current restaurant software features plus Event Management and future software upgrades. Does not include Hotel / Room Management (Plus).",
+      "Legacy Pro plan with Event Management (existing customers / renewal only).",
     features: [
       "Everything in Premium software",
       "Event Management",
       "WhatsApp bill and advanced analytics",
-      "All future restaurant software features",
       "Valid for 1 year only",
-      "Room Management requires Plus separately",
     ],
-    highlightedFeatures: ["Event Management", "All future restaurant software features"],
+    highlightedFeatures: ["Event Management"],
     icon: ShieldCheck,
     popular: false,
-    buttonText: "Choose Pro",
+    buttonText: "Renew Pro",
   },
   PLUS: {
     description:
-      "Independent Hotel / Room Management plan. Rooms, bookings, guests, room QR ordering, and folio. Does not include Event Management or full POS Pro features.",
+      "Legacy Plus hotel/room plan (existing customers / renewal only).",
     features: [
       "Rooms Management",
       "Room Billing",
@@ -126,7 +132,6 @@ const PLAN_COPY = Object.freeze({
       "Room QR ordering",
       "Room Folio billing",
       "Valid for 1 year only",
-      "Event Management requires Pro separately",
     ],
     highlightedFeatures: [
       "Rooms Management",
@@ -135,7 +140,7 @@ const PLAN_COPY = Object.freeze({
     ],
     icon: Sparkles,
     popular: false,
-    buttonText: "Choose Plus",
+    buttonText: "Renew Plus",
   },
 });
 
@@ -293,7 +298,12 @@ export default function SubscriptionCheckout() {
   const { refreshSession, user } = useAuth();
 
   const [plans, setPlans] = useState([]);
+  const [acquisitionPlans, setAcquisitionPlans] = useState([]);
   const [plansLoading, setPlansLoading] = useState(true);
+  const [activeCategory, setActiveCategory] = useState("RESTAURANT");
+  /** OWNER renewal audience from server: COMMERCIAL | LEGACY */
+  const [renewalAudienceMode, setRenewalAudienceMode] = useState(null);
+  const [renewalPlanFamily, setRenewalPlanFamily] = useState(null);
 
   const [loadingPlan, setLoadingPlan] = useState(null);
 
@@ -311,6 +321,25 @@ export default function SubscriptionCheckout() {
 
   const paymentTimeoutRef = useRef(null);
 
+  const paymentInFlightRef = useRef(false);
+
+  const pendingAutoPayRef = useRef(false);
+
+  /*
+  |--------------------------------------------------------------------------
+  | Mode
+  |--------------------------------------------------------------------------
+  |
+  | Logged-in OWNER with a restaurant → renewal (Razorpay / start-trial).
+  | Everyone else → acquisition (public plans → signup redirect).
+  |
+  |--------------------------------------------------------------------------
+  */
+
+  const isOwnerRenewal = Boolean(
+    user?.role === "OWNER" && (user?.restaurantId || user?.restaurant?.id),
+  );
+
   /*
   |--------------------------------------------------------------------------
   | Plan
@@ -319,6 +348,8 @@ export default function SubscriptionCheckout() {
 
   const planList = plans;
   const planSliderRef = useRef(null);
+
+  const apiBase = import.meta.env.VITE_APP_API_BASE || "";
 
   /*
   |--------------------------------------------------------------------------
@@ -390,50 +421,86 @@ export default function SubscriptionCheckout() {
   useEffect(() => {
     let cancelled = false;
 
+    const mapLegacyRenewalPlans = (serverPlans) =>
+      (Array.isArray(serverPlans) ? serverPlans : [])
+        .filter((plan) => PLAN_COPY[plan.code])
+        .map((plan) => ({
+          ...plan,
+          ...PLAN_COPY[plan.code],
+          code: plan.code,
+          name: plan.name,
+          amount: plan.amount,
+          trial: plan.trial === true,
+          buttonText:
+            plan.trial === true
+              ? "Start 7-day free trial"
+              : `Renew ${plan.name}`,
+        }));
+
     const loadPlans = async () => {
+      setPlansLoading(true);
       try {
-        const response = await axios.get(
-          `${import.meta.env.VITE_APP_API_BASE}/payments/plans`,
-          { withCredentials: true },
-        );
+        if (isOwnerRenewal) {
+          const response = await axios.get(`${apiBase}/payments/renewal-plans`, {
+            withCredentials: true,
+          });
+          if (cancelled || !mountedRef.current) return;
+          const payload = response.data?.data || {};
+          const serverPlans = Array.isArray(payload.plans) ? payload.plans : [];
+          const mode =
+            payload.audienceMode === "COMMERCIAL" ? "COMMERCIAL" : "LEGACY";
+          const family = String(payload.planFamily || "")
+            .trim()
+            .toUpperCase();
+          setRenewalAudienceMode(mode);
+          setRenewalPlanFamily(family || null);
 
-        if (cancelled || !mountedRef.current) {
-          return;
+          if (mode === "COMMERCIAL") {
+            // Server already filtered to the tenant's commercial family.
+            setAcquisitionPlans(
+              serverPlans.filter((p) => p.planFamily !== "LEGACY" && !p.trial),
+            );
+            setPlans([]);
+            if (["RESTAURANT", "HOTEL", "RESORT"].includes(family)) {
+              setActiveCategory(family);
+            }
+          } else {
+            setAcquisitionPlans([]);
+            setPlans(mapLegacyRenewalPlans(serverPlans));
+          }
+        } else {
+          const response = await axios.get(`${apiBase}/payments/plans`, {
+            withCredentials: true,
+          });
+          if (cancelled || !mountedRef.current) return;
+          const serverPlans = Array.isArray(response.data?.data)
+            ? response.data.data
+            : [];
+          setRenewalAudienceMode(null);
+          setRenewalPlanFamily(null);
+          setAcquisitionPlans(
+            serverPlans.filter((p) => !p.trial && p.planFamily !== "LEGACY"),
+          );
+          setPlans(
+            serverPlans
+              .filter((p) => p.trial === true)
+              .map((p) => ({
+                ...p,
+                ...PLAN_COPY.TRIAL,
+                buttonText: PLAN_COPY.TRIAL.buttonText,
+              })),
+          );
         }
 
-        const serverPlans = Array.isArray(response.data?.data)
-          ? response.data.data
-          : [];
-
-        const nextPlans = serverPlans
-          .filter((plan) => PLAN_COPY[plan.code])
-          .map((plan) => ({
-            ...plan,
-            ...PLAN_COPY[plan.code],
-            code: plan.code,
-            name: plan.name,
-            amount: plan.amount,
-            trial: plan.trial === true,
-          }));
-
-        setPlans(nextPlans);
-
-        if (nextPlans.length === 0) {
-          setError("Subscription plans are unavailable right now.");
-        }
+        if (mountedRef.current) setError("");
       } catch (loadError) {
-        if (cancelled || !mountedRef.current) {
-          return;
-        }
-
+        if (cancelled || !mountedRef.current) return;
         setError(
           loadError?.response?.data?.message ||
             "Unable to load subscription plans.",
         );
       } finally {
-        if (!cancelled && mountedRef.current) {
-          setPlansLoading(false);
-        }
+        if (!cancelled && mountedRef.current) setPlansLoading(false);
       }
     };
 
@@ -442,7 +509,7 @@ export default function SubscriptionCheckout() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [apiBase, isOwnerRenewal]);
 
   /*
   |--------------------------------------------------------------------------
@@ -460,45 +527,289 @@ export default function SubscriptionCheckout() {
     window.location.replace("/");
   }, [clearPaymentTimeout]);
 
-  const handleStartTrial = useCallback(() => {
-    if (loadingPlan) {
+  const finishSuccessfulPayment = useCallback(async () => {
+    clearPaymentTimeout();
+    setPaymentStage("Refreshing your subscription...");
+
+    try {
+      if (typeof refreshSession === "function") {
+        await refreshSession();
+      }
+    } catch {
+      // Dashboard reload still picks up /auth/me.
+    }
+
+    redirectToDashboard();
+  }, [clearPaymentTimeout, redirectToDashboard, refreshSession]);
+
+  const handleStartTrialRenewal = useCallback(async () => {
+    if (loadingPlan || paymentInFlightRef.current) {
       return;
     }
 
+    paymentInFlightRef.current = true;
+    setLoadingPlan("TRIAL");
     setError("");
+    setPaymentStage("Starting free trial...");
 
-    navigate("/?auth=signup&plan=TRIAL");
-  }, [loadingPlan, navigate]);
+    try {
+      const response = await axios.post(
+        `${apiBase}/payments/start-trial`,
+        {},
+        { withCredentials: true },
+      );
+
+      if (!response.data?.success) {
+        throw new Error(
+          response.data?.message || "Unable to start the free trial.",
+        );
+      }
+
+      await finishSuccessfulPayment();
+    } catch (trialError) {
+      if (mountedRef.current) {
+        setError(
+          trialError?.response?.data?.message ||
+            trialError?.message ||
+            "Unable to start the free trial.",
+        );
+        setPaymentStage("");
+      }
+    } finally {
+      paymentInFlightRef.current = false;
+      if (mountedRef.current) {
+        setLoadingPlan(null);
+      }
+    }
+  }, [apiBase, finishSuccessfulPayment, loadingPlan]);
+
+  const openRazorpayCheckout = useCallback(
+    (orderPayload, planCode) => {
+      if (!window.Razorpay) {
+        setError("Payment gateway is not ready. Please refresh and try again.");
+        setLoadingPlan(null);
+        paymentInFlightRef.current = false;
+        return;
+      }
+
+      const amountPaise = Math.round(Number(orderPayload.amount) * 100);
+
+      const options = {
+        key: orderPayload.keyId,
+        amount: amountPaise,
+        currency: orderPayload.currency || PAYMENT_CURRENCY,
+        name: "Transserve",
+        description: `${orderPayload.planName || planCode} subscription`,
+        order_id: orderPayload.orderId,
+        prefill: {
+          name: orderPayload.restaurant?.name || user?.name || "",
+          email: orderPayload.restaurant?.email || user?.email || "",
+          contact: orderPayload.restaurant?.phone || "",
+        },
+        handler: async (razorpayResponse) => {
+          try {
+            if (mountedRef.current) {
+              setPaymentStage("Verifying payment...");
+            }
+
+            const verifyRes = await axios.post(
+              `${apiBase}/payments/verify`,
+              {
+                razorpay_payment_id: razorpayResponse.razorpay_payment_id,
+                razorpay_order_id: razorpayResponse.razorpay_order_id,
+                razorpay_signature: razorpayResponse.razorpay_signature,
+              },
+              { withCredentials: true },
+            );
+
+            if (!verifyRes.data?.success) {
+              throw new Error(
+                verifyRes.data?.message || "Payment verification failed.",
+              );
+            }
+
+            await finishSuccessfulPayment();
+          } catch (verifyError) {
+            if (mountedRef.current) {
+              setError(
+                verifyError?.response?.data?.message ||
+                  verifyError?.message ||
+                  "Payment verification failed.",
+              );
+              setPaymentStage("");
+              setLoadingPlan(null);
+            }
+            paymentInFlightRef.current = false;
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            if (mountedRef.current) {
+              setPaymentStage("");
+              setLoadingPlan(null);
+              setError("Payment was cancelled. No subscription was activated.");
+            }
+            paymentInFlightRef.current = false;
+            clearPaymentTimeout();
+          },
+        },
+      };
+
+      clearPaymentTimeout();
+      paymentTimeoutRef.current = window.setTimeout(() => {
+        if (mountedRef.current) {
+          setError("Payment timed out. Please try again.");
+          setPaymentStage("");
+          setLoadingPlan(null);
+        }
+        paymentInFlightRef.current = false;
+        try {
+          razorpayInstanceRef.current?.close();
+        } catch {
+          // ignore
+        }
+      }, PAYMENT_TIMEOUT_MS);
+
+      const instance = new window.Razorpay(options);
+      razorpayInstanceRef.current = instance;
+      instance.on("payment.failed", (failure) => {
+        if (mountedRef.current) {
+          setError(
+            failure?.error?.description ||
+              "Payment failed. No subscription was activated.",
+          );
+          setPaymentStage("");
+          setLoadingPlan(null);
+        }
+        paymentInFlightRef.current = false;
+        clearPaymentTimeout();
+      });
+      instance.open();
+      if (mountedRef.current) {
+        setPaymentStage("Complete payment in the Razorpay window...");
+      }
+    },
+    [
+      apiBase,
+      clearPaymentTimeout,
+      finishSuccessfulPayment,
+      user?.email,
+      user?.name,
+    ],
+  );
 
   /*
   |--------------------------------------------------------------------------
-  | Payment
+  | Payment / acquisition CTA
   |--------------------------------------------------------------------------
   */
 
   const handlePayment = useCallback(
-    (planCode) => {
-      // Prevent multiple clicks
-      if (loadingPlan) {
+    async (planCode) => {
+      if (loadingPlan || paymentInFlightRef.current) {
         return;
       }
 
-      // Validate selected plan
-      const selectedPlan = plans.find((plan) => plan.code === planCode);
+      const selectedPlan =
+        plans.find((plan) => plan.code === planCode) ||
+        acquisitionPlans.find((plan) => plan.code === planCode);
 
       if (!selectedPlan) {
         setError("Invalid subscription plan selected.");
         return;
       }
 
-      // Clear any previous error
       setError("");
 
-      // Redirect to Register page
-      navigate(`/?auth=signup&plan=${encodeURIComponent(planCode)}`);
+      /*
+      | Acquisition (not logged-in OWNER): signup with plan + category.
+      */
+      if (!isOwnerRenewal) {
+        if (selectedPlan.trial) {
+          navigate("/?auth=signup&plan=TRIAL");
+          return;
+        }
+        const category =
+          selectedPlan.planFamily ||
+          selectedPlan.category ||
+          "RESTAURANT";
+        navigate(
+          `/?auth=signup&plan=${encodeURIComponent(planCode)}&category=${encodeURIComponent(category)}`,
+        );
+        return;
+      }
+
+      /*
+      | OWNER renewal: TRIAL → start-trial; paid → create-order + Razorpay.
+      */
+      if (selectedPlan.trial) {
+        await handleStartTrialRenewal();
+        return;
+      }
+
+      if (!razorpayReady) {
+        setError("Payment gateway is not ready. Please refresh and try again.");
+        return;
+      }
+
+      paymentInFlightRef.current = true;
+      setLoadingPlan(planCode);
+      setPaymentStage("Creating secure payment order...");
+
+      try {
+        const orderRes = await axios.post(
+          `${apiBase}/payments/create-order`,
+          { plan: planCode },
+          {
+            withCredentials: true,
+            headers: {
+              "Idempotency-Key": createIdempotencyKey(planCode),
+            },
+          },
+        );
+
+        if (!orderRes.data?.success || !orderRes.data?.data?.orderId) {
+          throw new Error(
+            orderRes.data?.message || "Unable to create payment order.",
+          );
+        }
+
+        openRazorpayCheckout(orderRes.data.data, planCode);
+      } catch (orderError) {
+        paymentInFlightRef.current = false;
+        if (mountedRef.current) {
+          setError(
+            orderError?.response?.data?.message ||
+              orderError?.message ||
+              "Unable to create payment order.",
+          );
+          setPaymentStage("");
+          setLoadingPlan(null);
+        }
+      }
     },
-    [loadingPlan, plans, navigate],
+    [
+      apiBase,
+      handleStartTrialRenewal,
+      isOwnerRenewal,
+      loadingPlan,
+      navigate,
+      openRazorpayCheckout,
+      plans,
+      acquisitionPlans,
+      razorpayReady,
+    ],
   );
+
+  /*
+  | Online Razorpay registration handoff is disabled.
+  | New registrations use manual SuperAdmin approval.
+  | Clear any leftover pending-checkout marker without opening Checkout.
+  */
+  useEffect(() => {
+    if (typeof sessionStorage === "undefined") return;
+    sessionStorage.removeItem("chotugtt_pending_checkout_plan");
+  }, []);
 
   /*
   |--------------------------------------------------------------------------
@@ -538,18 +849,18 @@ export default function SubscriptionCheckout() {
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[var(--primary)] shadow-sm">
               {/* <ChefHat size={20} strokeWidth={2.25} /> */}
               <img
-                src="/ChotuGTT__1_-removebg-preview.png"
-                alt="ChotuGTT Logo"
+                src="/Untitled.svg"
+                alt="Transserve Logo"
                 className="h-6 w-6"
               />
             </span>
 
             <div className="min-w-0 leading-tight">
-              <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">
+              {/* <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">
                 Restaurant
-              </p>
+              </p> */}
               <p className="truncate text-base font-black tracking-tight sm:text-lg">
-                Chotu<span className="text-[var(--secondary)]">GTT</span>
+               Transserve
               </p>
             </div>
           </div>
@@ -618,46 +929,67 @@ export default function SubscriptionCheckout() {
             ============================================================ */}
 
         <section className="mx-auto max-w-3xl text-center">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-rose-100 bg-white px-3.5 py-1.5 text-[11px] font-bold text-rose-600 shadow-sm">
-            <ShieldCheck size={14} />
-            Choose a plan
-          </div>
-
-          <h1 className="text-3xl font-black tracking-[-0.03em] text-slate-950 sm:text-4xl lg:text-5xl">
-            Start free, or run
-            <span className="block text-rose-600">the full restaurant</span>
-          </h1>
-
-          <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
-            Trial lasts 7 days, then the restaurant account is blocked. Starter,
-            Basic, Premium, Pro, and Plus plans are available for your
-            restaurant. Premium includes one thermal printer. Pro covers
-            restaurant software and Event Management. Plus is the independent
-            Hotel / Room Management plan.
-          </p>
-
-          {/* Secure indicators */}
-
-          <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-[11px] font-semibold text-slate-500">
-            <span className="inline-flex items-center gap-1.5">
-              <CircleCheck size={14} className="text-emerald-500" />
-              7-day trial
-            </span>
-
-            <span className="hidden h-3 w-px bg-slate-200 sm:block" />
-
-            <span className="inline-flex items-center gap-1.5">
-              <CircleCheck size={14} className="text-emerald-500" />
-              Basic ₹4,000 / year
-            </span>
-
-            <span className="hidden h-3 w-px bg-slate-200 sm:block" />
-
-            <span className="inline-flex items-center gap-1.5">
-              <CircleCheck size={14} className="text-emerald-500" />
-              Premium includes a printer
-            </span>
-          </div>
+          {isOwnerRenewal ? (
+            <>
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-rose-100 bg-white px-3.5 py-1.5 text-[11px] font-bold text-rose-600 shadow-sm">
+                <ShieldCheck size={14} />
+                Renew your plan
+              </div>
+              <h1 className="text-3xl font-black tracking-[-0.03em] text-slate-950 sm:text-4xl lg:text-5xl">
+                Renew or extend
+                <span className="block text-rose-600">your subscription</span>
+              </h1>
+              <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
+                Choose an eligible plan to renew. Amounts come from the server.
+                The free trial does not use payment and remains one-time per
+                restaurant.
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3.5 py-1.5 text-[11px] font-bold text-slate-700 shadow-sm">
+                <ShieldCheck size={14} className="text-rose-600" />
+                Transserve pricing
+              </div>
+              <h1 className="text-3xl font-black tracking-[-0.03em] text-slate-950 sm:text-4xl lg:text-5xl">
+                Choose the Right Plan for Your Business
+              </h1>
+              <p className="mx-auto mt-4 max-w-2xl text-sm leading-6 text-slate-500 sm:text-base">
+                Transserve helps restaurants, hotels, and resorts run operations
+                from one platform. All paid plans are annual. After registration,
+                our team contacts you for activation and payment — no online
+                checkout during signup.
+              </p>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-3 text-[11px] font-semibold text-slate-500">
+                <span className="inline-flex items-center gap-1.5">
+                  <CircleCheck size={14} className="text-emerald-500" />
+                  7-day free trial available
+                </span>
+                <span className="hidden h-3 w-px bg-slate-200 sm:block" />
+                <span className="inline-flex items-center gap-1.5">
+                  <CircleCheck size={14} className="text-emerald-500" />
+                  Annual pricing in INR
+                </span>
+                <span className="hidden h-3 w-px bg-slate-200 sm:block" />
+                <span className="inline-flex items-center gap-1.5">
+                  <CircleCheck size={14} className="text-emerald-500" />
+                  Manual activation after signup
+                </span>
+              </div>
+              <div className="mt-8">
+                <button
+                  type="button"
+                  onClick={() => handlePayment("TRIAL")}
+                  disabled={isBusy}
+                  className="inline-flex items-center gap-2 rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-900 shadow-sm transition hover:border-slate-400 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  <Clock3 size={16} className="text-rose-600" />
+                  Start 7-day free trial
+                  <ArrowRight size={16} />
+                </button>
+              </div>
+            </>
+          )}
         </section>
 
         {/* ============================================================
@@ -691,8 +1023,7 @@ export default function SubscriptionCheckout() {
             </p>
             <p className="mt-1 text-xs leading-5 text-emerald-700">
               The free trial cannot replace this subscription. Continue to the
-              dashboard, or choose Starter, Basic, Premium, Pro, or Plus below
-              to extend it.
+              dashboard, or renew with an eligible plan below.
             </p>
             <button
               type="button"
@@ -718,17 +1049,18 @@ export default function SubscriptionCheckout() {
         </div> */}
 
         {/* ============================================================
-            PLANS
+            OWNER RENEWAL — legacy-only cards (server-filtered)
             ============================================================ */}
 
+        {isOwnerRenewal && renewalAudienceMode === "LEGACY" ? (
         <section className="mx-auto mt-10 max-w-6xl">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-xl font-black tracking-tight text-slate-950 sm:text-2xl">
-                Plans made for your restaurant
+                Eligible renewal plans
               </h2>
               <p className="mt-1 text-xs font-medium text-slate-500 sm:text-sm">
-                Compare plans and choose what fits your business.
+                Compare eligible plans for your existing account.
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -901,7 +1233,11 @@ export default function SubscriptionCheckout() {
                     {isLoading ? (
                       <>
                         <Loader2 size={16} className="animate-spin" />
-                        {plan.trial ? "Starting trial..." : "Redirecting..."}
+                        {plan.trial
+                          ? "Starting trial..."
+                          : isOwnerRenewal
+                            ? "Opening checkout..."
+                            : "Redirecting..."}
                       </>
                     ) : (
                       <>
@@ -916,13 +1252,44 @@ export default function SubscriptionCheckout() {
                       ? hasActiveSubscription
                         ? "Trial is only for a restaurant with no active plan."
                         : "No payment required. One trial per restaurant."
-                      : "Choose your plan and continue to registration."}
+                      : isOwnerRenewal
+                        ? "Secure Razorpay payment. Your restaurant is charged the server plan amount."
+                        : "Choose your plan and continue to registration."}
                   </p>
                 </article>
               );
             })}
           </div>
         </section>
+        ) : null}
+
+        {!plansLoading &&
+          (!isOwnerRenewal || renewalAudienceMode === "COMMERCIAL") && (
+          <CommercialCatalogPreview
+            className={isOwnerRenewal ? "mt-10" : "mt-10"}
+            serverPlans={acquisitionPlans}
+            activeCategory={
+              isOwnerRenewal && renewalPlanFamily
+                ? renewalPlanFamily
+                : activeCategory
+            }
+            onCategoryChange={
+              isOwnerRenewal && renewalPlanFamily
+                ? undefined
+                : setActiveCategory
+            }
+            lockCategory={Boolean(isOwnerRenewal && renewalPlanFamily)}
+            busyPlan={loadingPlan}
+            showHero={!isOwnerRenewal}
+            ctaLabel={isOwnerRenewal ? "Renew / purchase" : "Get Started"}
+            onSelectPlan={(plan) => handlePayment(plan.code)}
+            footnote={
+              isOwnerRenewal
+                ? "Plans shown are limited to your business category. Amounts come from the server."
+                : "After you register, the Transserve team will contact your business regarding account activation and payment. Online checkout is not used during new registration."
+            }
+          />
+        )}
 
         {/* ============================================================
             TRUST / SECURITY
@@ -937,11 +1304,13 @@ export default function SubscriptionCheckout() {
 
               <div>
                 <h3 className="text-xs font-black text-slate-900">
-                  Secure payments
+                  {isOwnerRenewal ? "Secure payments" : "Verified catalog"}
                 </h3>
 
                 <p className="mt-1 text-[11px] leading-5 text-slate-500">
-                  Payment signatures are verified on the ChotuGTT backend.
+                  {isOwnerRenewal
+                    ? "Payment signatures are verified on the Transserve backend."
+                    : "Plan codes and annual prices match the approved commercial catalog."}
                 </p>
               </div>
             </div>
@@ -957,8 +1326,9 @@ export default function SubscriptionCheckout() {
                 </h3>
 
                 <p className="mt-1 text-[11px] leading-5 text-slate-500">
-                  Your restaurant identity is derived from your authenticated
-                  session.
+                  {isOwnerRenewal
+                    ? "Your restaurant identity is derived from your authenticated session."
+                    : "New accounts stay pending until SuperAdmin activation. No paid features unlock early."}
                 </p>
               </div>
             </div>
@@ -970,12 +1340,13 @@ export default function SubscriptionCheckout() {
 
               <div>
                 <h3 className="text-xs font-black text-slate-900">
-                  Instant activation
+                  {isOwnerRenewal ? "Plan activation" : "Team activation"}
                 </h3>
 
                 <p className="mt-1 text-[11px] leading-5 text-slate-500">
-                  After successful verification, the selected 1-year plan is
-                  activated automatically. The Basic trial needs no payment.
+                  {isOwnerRenewal
+                    ? "After successful verification, the selected plan is activated for your restaurant."
+                    : "After registration, our team contacts you for verification, payment, and activation."}
                 </p>
               </div>
             </div>
@@ -989,7 +1360,9 @@ export default function SubscriptionCheckout() {
         <div className="mt-8 flex flex-col items-center justify-center gap-2 text-center">
           <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-400">
             <LockKeyhole size={13} />
-            Secure SSL encrypted checkout
+            {isOwnerRenewal
+              ? "Secure SSL encrypted checkout"
+              : "Registration leads to awaiting-approval — no online payment step"}
           </div>
 
           <p className="text-[10px] font-medium text-slate-400">

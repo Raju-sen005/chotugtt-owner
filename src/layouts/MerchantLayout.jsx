@@ -7,12 +7,24 @@ import { Menu, X } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Navbar from "../components/Navbar";
 import GlobalOrderAlert from "../components/GlobalOrderAlert";
+import {
+  isHotelOnlyPlan,
+  resolveMerchantHomePath,
+} from "../components/sidebarHotelNav";
+import {
+  FEATURE_KEYS,
+  hasAvailableFeature,
+  hasAnyAvailableFeature,
+} from "../features/subscription/featureAccess";
 
 const LiveOrderMonitor = lazy(
   () => import("../features/orders/LiveOrderMonitor"),
 );
 const DashboardOverview = lazy(
   () => import("../features/dashboard/DashboardOverview"),
+);
+const HotelOverview = lazy(
+  () => import("../features/dashboard/HotelOverview"),
 );
 const MenuCatalog = lazy(() => import("../features/menu/MenuCatalog"));
 const StoreSettings = lazy(() => import("../features/settings/StoreSettings"));
@@ -56,10 +68,22 @@ function PageLoading() {
   );
 }
 
+function FeatureRoute({ user, feature, anyOf, children, fallback }) {
+  const allowed = anyOf
+    ? hasAnyAvailableFeature(user, anyOf)
+    : hasAvailableFeature(user, feature);
+  if (!allowed) {
+    return <Navigate to={fallback} replace />;
+  }
+  return children;
+}
+
 export default function MerchantLayout() {
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
   const { user } = useAuth();
   const isSuperAdmin = user?.role === "SUPERADMIN";
+  const hotelOnlyPlan = !isSuperAdmin && isHotelOnlyPlan(user);
+  const merchantHomePath = resolveMerchantHomePath(user);
 
   useEffect(() => {
     if (!isMobileSidebarOpen) return undefined;
@@ -95,7 +119,7 @@ export default function MerchantLayout() {
           GLOBAL ORDER ALERT
           ===================================================== */}
 
-      <GlobalOrderAlert />
+      {!hotelOnlyPlan ? <GlobalOrderAlert /> : null}
 
       {/* =====================================================
           DESKTOP SIDEBAR
@@ -266,37 +290,251 @@ export default function MerchantLayout() {
                 </>
               ) : (
                 <>
-                  <Route path="/" element={<DashboardOverview />} />
+                  <Route
+                    path="/"
+                    element={
+                      hotelOnlyPlan ? (
+                        <HotelOverview />
+                      ) : (
+                        <DashboardOverview />
+                      )
+                    }
+                  />
 
-                  <Route path="/orders" element={<LiveOrderMonitor />} />
+                  <Route
+                    path="/orders"
+                    element={
+                      hotelOnlyPlan ? (
+                        <Navigate to={merchantHomePath} replace />
+                      ) : (
+                        <FeatureRoute
+                          user={user}
+                          feature={FEATURE_KEYS.POS}
+                          fallback={merchantHomePath}
+                        >
+                          <LiveOrderMonitor />
+                        </FeatureRoute>
+                      )
+                    }
+                  />
 
-                  <Route path="/menu" element={<MenuCatalog />} />
-                  <Route path="/supply" element={<SupplyStore />} />
-                  <Route path="/settings" element={<StoreSettings />} />
+                  <Route
+                    path="/menu"
+                    element={
+                      hotelOnlyPlan ? (
+                        <Navigate to={merchantHomePath} replace />
+                      ) : (
+                        <FeatureRoute
+                          user={user}
+                          feature={FEATURE_KEYS.MENU}
+                          fallback={merchantHomePath}
+                        >
+                          <MenuCatalog />
+                        </FeatureRoute>
+                      )
+                    }
+                  />
+                  <Route
+                    path="/supply"
+                    element={
+                      hotelOnlyPlan ? (
+                        <Navigate to={merchantHomePath} replace />
+                      ) : (
+                        <SupplyStore />
+                      )
+                    }
+                  />
+                  <Route
+                    path="/settings"
+                    element={
+                      hotelOnlyPlan ? (
+                        <Navigate to={merchantHomePath} replace />
+                      ) : (
+                        <StoreSettings />
+                      )
+                    }
+                  />
 
-                  <Route path="/table-monitor" element={<TableMonitor />} />
+                  <Route
+                    path="/table-monitor"
+                    element={
+                      hotelOnlyPlan ? (
+                        <Navigate to={merchantHomePath} replace />
+                      ) : (
+                        <FeatureRoute
+                          user={user}
+                          feature={FEATURE_KEYS.QR_TABLE}
+                          fallback={merchantHomePath}
+                        >
+                          <TableMonitor />
+                        </FeatureRoute>
+                      )
+                    }
+                  />
 
-                  <Route path="/analysis" element={<Analysis />} />
+                  <Route
+                    path="/analysis"
+                    element={
+                      hotelOnlyPlan ? (
+                        <Navigate to={merchantHomePath} replace />
+                      ) : (
+                        <FeatureRoute
+                          user={user}
+                          feature={FEATURE_KEYS.ANALYSIS}
+                          fallback={merchantHomePath}
+                        >
+                          <Analysis />
+                        </FeatureRoute>
+                      )
+                    }
+                  />
 
-                  <Route path="/offer" element={<Offers />} />
+                  <Route
+                    path="/offer"
+                    element={
+                      hotelOnlyPlan ? (
+                        <Navigate to={merchantHomePath} replace />
+                      ) : (
+                        <FeatureRoute
+                          user={user}
+                          feature={FEATURE_KEYS.OFFERS}
+                          fallback={merchantHomePath}
+                        >
+                          <Offers />
+                        </FeatureRoute>
+                      )
+                    }
+                  />
 
-                  <Route path="/payment" element={<Payment />} />
+                  <Route
+                    path="/payment"
+                    element={
+                      hotelOnlyPlan ? (
+                        <Navigate to={merchantHomePath} replace />
+                      ) : (
+                        <FeatureRoute
+                          user={user}
+                          anyOf={[FEATURE_KEYS.PAYMENTS, FEATURE_KEYS.BILLING]}
+                          fallback={merchantHomePath}
+                        >
+                          <Payment />
+                        </FeatureRoute>
+                      )
+                    }
+                  />
 
-                  <Route path="/marketing" element={<AIMarketingDashboard />} />
+                  <Route
+                    path="/marketing"
+                    element={
+                      hotelOnlyPlan ? (
+                        <Navigate to={merchantHomePath} replace />
+                      ) : (
+                        <AIMarketingDashboard />
+                      )
+                    }
+                  />
 
-                  <Route path="/counter" element={<CounterPOS />} />
+                  <Route
+                    path="/counter"
+                    element={
+                      hotelOnlyPlan ? (
+                        <Navigate to={merchantHomePath} replace />
+                      ) : (
+                        <FeatureRoute
+                          user={user}
+                          feature={FEATURE_KEYS.POS}
+                          fallback={merchantHomePath}
+                        >
+                          <CounterPOS />
+                        </FeatureRoute>
+                      )
+                    }
+                  />
 
                   <Route path="/profile" element={<Profile />} />
 
-                  <Route path="/events" element={<EventManagement />} />
-                  <Route path="/rooms" element={<RoomsManagement />} />
-                  <Route path="/guests" element={<GuestManagement />} />
-                  <Route path="/bookings" element={<BookingManagement />} />
-                  <Route path="/room-qr" element={<RoomQrManagement />} />
-                  <Route path="/room-folios" element={<FolioManagement />} />
+                  <Route
+                    path="/events"
+                    element={
+                      hotelOnlyPlan ? (
+                        <Navigate to={merchantHomePath} replace />
+                      ) : (
+                        <FeatureRoute
+                          user={user}
+                          feature={FEATURE_KEYS.EVENT_MANAGEMENT}
+                          fallback={merchantHomePath}
+                        >
+                          <EventManagement />
+                        </FeatureRoute>
+                      )
+                    }
+                  />
+                  <Route
+                    path="/rooms"
+                    element={
+                      <FeatureRoute
+                        user={user}
+                        feature={FEATURE_KEYS.ROOM_MANAGEMENT}
+                        fallback={merchantHomePath}
+                      >
+                        <RoomsManagement />
+                      </FeatureRoute>
+                    }
+                  />
+                  <Route
+                    path="/guests"
+                    element={
+                      <FeatureRoute
+                        user={user}
+                        feature={FEATURE_KEYS.GUEST_MANAGEMENT}
+                        fallback={merchantHomePath}
+                      >
+                        <GuestManagement />
+                      </FeatureRoute>
+                    }
+                  />
+                  <Route
+                    path="/bookings"
+                    element={
+                      <FeatureRoute
+                        user={user}
+                        feature={FEATURE_KEYS.ROOM_BOOKING}
+                        fallback={merchantHomePath}
+                      >
+                        <BookingManagement />
+                      </FeatureRoute>
+                    }
+                  />
+                  <Route
+                    path="/room-qr"
+                    element={
+                      <FeatureRoute
+                        user={user}
+                        feature={FEATURE_KEYS.ROOM_QR_ORDERING}
+                        fallback={merchantHomePath}
+                      >
+                        <RoomQrManagement />
+                      </FeatureRoute>
+                    }
+                  />
+                  <Route
+                    path="/room-folios"
+                    element={
+                      <FeatureRoute
+                        user={user}
+                        feature={FEATURE_KEYS.ROOM_FOLIO}
+                        fallback={merchantHomePath}
+                      >
+                        <FolioManagement />
+                      </FeatureRoute>
+                    }
+                  />
                   <Route path="/staff" element={<StaffManagement />} />
 
-                  <Route path="*" element={<Navigate to="/" replace />} />
+                  <Route
+                    path="*"
+                    element={<Navigate to={merchantHomePath} replace />}
+                  />
                 </>
               )}
             </Routes>

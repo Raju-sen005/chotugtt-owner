@@ -368,7 +368,7 @@ ${
 
         <div class="footer-line">Thank you for visiting!<br/>Visit again 🙏</div>
 
-        <div class="powered-by">Powered by <b>ChotuGTT</b></div>
+        <div class="powered-by">Powered by <b>Transserve</b></div>
       </div>
     </body>
   </html>`;

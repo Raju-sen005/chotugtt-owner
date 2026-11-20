@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from "react-router-dom";
 import { useAuth } from "./context/AuthContext";
 
 import AuthGate from "./features/auth/AuthGate";
+import PendingRouteGuard from "./features/auth/PendingRouteGuard";
 
 const MerchantLayout = lazy(() => import("./layouts/MerchantLayout"));
 const PublicMenu = lazy(() => import("./features/public/PublicMenu"));
@@ -11,6 +12,9 @@ const SubscriptionCheckout = lazy(
   () => import("./components/SubscriptionCheckout"),
 );
 const ForgotPassword = lazy(() => import("./features/auth/ForgotPassword"));
+const RegistrationSuccess = lazy(
+  () => import("./features/auth/RegistrationSuccess"),
+);
 
 function ScreenLoading() {
   return (
@@ -51,6 +55,8 @@ export default function App() {
 
   return (
     <Suspense fallback={<ScreenLoading />}>
+      {/* Pending owners without a JWT stay on the welcome page. */}
+      <PendingRouteGuard enabled={!user} />
       <Routes>
         {/*
       |--------------------------------------------------------------------------
@@ -92,6 +98,11 @@ export default function App() {
         <Route
           path="/subscription-checkout"
           element={<SubscriptionCheckout />}
+        />
+
+        <Route
+          path="/registration-success"
+          element={<RegistrationSuccess />}
         />
 
         <Route path="/forgot-password" element={<ForgotPassword />} />

@@ -22,6 +22,19 @@ describe("[Unit] guest display helpers", () => {
   it("shows Not provided for blank optional fields", () => {
     assert.equal(displayGuestField(""), NOT_PROVIDED);
     assert.equal(displayGuestField(null), NOT_PROVIDED);
+    assert.equal(
+      displayGuestField({
+        v: 1,
+        alg: "AES-256-GCM",
+        kid: "k",
+        iv: "i",
+        tag: "t",
+        ct: "c",
+        wrappedDek: "w",
+        aad: "a",
+      }),
+      NOT_PROVIDED,
+    );
     assert.equal(displayGuestField("  Ada  "), "Ada");
     assert.equal(formatGuestDate(null), NOT_PROVIDED);
     assert.equal(formatGuestIdentity({}), NOT_PROVIDED);

@@ -1,6 +1,10 @@
 import { useState } from "react";
 import { Eye, EyeOff, ImagePlus } from "lucide-react";
 import { useAuth } from "../../context/AuthContext";
+import {
+  resolveBusinessCategoryForPlan,
+  resolveRegistrationPlanCode,
+} from "../subscription/commercialCatalog";
 import AuthShell, { AuthField, authInputClass } from "./AuthShell";
 
 export default function RegisterTenant({ onSwitchToLogin }) {
@@ -15,6 +19,17 @@ export default function RegisterTenant({ onSwitchToLogin }) {
   const [logoFile, setLogoFile] = useState(null);
   const [logoPreview, setLogoPreview] = useState(null);
   const [legalAccepted, setLegalAccepted] = useState(false);
+
+  const query = new URLSearchParams(
+    typeof window !== "undefined" ? window.location.search : "",
+  );
+  const selectedPlanCode = resolveRegistrationPlanCode(query.get("plan"));
+  const selectedCategory =
+    resolveBusinessCategoryForPlan(selectedPlanCode) ||
+    String(query.get("category") || "")
+      .trim()
+      .toUpperCase() ||
+    "";
 
   const [error, setError] = useState("");
   const [successData, setSuccessData] = useState(null);
@@ -96,11 +111,21 @@ export default function RegisterTenant({ onSwitchToLogin }) {
 
     try {
       const formData = new FormData();
-      const selectedPlan = new URLSearchParams(window.location.search).get(
-        "plan",
+      const selectedPlan = resolveRegistrationPlanCode(
+        new URLSearchParams(window.location.search).get("plan"),
       );
+      const category =
+        resolveBusinessCategoryForPlan(selectedPlan) ||
+        String(
+          new URLSearchParams(window.location.search).get("category") || "",
+        )
+          .trim()
+          .toUpperCase();
 
-      formData.append("subscriptionPlan", selectedPlan || "TRIAL");
+      formData.append("subscriptionPlan", selectedPlan);
+      if (category) {
+        formData.append("businessCategory", category);
+      }
       formData.append("restaurantName", restaurantName.trim());
       formData.append("slug", generatedSlug);
       formData.append("name", name.trim());
@@ -124,6 +149,18 @@ export default function RegisterTenant({ onSwitchToLogin }) {
       const response = await registerTenant(formData);
 
       if (response && response.success) {
+        /*
+        | Manual approval: AuthContext navigates to /registration-success.
+        | Never open Razorpay or subscription checkout after registration.
+        */
+        if (
+          response.data?.requiresApproval ||
+          response.requiresApproval ||
+          response.data?.approvalStatus === "PENDING_APPROVAL"
+        ) {
+          return;
+        }
+
         const liveMenuUrl = `${
           import.meta.env.VITE_APP_API_BASE || window.location.origin
         }/?store=${generatedSlug}`;
@@ -136,6 +173,8 @@ export default function RegisterTenant({ onSwitchToLogin }) {
           url: liveMenuUrl,
           qr: qrCodeApiUrl,
           slug: generatedSlug,
+          selectedPlan: selectedPlanCode,
+          category: selectedCategory,
         });
       }
     } catch (err) {
@@ -152,7 +191,7 @@ export default function RegisterTenant({ onSwitchToLogin }) {
       <AuthShell
         title="Restaurant is ready"
         subtitle="Save this link. Sign in next to open your dashboard."
-        panelTitle="Your restaurant is on ChotuGTT."
+        panelTitle="Your restaurant is on Transserve."
         panelPoints={[
           "Menu and QR are tied to this account",
           "Sign in to add dishes and tables",
@@ -197,7 +236,7 @@ export default function RegisterTenant({ onSwitchToLogin }) {
       wide
       title="Create your restaurant"
       subtitle="This account is the owner login for your menu, orders, and bills."
-      panelTitle="Open your restaurant on ChotuGTT."
+      panelTitle="Open your restaurant on Transserve."
       panelPoints={[
         "QR menu for every table",
         "Counter, captain, and kitchen",

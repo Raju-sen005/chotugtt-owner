@@ -581,12 +581,10 @@ export default function GuestManagement() {
             <Crown className="mt-0.5 h-6 w-6 text-amber-600" />
             <div>
               <h2 className="text-base font-bold text-amber-900">
-                PLUS feature required
+                This feature is not included in your current plan.
               </h2>
               <p className="mt-1 text-sm text-amber-800">
-                Guest Management requires an active PLUS plan with
-                GUEST_MANAGEMENT. PRO and other plans do not include this
-                feature.
+                Contact your administrator to enable this feature.
               </p>
             </div>
           </div>
@@ -694,9 +692,11 @@ export default function GuestManagement() {
                         <td className="px-4 py-3 font-semibold text-[var(--text-primary)]">
                           {guest.fullName}
                         </td>
-                        <td className="px-4 py-3">{guest.phone || "—"}</td>
+                        <td className="px-4 py-3">
+                          {displayGuestField(guest.phone)}
+                        </td>
                         <td className="hidden px-4 py-3 md:table-cell">
-                          {guest.email || "—"}
+                          {displayGuestField(guest.email)}
                         </td>
                         <td className="hidden px-4 py-3 lg:table-cell">
                           {guest.identityType ? (
@@ -978,7 +978,9 @@ export default function GuestManagement() {
                   </h3>
                   <p className="text-sm text-[var(--text-muted)]">
                     {displayGuestField(detailGuest.phone)}
-                    {detailGuest.email ? ` · ${detailGuest.email}` : ""}
+                    {displayGuestField(detailGuest.email) !== "Not provided"
+                      ? ` · ${displayGuestField(detailGuest.email)}`
+                      : ""}
                   </p>
                 </div>
                 {/* {canWrite && (

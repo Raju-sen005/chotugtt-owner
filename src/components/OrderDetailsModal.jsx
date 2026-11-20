@@ -8,6 +8,7 @@ import {
   AlertCircle,
 } from "lucide-react";
 import { resolveItemSpecialInstructions } from "../features/orders/itemSpecialInstructions";
+import { displayCustomerPhone } from "../utils/displayText";
 
 export default function OrderDetailsModal({
   order,
@@ -220,7 +221,7 @@ export default function OrderDetailsModal({
             </div>
 
             {/* Phone */}
-            {order.customerPhone && (
+            {displayCustomerPhone(order.customerPhone) ? (
               <div className="flex items-center gap-2 font-medium text-slate-800">
                 <Phone
                   size={14}
@@ -228,10 +229,10 @@ export default function OrderDetailsModal({
                 />
 
                 <span>
-                  {order.customerPhone}
+                  {displayCustomerPhone(order.customerPhone)}
                 </span>
               </div>
-            )}
+            ) : null}
 
             {/* Delivery Address */}
             {order.deliveryAddress && (

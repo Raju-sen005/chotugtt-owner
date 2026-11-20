@@ -32,9 +32,20 @@ export function guestIdOf(guest) {
   return String(guest?.id || guest?._id || "");
 }
 
-/** Display helper for optional guest profile fields. */
+const isFieldCryptoEnvelope = (value) =>
+  value &&
+  typeof value === "object" &&
+  !Array.isArray(value) &&
+  typeof value.ct === "string" &&
+  typeof value.alg === "string";
+
+/** Display helper for optional guest profile fields. Never renders envelopes. */
 export function displayGuestField(value) {
   if (value === null || value === undefined) return NOT_PROVIDED;
+  if (isFieldCryptoEnvelope(value)) return NOT_PROVIDED;
+  if (typeof value !== "string" && typeof value !== "number") {
+    return NOT_PROVIDED;
+  }
   const text = String(value).trim();
   return text ? text : NOT_PROVIDED;
 }
@@ -51,7 +62,10 @@ export function formatGuestDate(value) {
 }
 
 function trimOrEmpty(value) {
-  return value === null || value === undefined ? "" : String(value).trim();
+  if (value === null || value === undefined) return "";
+  if (isFieldCryptoEnvelope(value)) return "";
+  if (typeof value !== "string" && typeof value !== "number") return "";
+  return String(value).trim();
 }
 
 /** Prefer guest CRM fields; never invent from booking blobs. */
@@ -221,7 +235,7 @@ export function evaluateGuestDocumentUpload({
     return {
       enabled: false,
       reason:
-        "Identity document upload requires an active PLUS subscription with Guest Management.",
+        "This feature is not included in your current plan. Contact your administrator to enable this feature.",
     };
   }
   if (!canManageDocs) {

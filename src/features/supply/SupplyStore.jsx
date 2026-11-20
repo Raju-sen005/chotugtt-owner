@@ -399,7 +399,7 @@ export default function SupplyStore() {
         <div className="flex flex-col gap-5 bg-gradient-to-r from-[var(--primary)] via-[var(--primary)] to-[var(--secondary)] px-5 py-6 text-white sm:px-7 lg:flex-row lg:items-center lg:justify-between">
           <div className="max-w-2xl">
             <div className="mb-3 inline-flex items-center gap-2 rounded-full border border-rose-400/25 bg-rose-400/10 px-3 py-1 text-[11px] font-extrabold uppercase tracking-[0.16em] text-rose-300">
-              <span className="h-1.5 w-1.5 rounded-full bg-rose-400" /> ChotuGTT
+              <span className="h-1.5 w-1.5 rounded-full bg-rose-400" /> Transserve
               · Restaurant Supply
             </div>
             <h1 className="text-2xl font-black tracking-tight sm:text-3xl">

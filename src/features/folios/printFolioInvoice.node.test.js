@@ -148,7 +148,8 @@ describe("[Source] FolioManagement wires Print Invoice + access gates", () => {
     assert.match(source, /Print interim bill/);
     assert.match(source, /canView/);
     assert.match(access, /hasRoomFolioAccess/);
-    assert.match(access, /normalizePlan\(user\) === "PLUS"/);
+    assert.match(access, /FEATURE_KEYS\.ROOM_FOLIO|ROOM_FOLIO/);
+    assert.match(access, /hasAvailableFeature/);
     assert.match(access, /canViewFolio/);
     assert.match(access, /\["OWNER", "MANAGER", "STAFF"\]/);
     assert.match(access, /FOLIO_SETTLING/);

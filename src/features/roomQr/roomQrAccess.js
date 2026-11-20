@@ -1,8 +1,8 @@
 /**
- * PLUS + ROOM_QR_ORDERING access helpers (Phase C).
+ * ROOM_QR_ORDERING access helpers (Phase C).
  *
  * Backend: generate/get/revoke require requireFeature(ROOM_QR_ORDERING)
- * and authorize(OWNER, MANAGER). PRO does not receive this feature.
+ * and authorize(OWNER, MANAGER). Entitlement from availableFeatures.
  *
  * Guest QR destination must come from backend data.publicUrl —
  * never reconstruct from VITE_APP_API_BASE.
@@ -10,7 +10,6 @@
 
 import {
   isSubscriptionActive,
-  normalizePlan,
   isFeatureNotAvailable,
   normalizeRoomStatus,
 } from "../rooms/roomsAccess";
@@ -20,11 +19,18 @@ import {
   roomIdOf,
   roomNumberOf,
 } from "../bookings/bookingsAccess";
+import {
+  FEATURE_KEYS,
+  hasAvailableFeature,
+} from "../subscription/featureAccess";
 import { resolveBackendRoomQrPublicUrl } from "./roomQrPublicUrl";
 
 export function hasRoomQrAccess(user) {
   if (!user || user.role === "SUPERADMIN") return false;
-  return isSubscriptionActive(user) && normalizePlan(user) === "PLUS";
+  return (
+    isSubscriptionActive(user) &&
+    hasAvailableFeature(user, FEATURE_KEYS.ROOM_QR_ORDERING)
+  );
 }
 
 /** Generate / get / revoke — OWNER|MANAGER only (matches backend). */
@@ -37,7 +43,7 @@ export function getRoomQrApiErrorMessage(error, fallback = "Request failed") {
   if (data?.code === "FEATURE_NOT_AVAILABLE") {
     return (
       data.message ||
-      "Room QR Ordering requires an active PLUS subscription."
+      "This feature is not included in your current plan."
     );
   }
   if (data?.code === "ROOM_QR_NOT_FOUND") {

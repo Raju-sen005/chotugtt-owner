@@ -1,0 +1,23 @@
+{
+  "name": "Transserve",
+  "short_name": "Transserve",
+  "description": "A Complete Restaurant & Hospitality Platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFFFFF",
+  "theme_color": "#F00078",
+  "icons": [
+    {
+      "src": "/Untitled.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/transserve-icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1936,7 +1936,7 @@ export default function CounterPOS() {
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_340px]">
           <div className="min-w-0 space-y-4">
             <div className="grid grid-cols-1 gap-3 xl:grid-cols-[minmax(0,1.35fr)_minmax(280px,0.9fr)]">
-              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[var(--primary)] via-[var(--primary)] to-[var(--secondary)] p-5 text-white shadow-sm min-h-[156px]">
+              <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-rose-500 via-rose-500 to-orange-400 p-5 text-white shadow-sm min-h-[156px]">
                 <div className="relative z-10 max-w-md">
                   <div className="mb-3 flex h-11 w-11 items-center justify-center rounded-2xl bg-white/20">
                     <ChefHat className="h-6 w-6" />

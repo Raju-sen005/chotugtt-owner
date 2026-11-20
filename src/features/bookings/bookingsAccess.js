@@ -1,9 +1,8 @@
 /**
- * PLUS room-booking access helpers (Milestone 6B.2).
+ * Room-booking access helpers (Milestone 6B.2).
  *
- * Backend mounts booking routes under requireFeature(ROOM_MANAGEMENT)
- * (PLUS-only). ROOM_BOOKING is also PLUS-only on the plan matrix.
- * PRO must not receive access.
+ * Backend mounts booking routes under requireFeature(ROOM_MANAGEMENT).
+ * Frontend entitlement uses ROOM_BOOKING from availableFeatures.
  */
 
 import {
@@ -12,6 +11,10 @@ import {
   isFeatureNotAvailable,
   normalizeRoomStatus,
 } from "../rooms/roomsAccess";
+import {
+  FEATURE_KEYS,
+  hasAvailableFeature,
+} from "../subscription/featureAccess";
 
 export const BOOKING_STATUSES = Object.freeze([
   "CONFIRMED",
@@ -306,7 +309,10 @@ export function validateIdProof(proofTypeRaw, proofNumberRaw) {
 
 export function hasRoomBookingAccess(user) {
   if (!user || user.role === "SUPERADMIN") return false;
-  return isSubscriptionActive(user) && normalizePlan(user) === "PLUS";
+  return (
+    isSubscriptionActive(user) &&
+    hasAvailableFeature(user, FEATURE_KEYS.ROOM_BOOKING)
+  );
 }
 
 export function canWriteBookings(user) {
@@ -435,7 +441,7 @@ export function getBookingApiErrorMessage(error, fallback = "Request failed") {
   if (data?.code === "FEATURE_NOT_AVAILABLE") {
     return (
       data.message ||
-      "Room Booking requires an active PLUS subscription."
+      "This feature is not included in your current plan."
     );
   }
   if (data?.code === "GUEST_STORAGE_NOT_CONFIGURED") {

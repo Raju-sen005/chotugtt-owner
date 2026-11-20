@@ -13,6 +13,7 @@ import {
   stripAutoKotMeta,
 } from "../features/orders/autoKotPrint";
 import { resolveItemSpecialInstructions } from "../features/orders/itemSpecialInstructions";
+import { displayCustomerPhone } from "../utils/displayText";
 
 const getOrderRestaurantId = (order) => {
   if (!order?.restaurantId) {
@@ -799,7 +800,8 @@ export default function GlobalOrderAlert() {
             </div>
 
             {/* CUSTOMER */}
-            {(order?.customerName || order?.customerPhone) && (
+            {(order?.customerName ||
+              displayCustomerPhone(order?.customerPhone)) && (
               <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3.5">
                 <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
                   Customer
@@ -810,11 +812,11 @@ export default function GlobalOrderAlert() {
                       {order.customerName}
                     </span>
                   )}
-                  {order?.customerPhone && (
+                  {displayCustomerPhone(order?.customerPhone) ? (
                     <span className="text-xs font-semibold text-slate-500">
-                      {order.customerPhone}
+                      {displayCustomerPhone(order?.customerPhone)}
                     </span>
-                  )}
+                  ) : null}
                 </div>
               </div>
             )}

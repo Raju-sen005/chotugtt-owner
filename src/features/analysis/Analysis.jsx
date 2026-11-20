@@ -6,6 +6,11 @@ import { useNavigate } from "react-router-dom";
 import React from "react";
 import axios from "axios";
 import {
+  FEATURE_KEYS,
+  hasAvailableFeature,
+} from "../subscription/featureAccess";
+import { isSubscriptionActive } from "../rooms/roomsAccess";
+import {
   Sun,
   Coffee,
   Moon,
@@ -66,11 +71,9 @@ function Analysis() {
     staleTime: 60_000,
   });
 
-  const currentPlan = String(restaurantProfile?.subscriptionPlan || "")
-    .trim()
-    .toUpperCase();
-
-  const isStarterPlan = currentPlan === "STARTER";
+  const canAccessAnalysis =
+    isSubscriptionActive(user) &&
+    hasAvailableFeature(user, FEATURE_KEYS.ANALYSIS);
 
   const [showUpgradePopup, setShowUpgradePopup] = React.useState(false);
 
@@ -103,7 +106,7 @@ function Analysis() {
       return res.data.data;
     },
     staleTime: 60_000,
-    enabled: !!restaurantId && !!restaurantProfile && !isStarterPlan,
+    enabled: !!restaurantId && !!restaurantProfile && canAccessAnalysis,
   });
 
   const chartData = React.useMemo(() => {
@@ -157,7 +160,7 @@ function Analysis() {
     );
   }
 
-  if (isStarterPlan) {
+  if (!canAccessAnalysis) {
     return (
       <div className="flex min-h-[400px] items-center justify-center p-4">
         <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-lg">
@@ -170,8 +173,8 @@ function Analysis() {
           </h2>
 
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Analysis feature is not available in the Starter plan. Please
-            upgrade your subscription plan to access business analytics and
+            Analysis is not available on your current subscription plan. Please
+            upgrade your subscription to access business analytics and
             performance insights.
           </p>
 
@@ -292,18 +295,18 @@ function Analysis() {
 
   return (
     <div className="-m-4 bg-[var(--background)] p-4 font-sans md:-m-6 md:p-5 lg:-m-8 lg:p-5">
-      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[var(--primary)] via-[var(--primary)] to-[var(--secondary)] p-5 text-white">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-rose-500 via-rose-500 to-orange-400  p-5 text-white">
         <div className="relative z-10 flex flex-wrap items-start justify-between gap-4">
           <div className="flex items-start gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
               <BarChart3 className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-xs font-bold text-white/80">
+              {/* <p className="text-xs font-bold text-white/80">
                 Business Analytics
-              </p>
+              </p> */}
               <h2 className="text-2xl font-black tracking-tight">
-                Restaurant Performance
+               Business Analytics
               </h2>
               <p className="mt-1 max-w-xl text-sm text-white/85">
                 Get insights about your sales, orders, popular items and table

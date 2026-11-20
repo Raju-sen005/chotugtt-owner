@@ -31,7 +31,18 @@ import {
   Users,
   Eye,
   Phone,
+  LayoutDashboard,
+  ClipboardList,
+  Menu,
 } from "lucide-react";
+import {
+  ASSIGNABLE_PLANS,
+  BUSINESS_CATEGORIES,
+  FILTERABLE_PLANS,
+  formatPlanLabel,
+  isLegacyPlanCode,
+} from "./adminPlanCatalog";
+import { displayEmail, displayPhone } from "../../utils/displayText";
 
 /* ----------------------------------------------------------------------
    Small presentational primitives
@@ -180,20 +191,15 @@ const currency = (value) =>
     maximumFractionDigits: 2,
   })}`;
 
-const SELLABLE_PLANS = [
-  "TRIAL",
-  "STARTER",
-  "BASIC",
-  "PREMIUM",
-  "PRO",
-  "PLUS",
-];
+const formatPlan = formatPlanLabel;
 
-const formatPlan = (plan) => {
-  const value = String(plan || "").trim();
-  if (!value) return "No plan";
-  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
-};
+const NAV_ITEMS = [
+  { id: "overview", label: "Overview", icon: LayoutDashboard },
+  { id: "businesses", label: "Businesses", icon: Building2 },
+  { id: "pending", label: "Pending Approvals", icon: ClipboardList },
+  { id: "revenue", label: "Reports", icon: TrendingUp },
+  { id: "logs", label: "Audit Logs", icon: History },
+];
 
 const formatJoined = (value) => {
   if (!value) return "—";
@@ -345,12 +351,15 @@ export default function SuperAdminPanel() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [approvalFilter, setApprovalFilter] = useState("all");
   const [sortBy, setSortBy] = useState("newest");
-  const [activeTab, setActiveTab] = useState("restaurants");
+  const [activeTab, setActiveTab] = useState("overview");
   const [joinedFilter, setJoinedFilter] = useState("all");
   const [planFilter, setPlanFilter] = useState("all");
   const [subscriptionFilter, setSubscriptionFilter] = useState("all");
+  const [categoryFilter, setCategoryFilter] = useState("all");
   const [districtFilter, setDistrictFilter] = useState("");
   const [pincodeFilter, setPincodeFilter] = useState("");
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const [approveConfirm, setApproveConfirm] = useState(null);
   const [auditLogs, setAuditLogs] = useState([]);
   const [auditLoading, setAuditLoading] = useState(false);
   const [revenueStats, setRevenueStats] = useState(null);
@@ -400,6 +409,7 @@ export default function SuperAdminPanel() {
         plan: planFilter !== "all" ? planFilter : undefined,
         subscription:
           subscriptionFilter !== "all" ? subscriptionFilter : undefined,
+        category: categoryFilter !== "all" ? categoryFilter : undefined,
         district: districtFilter.trim() || undefined,
         pincode: pincodeFilter.trim() || undefined,
       };
@@ -451,6 +461,7 @@ export default function SuperAdminPanel() {
     joinedFilter,
     planFilter,
     subscriptionFilter,
+    categoryFilter,
     districtFilter,
     pincodeFilter,
   ]);
@@ -472,12 +483,39 @@ export default function SuperAdminPanel() {
       await fetchRestaurants();
       await fetchPlatformStats();
       await fetchAuditLogs();
+      setApproveConfirm(null);
     } catch (error) {
       console.error("Restaurant status update failed:", error);
 
       alert(error?.response?.data?.message || "Update failed!");
     }
   };
+
+  const requestApprovalToggle = (store) => {
+    if (!store?._id) return;
+    setApproveConfirm({
+      id: store._id,
+      name: store.name,
+      currentlyApproved: store.isApproved === true,
+    });
+  };
+
+  const openBusinessesTab = (overrides = {}) => {
+    if (overrides.approval) setApprovalFilter(overrides.approval);
+    if (overrides.joined) setJoinedFilter(overrides.joined);
+    setPage(1);
+    setActiveTab(
+      overrides.approval === "pending" ? "pending" : "businesses",
+    );
+    setMobileNavOpen(false);
+  };
+
+  useEffect(() => {
+    if (activeTab === "pending" && approvalFilter !== "pending") {
+      setApprovalFilter("pending");
+      setPage(1);
+    }
+  }, [activeTab, approvalFilter]);
 
   const handleStaffStatusUpdate = async (userId, isActive) => {
     if (!selectedRestaurant?._id) return;
@@ -618,6 +656,9 @@ export default function SuperAdminPanel() {
                 subscriptionStatus: updatedRestaurant.subscriptionStatus,
                 subscriptionStartedAt: updatedRestaurant.subscriptionStartedAt,
                 subscriptionExpiresAt: updatedRestaurant.subscriptionExpiresAt,
+                businessCategory:
+                  updatedRestaurant.businessCategory ??
+                  restaurant.businessCategory,
               }
             : restaurant,
         ),
@@ -934,12 +975,11 @@ export default function SuperAdminPanel() {
               >
                 {subscriptionModal.field === "subscriptionPlan" ? (
                   <>
-                    <option value="TRIAL">Trial</option>
-                    <option value="STARTER">Starter</option>
-                    <option value="BASIC">Basic</option>
-                    <option value="PREMIUM">Premium</option>
-                    <option value="PRO">Pro</option>
-                    <option value="PLUS">Plus</option>
+                    {ASSIGNABLE_PLANS.map((code) => (
+                      <option key={code} value={code}>
+                        {formatPlan(code)}
+                      </option>
+                    ))}
                   </>
                 ) : (
                   <>
@@ -951,10 +991,13 @@ export default function SuperAdminPanel() {
               </SelectField>
               {subscriptionModal.field === "subscriptionPlan" && (
                 <p className="mt-2 text-xs text-stone-500">
-                  Saving a plan sets it active from the server: Trial 7 days;
-                  Starter, Basic, Premium, Pro, and Plus are 1 year each. Pro
-                  and Plus are independent — Plus is Room Management, Pro is
-                  restaurant software / Event Management.
+                  New assignments are limited to TRIAL and the 11 commercial
+                  plans. Legacy STARTER/BASIC/PREMIUM/PRO/PLUS remain on
+                  existing accounts for display and renewal, but cannot be
+                  newly assigned. For an already-active subscription, saving
+                  changes entitlements only and preserves the existing expiry.
+                  Expired or inactive accounts receive a fresh plan duration
+                  from the server catalog.
                 </p>
               )}
             </div>
@@ -1096,13 +1139,7 @@ export default function SuperAdminPanel() {
                   </button>
                   <button
                     type="button"
-                    onClick={() =>
-                      handleStatusUpdate(
-                        selectedRestaurant._id,
-                        "isApproved",
-                        selectedRestaurant.isApproved === true,
-                      )
-                    }
+                    onClick={() => requestApprovalToggle(selectedRestaurant)}
                     className="inline-flex items-center justify-center gap-1 rounded-xl bg-rose-500 px-3 py-2 text-xs font-black text-white"
                   >
                     {selectedRestaurant.isApproved ? "Revoke" : "Approve"}
@@ -1162,12 +1199,12 @@ export default function SuperAdminPanel() {
 
                     <DetailItem
                       label="Email"
-                      value={selectedRestaurant.email || "—"}
+                      value={displayEmail(selectedRestaurant.email)}
                     />
 
                     <DetailItem
                       label="Phone"
-                      value={selectedRestaurant.phone || "—"}
+                      value={displayPhone(selectedRestaurant.phone)}
                     />
                   </div>
                 </div>
@@ -1343,7 +1380,7 @@ export default function SuperAdminPanel() {
                                           {user.name || "—"}
                                         </p>
                                         <p className="mt-0.5 truncate text-xs text-stone-400">
-                                          {user.email || "—"}
+                                          {displayEmail(user.email)}
                                         </p>
                                       </div>
                                     </div>
@@ -1366,7 +1403,7 @@ export default function SuperAdminPanel() {
 
                                   {/* PHONE */}
                                   <td className="px-4 py-3 text-xs text-stone-600">
-                                    {user.phone || "—"}
+                                    {displayPhone(user.phone)}
                                   </td>
 
                                   {/* STATUS */}
@@ -1450,9 +1487,20 @@ export default function SuperAdminPanel() {
                       <p className="text-xs text-stone-400">Current plan</p>
 
                       <div className="mt-2 flex items-center justify-between gap-3">
-                        <span className="text-sm font-semibold text-stone-900">
-                          {selectedRestaurant.subscriptionPlan || "Not set"}
-                        </span>
+                        <div>
+                          <span className="text-sm font-semibold text-stone-900">
+                            {formatPlan(
+                              selectedRestaurant.subscriptionPlan,
+                            ) || "Not set"}
+                          </span>
+                          {isLegacyPlanCode(
+                            selectedRestaurant.subscriptionPlan,
+                          ) ? (
+                            <p className="mt-1 text-[10px] font-bold uppercase tracking-wide text-amber-700">
+                              Legacy plan — preserved for this account
+                            </p>
+                          ) : null}
+                        </div>
 
                         <button
                           type="button"
@@ -1460,11 +1508,11 @@ export default function SuperAdminPanel() {
                           onClick={() =>
                             setSubscriptionModal({
                               field: "subscriptionPlan",
-                              value: SELLABLE_PLANS.includes(
+                              value: ASSIGNABLE_PLANS.includes(
                                 selectedRestaurant.subscriptionPlan,
                               )
                                 ? selectedRestaurant.subscriptionPlan
-                                : "BASIC",
+                                : "RESTAURANT_STARTER",
                             })
                           }
                           className="rounded-lg border border-stone-200 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 transition hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
@@ -1591,68 +1639,164 @@ export default function SuperAdminPanel() {
         </div>
       )}
 
-      <div className="-m-4 min-h-screen bg-[var(--background)] p-4 font-sans sm:-m-6 sm:p-5 lg:-m-8 lg:p-5">
-        <div className="mx-auto max-w-[1400px] space-y-4">
-          <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[var(--primary)] via-[var(--primary)] to-[var(--secondary)] p-5 text-white">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="flex items-start gap-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
-                  <Building2 className="h-6 w-6" />
-                </div>
+      {approveConfirm && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-xl">
+            <h3 className="text-base font-semibold text-slate-900">
+              {approveConfirm.currentlyApproved
+                ? "Revoke approval?"
+                : "Approve and activate?"}
+            </h3>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              {approveConfirm.currentlyApproved
+                ? `Revoke approval for “${approveConfirm.name}”. The business will return to pending and lose dashboard access.`
+                : `Approve “${approveConfirm.name}” using the existing SuperAdmin activation workflow. This activates the selected plan and may notify the owner.`}
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setApproveConfirm(null)}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  handleStatusUpdate(
+                    approveConfirm.id,
+                    "isApproved",
+                    approveConfirm.currentlyApproved,
+                  )
+                }
+                className={`rounded-lg px-4 py-2 text-sm font-semibold text-white ${
+                  approveConfirm.currentlyApproved
+                    ? "bg-amber-600 hover:bg-amber-700"
+                    : "bg-emerald-600 hover:bg-emerald-700"
+                }`}
+              >
+                {approveConfirm.currentlyApproved ? "Revoke" : "Approve"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="-m-4 min-h-screen bg-slate-100 font-sans text-slate-900 sm:-m-6 lg:-m-8">
+        <div className="mx-auto flex min-h-screen max-w-[1500px]">
+          <aside
+            className={`fixed inset-y-0 left-0 z-40 w-64 border-r border-slate-200 bg-slate-950 text-white transition-transform lg:static lg:translate-x-0 ${
+              mobileNavOpen ? "translate-x-0" : "-translate-x-full"
+            }`}
+          >
+            <div className="flex h-16 items-center gap-3 border-b border-white/10 px-5">
+              <img
+                src="/Untitled.svg"
+                alt="Transserve"
+                className="h-8 w-8"
+              />
+              <div>
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/45">
+                  Transserve
+                </p>
+                <p className="text-sm font-semibold">SuperAdmin</p>
+              </div>
+            </div>
+            <nav className="space-y-1 p-3">
+              {NAV_ITEMS.map((item) => {
+                const Icon = item.icon;
+                const selected = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => {
+                      if (item.id === "pending") {
+                        setApprovalFilter("pending");
+                        setJoinedFilter("all");
+                        setPage(1);
+                      }
+                      if (item.id === "businesses" && activeTab === "pending") {
+                        setApprovalFilter("all");
+                      }
+                      setActiveTab(item.id);
+                      setMobileNavOpen(false);
+                    }}
+                    className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition ${
+                      selected
+                        ? "bg-white text-slate-950"
+                        : "text-white/75 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    <Icon size={16} />
+                    {item.label}
+                    {item.id === "pending" && !statsLoading ? (
+                      <span
+                        className={`ml-auto rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                          selected
+                            ? "bg-amber-100 text-amber-800"
+                            : "bg-amber-500/20 text-amber-100"
+                        }`}
+                      >
+                        {pendingStores}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              })}
+            </nav>
+          </aside>
+
+          {mobileNavOpen ? (
+            <button
+              type="button"
+              aria-label="Close navigation"
+              className="fixed inset-0 z-30 bg-slate-950/40 lg:hidden"
+              onClick={() => setMobileNavOpen(false)}
+            />
+          ) : null}
+
+          <div className="flex min-w-0 flex-1 flex-col">
+            <header className="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-6">
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  className="rounded-lg border border-slate-200 p-2 text-slate-600 lg:hidden"
+                  onClick={() => setMobileNavOpen(true)}
+                  aria-label="Open navigation"
+                >
+                  <Menu size={18} />
+                </button>
                 <div>
-                  <h1 className="text-2xl font-black tracking-tight">
-                    {activeTab === "restaurants"
-                      ? "All Restaurants"
-                      : activeTab === "graphs"
-                        ? "Platform Graphs"
-                        : activeTab === "revenue"
-                          ? "Platform Revenue"
-                          : "Audit Logs"}
+                  <h1 className="text-lg font-semibold tracking-tight text-slate-950">
+                    {NAV_ITEMS.find((item) => item.id === activeTab)?.label ||
+                      "SuperAdmin"}
                   </h1>
-                  <p className="mt-1 text-sm text-white/85">
-                    Manage, monitor and support all restaurant partners
+                  <p className="text-xs text-slate-500">
+                    Manage businesses, approvals, and subscriptions
                   </p>
                 </div>
               </div>
-              {activeTab === "restaurants" && (
-                <div className="rounded-2xl bg-white/15 px-4 py-3 text-right">
-                  <p className="text-[11px] font-bold text-white/80">
-                    Total Restaurants
-                  </p>
-                  <p className="text-2xl font-black">
-                    {statsLoading ? "…" : totalStores}
-                  </p>
-                </div>
-              )}
-            </div>
-          </div>
+              <div className="hidden items-center gap-2 sm:flex">
+                <StatusPill tone="emerald" dot>
+                  Live admin
+                </StatusPill>
+                <button
+                  type="button"
+                  onClick={() => openBusinessesTab({ approval: "pending" })}
+                  className="rounded-lg bg-slate-950 px-3 py-2 text-xs font-semibold text-white hover:bg-slate-800"
+                >
+                  Review pending
+                </button>
+              </div>
+            </header>
 
-          <div className="flex gap-1 overflow-x-auto rounded-2xl border border-slate-100 bg-white p-1 shadow-sm">
-            {[
-              { id: "graphs", label: "Graphs" },
-              { id: "restaurants", label: "Restaurants" },
-              { id: "revenue", label: "Revenue" },
-              { id: "logs", label: "Logs" },
-            ].map((tab) => (
-              <button
-                key={tab.id}
-                type="button"
-                onClick={() => setActiveTab(tab.id)}
-                className={`rounded-xl px-4 py-2 text-sm font-black whitespace-nowrap transition ${
-                  activeTab === tab.id
-                    ? "bg-rose-500 text-white"
-                    : "text-slate-600 hover:bg-slate-50"
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {activeTab === "graphs" && (
+            <main className="space-y-4 p-4 sm:p-6">
+          {activeTab === "overview" && (
+            <>
             <div className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-stone-200 bg-stone-200 sm:grid-cols-4 lg:grid-cols-7">
               <StatCell
-                title="Total restaurants"
+                title="Total businesses"
                 value={statsLoading ? "…" : totalStores}
               />
               <StatCell
@@ -1666,12 +1810,12 @@ export default function SuperAdminPanel() {
                 tone="amber"
               />
               <StatCell
-                title="Blocked"
+                title="Suspended"
                 value={statsLoading ? "…" : blockedStores}
                 tone="rose"
               />
               <StatCell
-                title="Active restaurants"
+                title="Active access"
                 value={statsLoading ? "…" : activeStores}
                 tone="emerald"
               />
@@ -1685,6 +1829,138 @@ export default function SuperAdminPanel() {
                 tone="brand"
               />
             </div>
+
+            <div className="grid gap-4 lg:grid-cols-3">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <h3 className="text-sm font-semibold text-slate-900">
+                  Business categories
+                </h3>
+                <dl className="mt-3 space-y-2 text-sm">
+                  {["RESTAURANT", "HOTEL", "RESORT", "UNSET"].map((key) => (
+                    <div
+                      key={key}
+                      className="flex items-center justify-between"
+                    >
+                      <dt className="text-slate-500">{formatPlan(key)}</dt>
+                      <dd className="font-semibold tabular-nums text-slate-900">
+                        {statsLoading
+                          ? "…"
+                          : platformStats?.categoryDistribution?.[key] || 0}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4 lg:col-span-2">
+                <h3 className="text-sm font-semibold text-slate-900">
+                  Plan distribution
+                </h3>
+                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                  {statsLoading ? (
+                    <p className="text-sm text-slate-500">Loading…</p>
+                  ) : Object.keys(platformStats?.planDistribution || {}).length ===
+                    0 ? (
+                    <p className="text-sm text-slate-500">No plan data yet.</p>
+                  ) : (
+                    Object.entries(platformStats.planDistribution).map(
+                      ([plan, count]) => (
+                        <div
+                          key={plan}
+                          className="flex items-center justify-between rounded-xl border border-slate-100 px-3 py-2 text-sm"
+                        >
+                          <span className="font-medium text-slate-700">
+                            {formatPlan(plan)}
+                            {isLegacyPlanCode(plan) ? (
+                              <span className="ml-2 text-[10px] font-bold uppercase text-amber-700">
+                                Legacy
+                              </span>
+                            ) : null}
+                          </span>
+                          <span className="font-semibold tabular-nums text-slate-900">
+                            {count}
+                          </span>
+                        </div>
+                      ),
+                    )
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 lg:grid-cols-2">
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-900">
+                    Recent registrations
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => openBusinessesTab({ joined: "new" })}
+                    className="text-xs font-semibold text-rose-600 hover:underline"
+                  >
+                    View all
+                  </button>
+                </div>
+                <ul className="space-y-2">
+                  {(platformStats?.recentRegistrations || []).length === 0 ? (
+                    <li className="text-sm text-slate-500">No recent signups.</li>
+                  ) : (
+                    (platformStats.recentRegistrations || []).map((row) => (
+                      <li
+                        key={row._id}
+                        className="flex items-start justify-between gap-3 rounded-xl border border-slate-100 px-3 py-2"
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">
+                            {row.name}
+                          </p>
+                          <p className="text-xs text-slate-500">
+                            {formatPlan(row.subscriptionPlan)}
+                            {row.businessCategory
+                              ? ` · ${row.businessCategory}`
+                              : ""}
+                          </p>
+                        </div>
+                        <StatusPill
+                          tone={row.isApproved ? "emerald" : "amber"}
+                          dot
+                        >
+                          {row.isApproved ? "ACTIVE" : "PENDING"}
+                        </StatusPill>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                <h3 className="mb-3 text-sm font-semibold text-slate-900">
+                  Recent activations
+                </h3>
+                <ul className="space-y-2">
+                  {(platformStats?.recentApprovals || []).length === 0 ? (
+                    <li className="text-sm text-slate-500">
+                      No activation markers yet.
+                    </li>
+                  ) : (
+                    (platformStats.recentApprovals || []).map((row) => (
+                      <li
+                        key={row._id}
+                        className="rounded-xl border border-slate-100 px-3 py-2"
+                      >
+                        <p className="text-sm font-semibold text-slate-900">
+                          {row.name}
+                        </p>
+                        <p className="text-xs text-slate-500">
+                          {formatPlan(row.subscriptionPlan)} ·{" "}
+                          {formatJoined(row.activationEmailSentAt)}
+                        </p>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              </div>
+            </div>
+            </>
           )}
 
           {activeTab === "revenue" && (
@@ -1876,7 +2152,7 @@ export default function SuperAdminPanel() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <p className="text-[10px] font-black uppercase tracking-widest text-red-500">
-                      ChotuGTT Earnings
+                      Transserve Earnings
                     </p>
 
                     <h3 className="mt-1 text-base font-black text-slate-900">
@@ -1970,7 +2246,7 @@ export default function SuperAdminPanel() {
             </>
           )}
 
-          {activeTab === "graphs" && (
+          {activeTab === "overview" && (
             <div className="rounded-2xl border border-stone-200 bg-white">
               <div className="flex flex-col gap-4 border-b border-stone-100 p-5 sm:flex-row sm:items-center sm:justify-between">
                 <SectionHeading
@@ -2119,70 +2395,14 @@ export default function SuperAdminPanel() {
             </div>
           )}
 
-          {activeTab === "restaurants" && (
+          {(activeTab === "businesses" || activeTab === "pending") && (
             <>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                {[
-                  [
-                    "Total Restaurants",
-                    statsLoading ? "…" : totalStores,
-                    Building2,
-                    "text-violet-600 bg-violet-50",
-                    "All partners",
-                  ],
-                  [
-                    "Active Restaurants",
-                    statsLoading ? "…" : activeStores,
-                    CheckCircle2,
-                    "text-emerald-600 bg-emerald-50",
-                    statsLoading || !totalStores
-                      ? ""
-                      : `${((activeStores / totalStores) * 100).toFixed(1)}% active`,
-                  ],
-                  [
-                    "Pending Approval",
-                    statsLoading ? "…" : pendingStores,
-                    AlertCircle,
-                    "text-amber-600 bg-amber-50",
-                    statsLoading || !totalStores
-                      ? ""
-                      : `${((pendingStores / totalStores) * 100).toFixed(1)}% pending`,
-                  ],
-                  [
-                    "Blocked Restaurants",
-                    statsLoading ? "…" : blockedStores,
-                    XCircle,
-                    "text-rose-600 bg-rose-50",
-                    statsLoading || !totalStores
-                      ? ""
-                      : `${((blockedStores / totalStores) * 100).toFixed(1)}% blocked`,
-                  ],
-                ].map(([label, value, Icon, tint, note]) => (
-                  <div
-                    key={label}
-                    className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
-                  >
-                    <div className="flex items-center justify-between">
-                      <span
-                        className={`flex h-9 w-9 items-center justify-center rounded-xl ${tint}`}
-                      >
-                        <Icon size={16} />
-                      </span>
-                      <p className="text-[11px] font-bold text-slate-400">
-                        {label}
-                      </p>
-                    </div>
-                    <p className="mt-3 text-2xl font-black text-slate-900">
-                      {value}
-                    </p>
-                    {note ? (
-                      <p className="mt-1 text-[11px] font-bold text-slate-400">
-                        {note}
-                      </p>
-                    ) : null}
-                  </div>
-                ))}
-              </div>
+              {activeTab === "pending" ? (
+                <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950">
+                  Showing businesses awaiting SuperAdmin approval. Approve uses
+                  the existing activation workflow — no online payment.
+                </div>
+              ) : null}
               <div className="rounded-2xl border border-slate-100 bg-white p-3 shadow-sm">
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-4">
                   <div className="relative lg:col-span-2">
@@ -2252,6 +2472,21 @@ export default function SuperAdminPanel() {
                   </SelectField>
 
                   <SelectField
+                    value={categoryFilter}
+                    onChange={(e) => {
+                      setCategoryFilter(e.target.value);
+                      setPage(1);
+                    }}
+                  >
+                    <option value="all">All categories</option>
+                    {BUSINESS_CATEGORIES.map((code) => (
+                      <option key={code} value={code}>
+                        {formatPlan(code)}
+                      </option>
+                    ))}
+                  </SelectField>
+
+                  <SelectField
                     value={planFilter}
                     onChange={(e) => {
                       setPlanFilter(e.target.value);
@@ -2259,12 +2494,22 @@ export default function SuperAdminPanel() {
                     }}
                   >
                     <option value="all">All plans</option>
-                    <option value="TRIAL">Trial</option>
-                    <option value="STARTER">Starter</option>
-                    <option value="BASIC">Basic</option>
-                    <option value="PREMIUM">Premium</option>
-                    <option value="PRO">Pro</option>
-                    <option value="PLUS">Plus</option>
+                    <optgroup label="Current commercial">
+                      {ASSIGNABLE_PLANS.map((code) => (
+                        <option key={code} value={code}>
+                          {formatPlan(code)}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Legacy (existing accounts)">
+                      {FILTERABLE_PLANS.filter((code) =>
+                        isLegacyPlanCode(code),
+                      ).map((code) => (
+                        <option key={code} value={code}>
+                          {formatPlan(code)} (legacy)
+                        </option>
+                      ))}
+                    </optgroup>
                   </SelectField>
 
                   <SelectField
@@ -2311,6 +2556,7 @@ export default function SuperAdminPanel() {
                       setJoinedFilter("all");
                       setPlanFilter("all");
                       setSubscriptionFilter("all");
+                      setCategoryFilter("all");
                       setDistrictFilter("");
                       setPincodeFilter("");
                       setPage(1);
@@ -2389,11 +2635,11 @@ export default function SuperAdminPanel() {
                               <td className="px-4 py-3">
                                 <p className="flex items-center gap-1 font-semibold text-slate-700">
                                   <Phone size={12} className="text-slate-400" />
-                                  {store.phone || "—"}
+                                  {displayPhone(store.phone)}
                                 </p>
                                 <p className="mt-0.5 flex items-center gap-1 text-[11px] text-slate-400">
                                   <Mail size={12} />
-                                  {store.email || "—"}
+                                  {displayEmail(store.email)}
                                 </p>
                               </td>
                               <td className="px-4 py-3">
@@ -2409,13 +2655,29 @@ export default function SuperAdminPanel() {
                                 </p>
                               </td>
                               <td className="px-4 py-3">
-                                <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-600">
-                                  {formatPlan(store.subscriptionPlan)}
-                                </span>
+                                <div className="flex flex-col gap-1">
+                                  <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-600">
+                                    {formatPlan(store.subscriptionPlan)}
+                                  </span>
+                                  {isLegacyPlanCode(store.subscriptionPlan) ? (
+                                    <span className="text-[10px] font-bold uppercase tracking-wide text-amber-700">
+                                      Legacy
+                                    </span>
+                                  ) : null}
+                                  {store.businessCategory ? (
+                                    <span className="text-[10px] font-semibold text-slate-400">
+                                      {store.businessCategory}
+                                    </span>
+                                  ) : null}
+                                </div>
                               </td>
                               <td className="px-4 py-3">
                                 <StatusPill tone={rowTone} dot>
-                                  {rowStatus}
+                                  {rowStatus === "Pending"
+                                    ? "PENDING_APPROVAL"
+                                    : rowStatus === "Blocked"
+                                      ? "SUSPENDED"
+                                      : "ACTIVE"}
                                 </StatusPill>
                               </td>
                               <td className="px-4 py-3 text-xs font-semibold text-slate-500">
@@ -2451,13 +2713,7 @@ export default function SuperAdminPanel() {
                                   </button>
                                   <button
                                     type="button"
-                                    onClick={() =>
-                                      handleStatusUpdate(
-                                        store._id,
-                                        "isApproved",
-                                        store.isApproved === true,
-                                      )
-                                    }
+                                    onClick={() => requestApprovalToggle(store)}
                                     title={
                                       store.isApproved
                                         ? "Revoke approval"
@@ -2619,11 +2875,11 @@ export default function SuperAdminPanel() {
                             <p className="font-semibold text-stone-900">
                               {log.restaurantId?.name || "Deleted restaurant"}
                             </p>
-                            {log.restaurantId?.email && (
+                            {displayEmail(log.restaurantId?.email, "") ? (
                               <p className="text-xs text-stone-400">
-                                {log.restaurantId.email}
+                                {displayEmail(log.restaurantId?.email)}
                               </p>
-                            )}
+                            ) : null}
                           </td>
 
                           <td className="px-5 py-4">
@@ -2636,11 +2892,11 @@ export default function SuperAdminPanel() {
                             <p className="font-medium text-stone-700">
                               {log.adminUserId?.name || "Unknown"}
                             </p>
-                            {log.adminUserId?.email && (
+                            {displayEmail(log.adminUserId?.email, "") ? (
                               <p className="text-xs text-stone-400">
-                                {log.adminUserId.email}
+                                {displayEmail(log.adminUserId?.email)}
                               </p>
-                            )}
+                            ) : null}
                           </td>
 
                           <td className="px-5 py-4 text-sm text-stone-600">
@@ -2676,6 +2932,8 @@ export default function SuperAdminPanel() {
               />
             </div>
           )}
+            </main>
+          </div>
         </div>
       </div>
     </>

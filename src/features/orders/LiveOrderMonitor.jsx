@@ -35,6 +35,7 @@ import {
   orderTypeLabel,
   roomNumberFromOrder,
 } from "./roomOrderLive";
+import { displayCustomerPhone } from "../../utils/displayText";
 import {
   buildKotPrintJobKey,
   claimKotPrintJob,
@@ -147,7 +148,10 @@ const OrderRow = memo(function OrderRow({
   const label = kitchenLabel(order);
   const preview = activeOrderItems(order).slice(0, 1);
   const extra = Math.max(0, activeOrderItems(order).length - preview.length);
-  const phone = order.customerPhone || order.phone || order.contactNumber || "";
+  const phone =
+    displayCustomerPhone(order.customerPhone) ||
+    displayCustomerPhone(order.phone) ||
+    displayCustomerPhone(order.contactNumber);
 
   return (
     <tr
@@ -1699,7 +1703,7 @@ export default function LiveOrderMonitor() {
       </div>
 
       <div class="powered-by">
-        Powered by <b>ChotuGTT</b>
+        Powered by <b>Transserve</b>
       </div>
 
     </div>
@@ -1936,8 +1940,8 @@ export default function LiveOrderMonitor() {
         order.orderId,
         order.tableNumber,
         order.customerName,
-        order.customerPhone,
-        order.phone,
+        displayCustomerPhone(order.customerPhone),
+        displayCustomerPhone(order.phone),
       ]
         .filter(Boolean)
         .join(" ")
@@ -4393,7 +4397,7 @@ export default function LiveOrderMonitor() {
         </div>
       )}
       <div className="-m-4 bg-[var(--background)] p-4 font-sans md:-m-6 md:p-5 lg:-m-8 lg:p-5">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[var(--primary)] via-[var(--primary)] to-[var(--secondary)] px-5 py-5 text-white shadow-sm">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-rose-500 via-rose-500 to-orange-400 px-5 py-5 text-white shadow-sm">
           <div className="relative z-10 flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
             {/* Left: Title and live count */}
             <div className="flex min-w-0 items-start gap-3">

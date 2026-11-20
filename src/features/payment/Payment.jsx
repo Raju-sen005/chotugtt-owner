@@ -32,6 +32,7 @@ import * as XLSX from "xlsx";
 import { useSocket } from "../../context/SocketContext";
 import { useAuth } from "../../context/AuthContext";
 import { useQueryClient } from "@tanstack/react-query";
+import { displayCustomerPhone } from "../../utils/displayText";
 
 function SkeletonRow() {
   return (
@@ -206,7 +207,7 @@ export default function Payment() {
       return [
         bill.orderId,
         bill.customerName,
-        bill.customerPhone,
+        displayCustomerPhone(bill.customerPhone),
         bill.tableNumber,
         bill.paymentMethod,
       ]
@@ -257,7 +258,7 @@ export default function Payment() {
   const openCustomerEdit = (bill) => {
     setSelectedDueBill(bill);
     setCustomerName(bill.customerName || "");
-    setCustomerPhone(bill.customerPhone || "");
+    setCustomerPhone(displayCustomerPhone(bill.customerPhone));
     setShowCustomerModal(true);
   };
 
@@ -349,7 +350,7 @@ export default function Payment() {
     const formattedData = visibleBills.map((bill) => ({
       "Order ID": bill.orderId,
       Customer: bill.customerName,
-      Phone: bill.customerPhone,
+      Phone: displayCustomerPhone(bill.customerPhone),
       "Order Type": bill.orderType,
       Table: bill.tableNumber,
       Subtotal: bill.subtotal,
@@ -622,7 +623,7 @@ export default function Payment() {
         </div>
       )}
       <div className="-m-4 bg-[var(--background)] p-4 font-sans md:-m-6 md:p-5 lg:-m-8 lg:p-5">
-        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-[var(--primary)] via-[var(--primary)] to-[var(--secondary)] p-5 text-white">
+        <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-rose-500 via-rose-500 to-orange-400  p-5 text-white">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex items-start gap-3">
               <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/20">
@@ -840,11 +841,11 @@ export default function Payment() {
                             <p className="font-bold text-slate-800">
                               {bill.customerName || "Walk-in"}
                             </p>
-                            {bill.customerPhone && (
+                            {displayCustomerPhone(bill.customerPhone) ? (
                               <p className="text-[10px] text-slate-400">
-                                {bill.customerPhone}
+                                {displayCustomerPhone(bill.customerPhone)}
                               </p>
-                            )}
+                            ) : null}
                             {bill.isSplitBill && (
                               <span className="text-[9px] font-black text-violet-600">
                                 Split

@@ -20,6 +20,9 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "react-toastify";
+import { useAuth } from "../context/AuthContext";
+import { hasEventManagementAccess } from "../features/events/eventsAccess";
+import { displayPhone } from "../utils/displayText";
 
 const API_BASE = (import.meta.env.VITE_APP_API_BASE || "").replace(/\/+$/, "");
 
@@ -724,6 +727,9 @@ function Info({ title, value, sub, icon: Icon }) {
 }
 
 export default function EventManagement() {
+  const { user } = useAuth();
+  const entitled = hasEventManagementAccess(user);
+
   const [workspace, setWorkspace] = useState("EVENTS");
   const [view, setView] = useState("LIST");
   const [search, setSearch] = useState("");
@@ -990,53 +996,58 @@ export default function EventManagement() {
   }, []);
 
   useEffect(() => {
+    if (!entitled) return undefined;
     const timer = setTimeout(() => {
       setPage(1);
       loadEvents();
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [search, statusFilter]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [search, statusFilter, entitled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (!entitled) return undefined;
     const timer = setTimeout(() => {
       loadEvents();
     }, 0);
 
     return () => clearTimeout(timer);
-  }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [page, entitled]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (!entitled) return undefined;
     const timer = setTimeout(() => {
       loadStats();
     }, 0);
 
     return () => clearTimeout(timer);
-  }, [loadStats]);
+  }, [loadStats, entitled]);
 
   useEffect(() => {
+    if (!entitled) return undefined;
     const timer = setTimeout(() => {
       loadCalendarEvents();
     }, 0);
 
     return () => clearTimeout(timer);
-  }, [loadCalendarEvents]);
+  }, [loadCalendarEvents, entitled]);
 
   useEffect(() => {
+    if (!entitled) return undefined;
     const timer = setTimeout(() => {
       loadMasters();
     }, 0);
 
     return () => clearTimeout(timer);
-  }, [loadMasters]);
+  }, [loadMasters, entitled]);
 
   useEffect(() => {
-    if (workspace !== "PACKAGES") return undefined;
+    if (!entitled || workspace !== "PACKAGES") return undefined;
     const timer = setTimeout(() => {
       loadManagedPackages();
     }, 0);
     return () => clearTimeout(timer);
-  }, [workspace, loadManagedPackages]);
+  }, [workspace, loadManagedPackages, entitled]);
 
   const refreshAll = async () => {
     await Promise.all([
@@ -1701,6 +1712,25 @@ export default function EventManagement() {
   const showMenu = wizardStep === 2;
   const showBilling = wizardStep === 3;
 
+  if (!entitled) {
+    return (
+      <div className="flex min-h-[400px] items-center justify-center p-4">
+        <div className="w-full max-w-md rounded-3xl border border-amber-200 bg-amber-50 p-8 text-center shadow-sm">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-100">
+            <CalendarDays className="h-8 w-8 text-amber-600" />
+          </div>
+          <h2 className="mt-5 text-2xl font-black text-amber-950">
+            Event Management unavailable
+          </h2>
+          <p className="mt-3 text-sm leading-6 text-amber-900">
+            Event Management requires an active subscription with
+            EVENT_MANAGEMENT. Upgrade your plan to access this feature.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="-m-4 min-h-full bg-[var(--background)] p-4 font-sans text-slate-900 md:-m-6 md:p-5 lg:-m-8 lg:p-5">
       <div className="relative mb-4 overflow-hidden rounded-3xl bg-gradient-to-r from-[var(--primary)] via-[var(--primary)] to-[var(--secondary)] p-5 text-white shadow-sm">
@@ -2080,7 +2110,11 @@ export default function EventManagement() {
                               {event.customer?.name || event.customerName}
                             </p>
                             <p className="mt-0.5 text-xs text-[var(--text-muted)]">
-                              +91 {event.customer?.phone || event.customerPhone}
+                              +91{" "}
+                              {displayPhone(
+                                event.customer?.phone || event.customerPhone,
+                                "",
+                              ) || "—"}
                             </p>
                           </td>
 
@@ -3500,9 +3534,12 @@ export default function EventManagement() {
                 <Info
                   title="Customer"
                   value={selectedEvent.customer?.name}
-                  sub={`+91 ${selectedEvent.customer?.phone || ""}${
-                    selectedEvent.customer?.alternatePhone
-                      ? ` · Alt ${selectedEvent.customer.alternatePhone}`
+                  sub={`+91 ${displayPhone(selectedEvent.customer?.phone, "") || "—"}${
+                    displayPhone(
+                      selectedEvent.customer?.alternatePhone,
+                      "",
+                    )
+                      ? ` · Alt ${displayPhone(selectedEvent.customer?.alternatePhone, "")}`
                       : ""
                   }`}
                   icon={UserRound}

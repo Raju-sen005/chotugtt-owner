@@ -38,6 +38,10 @@ import {
 import { roomMgmtKeys } from "../rooms/roomManagementQueryKeys";
 import { buildRoomFoliosCheckoutHref } from "./bookingsCheckoutNav";
 import {
+  displayMobileNumber,
+  displayPhone,
+} from "../../utils/displayText";
+import {
   BOOKING_STATUSES,
   ID_PROOF_TYPES,
   bookingIdOf,
@@ -634,7 +638,7 @@ export default function BookingManagement() {
 
     if (pendingDocs.length > 0 && !canUploadGuestDocs) {
       showPopup(
-        "Identity document upload requires Guest Management (PLUS) and OWNER/MANAGER role.",
+        "This feature is not included in your current plan. Contact your administrator to enable this feature.",
         "error",
       );
       return;
@@ -865,11 +869,10 @@ export default function BookingManagement() {
             <Crown className="mt-0.5 h-6 w-6 text-amber-600" />
             <div>
               <h2 className="text-base font-bold text-amber-900">
-                PLUS feature required
+                This feature is not included in your current plan.
               </h2>
               <p className="mt-1 text-sm text-amber-800">
-                Room Booking is available on an active PLUS plan. PRO and other
-                plans do not include this feature.
+                Contact your administrator to enable this feature.
               </p>
             </div>
           </div>
@@ -1044,7 +1047,7 @@ export default function BookingManagement() {
                               {booking.customerName}
                             </p>
                             <p className="text-xs text-[var(--text-muted)]">
-                              {booking.mobileNumber}
+                              {displayMobileNumber(booking.mobileNumber)}
                             </p>
                             {booking.idProof?.proofType ? (
                               <p className="text-[10px] text-[var(--text-muted)]">
@@ -1264,7 +1267,7 @@ export default function BookingManagement() {
                         <UserRound size={14} />
                         <span className="font-medium">{guest.fullName}</span>
                         <span className="text-xs text-[var(--text-muted)]">
-                          {guest.phone}
+                          {displayPhone(guest.phone)}
                         </span>
                       </button>
                     );
@@ -1443,9 +1446,9 @@ export default function BookingManagement() {
             </h4>
             {!canUploadGuestDocs ? (
               <p className="text-xs text-[var(--text-muted)]">
-                Encrypted document upload requires Guest Management (PLUS) and
-                OWNER/MANAGER access. You can still create the booking with ID
-                proof details above.
+                This feature is not included in your current plan. Contact your
+                administrator to enable this feature. You can still create the
+                booking with ID proof details above.
               </p>
             ) : (
               <>

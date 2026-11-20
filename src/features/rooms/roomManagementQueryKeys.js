@@ -1,5 +1,5 @@
 /**
- * Canonical TanStack Query keys for ChotuGTT Room Management.
+ * Canonical TanStack Query keys for Transserve Room Management.
  * Always use these prefixes so invalidateQueries hits every consumer.
  */
 

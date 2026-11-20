@@ -1,13 +1,12 @@
 /**
- * PLUS + ROOM_FOLIO access helpers (Milestone 6D).
+ * ROOM_FOLIO access helpers (Milestone 6D).
  *
  * Backend: folio routes require requireFeature(ROOM_FOLIO) under
- * ROOM_MANAGEMENT parent. PRO does not receive ROOM_FOLIO.
+ * ROOM_MANAGEMENT parent. Entitlement from availableFeatures.
  */
 
 import {
   isSubscriptionActive,
-  normalizePlan,
   isFeatureNotAvailable,
 } from "../rooms/roomsAccess";
 import {
@@ -18,6 +17,10 @@ import {
   formatBookingDate,
   getBookingApiErrorMessage,
 } from "../bookings/bookingsAccess";
+import {
+  FEATURE_KEYS,
+  hasAvailableFeature,
+} from "../subscription/featureAccess";
 
 export const FOLIO_STATUSES = Object.freeze([
   "OPEN",
@@ -37,7 +40,10 @@ export const PAYMENT_METHODS = Object.freeze(["CASH", "UPI", "MIXED"]);
 
 export function hasRoomFolioAccess(user) {
   if (!user || user.role === "SUPERADMIN") return false;
-  return isSubscriptionActive(user) && normalizePlan(user) === "PLUS";
+  return (
+    isSubscriptionActive(user) &&
+    hasAvailableFeature(user, FEATURE_KEYS.ROOM_FOLIO)
+  );
 }
 
 /** Payments, adjustments, init, checkout — OWNER|MANAGER (matches backend). */
@@ -89,7 +95,7 @@ export function getFolioApiErrorMessage(error, fallback = "Request failed") {
   if (code === "FEATURE_NOT_AVAILABLE") {
     return (
       data.message ||
-      "Room Folio requires an active PLUS subscription (ROOM_FOLIO)."
+      "This feature is not included in your current plan."
     );
   }
   if (code === "FOLIO_NOT_FOUND") {

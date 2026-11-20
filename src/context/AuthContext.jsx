@@ -11,6 +11,11 @@ import {
 } from "react";
 import axios from "axios";
 import { useQueryClient } from "@tanstack/react-query";
+import {
+  buildWelcomePayloadFromPendingResponse,
+  clearPendingRegistration,
+  writeWelcomePayload,
+} from "../features/auth/pendingRegistration";
 
 const AuthContext = createContext(null);
 
@@ -38,6 +43,7 @@ axios.interceptors.response.use(
       url.includes("/auth/me") ||
       url.includes("/auth/login") ||
       url.includes("/auth/register") ||
+      url.includes("/auth/registration-status") ||
       url.includes("/auth/logout");
 
     if (
@@ -234,6 +240,7 @@ export const AuthProvider = ({ children }) => {
   const expiryTimerRef = useRef(null);
   const mountedRef = useRef(true);
   const verifySessionRef = useRef(null);
+  const previousEntitlementKeyRef = useRef(null);
 
   /*
   |--------------------------------------------------------------------------
@@ -430,6 +437,8 @@ export const AuthProvider = ({ children }) => {
         return null;
       }
 
+      clearPendingRegistration();
+
       /*
       |--------------------------------------------------------------------------
       | Backend subscription check
@@ -476,17 +485,60 @@ export const AuthProvider = ({ children }) => {
         return authenticatedUser;
       }
 
-     
+      const entitlementKey = [
+        authenticatedUser.subscriptionPlan,
+        authenticatedUser.subscriptionStatus,
+        Array.isArray(authenticatedUser.availableFeatures)
+          ? authenticatedUser.availableFeatures.join("|")
+          : "",
+      ].join("::");
+
+      if (
+        previousEntitlementKeyRef.current &&
+        previousEntitlementKeyRef.current !== entitlementKey
+      ) {
+        // Plan/feature change: drop stale React Query caches (replace, never merge).
+        queryClient.clear();
+      }
+      previousEntitlementKeyRef.current = entitlementKey;
 
       if (mountedRef.current) {
+        // Full replace from /auth/me — never merge prior availableFeatures.
         setUser(authenticatedUser);
       }
 
       scheduleSubscriptionCheck(authenticatedUser);
 
       return authenticatedUser;
-    } catch {
-     
+    } catch (error) {
+      const responseData = error?.response?.data;
+
+      if (
+        responseData?.requiresApproval === true ||
+        responseData?.code === "PENDING_APPROVAL"
+      ) {
+        if (mountedRef.current) {
+          setUser(null);
+        }
+        clearSubscriptionTimer();
+
+        const welcome = buildWelcomePayloadFromPendingResponse(
+          responseData,
+          responseData?.ownerEmail,
+        );
+        if (welcome) {
+          writeWelcomePayload(welcome);
+        }
+
+        if (
+          typeof window !== "undefined" &&
+          !window.location.pathname.startsWith("/registration-success")
+        ) {
+          window.location.replace("/registration-success");
+        }
+
+        return null;
+      }
 
       if (mountedRef.current) {
         setUser(null);
@@ -498,10 +550,10 @@ export const AuthProvider = ({ children }) => {
     }
   }, [
     clearSubscriptionTimer,
+    queryClient,
     redirectToSubscription,
     scheduleSubscriptionCheck,
   ]);
-
   useEffect(() => {
     verifySessionRef.current = verifySession;
   }, [verifySession]);
@@ -642,6 +694,31 @@ export const AuthProvider = ({ children }) => {
         |--------------------------------------------------------------------------
         */
 
+        if (
+          responseData?.requiresApproval === true ||
+          responseData?.code === "PENDING_APPROVAL"
+        ) {
+          if (mountedRef.current) {
+            setUser(null);
+          }
+          clearSubscriptionTimer();
+
+          const welcome = buildWelcomePayloadFromPendingResponse(
+            responseData,
+            email,
+          );
+          if (welcome) {
+            writeWelcomePayload(welcome);
+          }
+
+          return {
+            ...responseData,
+            requiresApproval: true,
+            requiresSubscription: false,
+            requiresCheckout: false,
+          };
+        }
+
         if (responseData?.requiresSubscription === true) {
           /*
           |--------------------------------------------------------------------------
@@ -683,6 +760,12 @@ export const AuthProvider = ({ children }) => {
               responseData.subscriptionExpiresAt ||
               responseData.data?.subscriptionExpiresAt ||
               null,
+
+            availableFeatures: Array.isArray(responseData.availableFeatures)
+              ? responseData.availableFeatures
+              : Array.isArray(responseData.data?.availableFeatures)
+                ? responseData.data.availableFeatures
+                : [],
 
             requiresSubscription: true,
           };
@@ -775,6 +858,16 @@ export const AuthProvider = ({ children }) => {
         |--------------------------------------------------------------------------
         */
 
+        const registrationFeatures = Array.isArray(
+          registeredUser?.availableFeatures,
+        )
+          ? registeredUser.availableFeatures
+          : Array.isArray(res.data.data?.availableFeatures)
+            ? res.data.data.availableFeatures
+            : Array.isArray(res.data.data?.restaurant?.availableFeatures)
+              ? res.data.data.restaurant.availableFeatures
+              : [];
+
         const registrationUser = {
           ...(registeredUser || {}),
           role: registeredUser?.role || "OWNER",
@@ -782,6 +875,12 @@ export const AuthProvider = ({ children }) => {
           restaurantId:
             registeredUser?.restaurantId ||
             res.data.data?.restaurant?._id ||
+            res.data.data?.restaurant?.id ||
+            null,
+
+          subscriptionPlan:
+            registeredUser?.subscriptionPlan ||
+            res.data.data?.restaurant?.subscriptionPlan ||
             null,
 
           subscriptionStatus:
@@ -793,31 +892,55 @@ export const AuthProvider = ({ children }) => {
             registeredUser?.subscriptionExpiresAt ||
             res.data.data?.restaurant?.subscriptionExpiresAt ||
             null,
+
+          availableFeatures: registrationFeatures,
         };
 
-        if (mountedRef.current) {
-          setUser(registrationUser);
-        }
-
         /*
-        |--------------------------------------------------------------------------
-        | New registration must have an active subscription
-        | before dashboard access.
-        |--------------------------------------------------------------------------
+        | Manual approval flow: do not keep a dashboard session and do not
+        | send the owner to Razorpay / subscription checkout.
         */
+        const requiresApproval = Boolean(
+          res.data.data?.requiresApproval ||
+            res.data.data?.approvalStatus === "PENDING_APPROVAL",
+        );
 
-        if (
-          res.data.requiresSubscription === true ||
-          isSubscriptionExpired(registrationUser)
-        ) {
+        if (requiresApproval) {
           clearSubscriptionTimer();
+          if (mountedRef.current) {
+            setUser(null);
+          }
 
-          redirectToSubscription();
+          writeWelcomePayload({
+            businessName: res.data.data?.restaurant?.name || null,
+            businessCategory:
+              res.data.data?.businessCategory ||
+              res.data.data?.restaurant?.businessCategory ||
+              null,
+            planCode: res.data.data?.selectedPlan?.code || null,
+            planName: res.data.data?.selectedPlan?.name || null,
+            planAmount: res.data.data?.selectedPlan?.amount ?? null,
+            approvalStatus: "PENDING_APPROVAL",
+            ownerEmail:
+              res.data.data?.user?.email ||
+              registeredUser?.email ||
+              null,
+          });
+
+          if (typeof window !== "undefined") {
+            window.location.replace("/registration-success");
+          }
 
           return {
             ...res.data,
-            requiresSubscription: true,
+            requiresApproval: true,
+            requiresCheckout: false,
+            requiresSubscription: false,
           };
+        }
+
+        if (mountedRef.current) {
+          setUser(registrationUser);
         }
 
         scheduleSubscriptionCheck(registrationUser);
@@ -825,7 +948,7 @@ export const AuthProvider = ({ children }) => {
 
       return res.data;
     },
-    [clearSubscriptionTimer, redirectToSubscription, scheduleSubscriptionCheck],
+    [clearSubscriptionTimer, scheduleSubscriptionCheck],
   );
 
   /*

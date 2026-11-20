@@ -21,7 +21,7 @@ export function buildRoomQrPrintHtml({
   roomNumber,
   dataUrl,
 }) {
-  const brand = escapeHtml(restaurantName || "ChotuGTT");
+  const brand = escapeHtml(restaurantName || "Transserve");
   const room = escapeHtml(roomNumber || "");
   const src = escapeHtml(dataUrl || "");
 
@@ -98,7 +98,7 @@ export function buildRoomQrPrintHtml({
 </head>
 <body>
   <div class="sheet">
-    <p class="eyebrow">ChotuGTT</p>
+    <p class="eyebrow">Transserve</p>
     <p class="brand">${brand}</p>
     <h1 class="room">Room ${room}</h1>
     <div class="qr"><img id="qr-img" src="${src}" alt="Room QR code" width="220" height="220" /></div>

@@ -1,8 +1,7 @@
 /**
  * Label: Source-contract / pure unit
- * Subscription plan visibility — Pro + Plus must appear in public checkout
- * copy and admin sellable lists. Amounts remain backend-authoritative.
- * Not browser UI. Not HTTP.
+ * Legacy plans remain for OWNER renewal copy only.
+ * New acquisition uses commercial catalog; SuperAdmin assigns TRIAL + 11.
  */
 
 import { describe, it } from "node:test";
@@ -10,17 +9,32 @@ import assert from "node:assert/strict";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import {
+  ASSIGNABLE_PLANS,
+  FILTERABLE_PLANS,
+  isLegacyPlanCode,
+} from "../features/admin/adminPlanCatalog.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const EXPECTED_SIX = [
-  "TRIAL",
-  "STARTER",
-  "BASIC",
-  "PREMIUM",
-  "PRO",
-  "PLUS",
-];
+const LEGACY_SIX = ["TRIAL", "STARTER", "BASIC", "PREMIUM", "PRO", "PLUS"];
+
+describe("[Unit] adminPlanCatalog assignment vs legacy", () => {
+  it("assignable plans are TRIAL + 11 commercial only", () => {
+    assert.equal(ASSIGNABLE_PLANS.length, 12);
+    assert.equal(ASSIGNABLE_PLANS.includes("TRIAL"), true);
+    assert.equal(ASSIGNABLE_PLANS.includes("RESTAURANT_STARTER"), true);
+    assert.equal(ASSIGNABLE_PLANS.includes("PLUS"), false);
+    assert.equal(ASSIGNABLE_PLANS.includes("PRO"), false);
+  });
+
+  it("filterable plans still include legacy for existing tenants", () => {
+    assert.equal(isLegacyPlanCode("PLUS"), true);
+    assert.equal(isLegacyPlanCode("RESTAURANT_PRO"), false);
+    assert.equal(FILTERABLE_PLANS.includes("PLUS"), true);
+    assert.equal(FILTERABLE_PLANS.includes("HOTEL_GROWTH"), true);
+  });
+});
 
 describe("[Source-contract] public SubscriptionCheckout PLAN_COPY", () => {
   const source = fs.readFileSync(
@@ -28,43 +42,35 @@ describe("[Source-contract] public SubscriptionCheckout PLAN_COPY", () => {
     "utf8",
   );
 
-  it("PLAN_COPY includes PRO and PLUS (not commented out)", () => {
+  it("keeps legacy PLAN_COPY for renewal but marks renewal-only", () => {
+    assert.match(source, /renewal only/i);
     assert.match(source, /^\s*PRO:\s*\{/m);
     assert.match(source, /^\s*PLUS:\s*\{/m);
-    assert.doesNotMatch(source, /\/\/\s*PRO:\s*\{/);
-  });
-
-  it("filters server plans through PLAN_COPY keys for all six codes", () => {
-    assert.match(source, /\.filter\(\(plan\)\s*=>\s*PLAN_COPY\[plan\.code\]\)/);
-    for (const code of EXPECTED_SIX) {
-      assert.match(
-        source,
-        new RegExp(`${code}:\\s*\\{`),
-        `missing PLAN_COPY.${code}`,
-      );
+    for (const code of LEGACY_SIX) {
+      assert.match(source, new RegExp(`${code}:\\s*\\{`));
     }
   });
 
-  it("keeps amounts from API (does not hardcode Pro/Plus prices in PLAN_COPY)", () => {
-    const planCopy = source.slice(
-      source.indexOf("const PLAN_COPY"),
-      source.indexOf("export { PLAN_COPY }"),
+  it("acquisition path uses CommercialCatalogPreview, not legacy marketing", () => {
+    assert.match(source, /CommercialCatalogPreview/);
+    assert.match(source, /Choose the Right Plan for Your Business/);
+    assert.doesNotMatch(
+      source,
+      /Choose Starter, Basic, Premium, Pro, or Plus to continue/,
     );
-    assert.doesNotMatch(planCopy, /amount\s*:/);
-    assert.doesNotMatch(planCopy, /12000|10000/);
   });
 });
 
-describe("[Source-contract] admin SuperAdminPanel sellable plans", () => {
+describe("[Source-contract] admin SuperAdminPanel assignable plans", () => {
   const source = fs.readFileSync(
     path.join(__dirname, "../features/admin/SuperAdminPanel.jsx"),
     "utf8",
   );
 
-  it("SELLABLE_PLANS includes PLUS and PRO", () => {
-    assert.match(source, /const SELLABLE_PLANS\s*=\s*\[[\s\S]*?"PLUS"[\s\S]*?\]/);
-    assert.match(source, /"PRO"/);
-    assert.match(source, /option value="PLUS"/);
-    assert.match(source, /label:\s*"Plus"/);
+  it("assignment UI uses ASSIGNABLE_PLANS and labels legacy separately", () => {
+    assert.match(source, /ASSIGNABLE_PLANS/);
+    assert.match(source, /isLegacyPlanCode/);
+    assert.match(source, /Pending Approvals/);
+    assert.doesNotMatch(source, /const SELLABLE_PLANS\s*=/);
   });
 });

@@ -17,7 +17,6 @@ import {
   Crown,
   CheckCircle2,
   CalendarDays,
-  // ShoppingBasket,
   Package,
   BedDouble,
   ContactRound,
@@ -31,19 +30,25 @@ import { hasGuestManagementAccess } from "../features/guests/guestsAccess";
 import { hasRoomBookingAccess } from "../features/bookings/bookingsAccess";
 import { hasRoomQrAccess } from "../features/roomQr/roomQrAccess";
 import { hasRoomFolioAccess } from "../features/folios/folioAccess";
+import { hasEventManagementAccess } from "../features/events/eventsAccess";
+import {
+  FEATURE_KEYS,
+  hasAvailableFeature,
+} from "../features/subscription/featureAccess";
+import {
+  HOTEL_ONLY_NAV_PATHS,
+  isHotelOnlyPlan,
+} from "./sidebarHotelNav";
 
-const NAV_ITEMS = [
-  { to: "/", icon: LayoutGrid, label: "Overview" },
-  { to: "/counter", icon: MonitorSmartphone, label: "Counter POS" },
-  { to: "/orders", icon: ClipboardList, label: "Live Orders", badge: true },
-  { to: "/menu", icon: BookOpen, label: "Menu Catalog" },
-  { to: "/analysis", icon: BarChart3, label: "Analysis" },
-  { to: "/payment", icon: Wallet, label: "Payment" },
-  { to: "/offer", icon: Tag, label: "Offers" },
-  { to: "/table-monitor", icon: Grid2x2, label: "Table Monitor" },
+const HOTEL_ONLY_NAV_ITEMS = Object.freeze([
+  { to: "/", icon: LayoutGrid, label: "Hotel Overview" },
+  { to: HOTEL_ONLY_NAV_PATHS[0], icon: BedDouble, label: "Rooms" },
+  { to: HOTEL_ONLY_NAV_PATHS[1], icon: CalendarCheck2, label: "Bookings" },
+  { to: HOTEL_ONLY_NAV_PATHS[2], icon: QrCode, label: "Room QR" },
+  { to: HOTEL_ONLY_NAV_PATHS[3], icon: FileText, label: "Room Billing" },
+  { to: HOTEL_ONLY_NAV_PATHS[4], icon: ContactRound, label: "Guests" },
   { to: "/profile", icon: UserRound, label: "Profile" },
-  { to: "/staff", icon: Users, label: "Staff & Captains" },
-];
+]);
 
 function formatExpiry(value) {
   const date = value ? new Date(value) : null;
@@ -55,11 +60,96 @@ function formatExpiry(value) {
   });
 }
 
+function buildRestaurantNavItems(user, {
+  showRoomsManagement,
+  showBookingManagement,
+  showRoomQrManagement,
+  showRoomFolioManagement,
+  showGuestManagement,
+  showEventManagement,
+  canManageStaff,
+}) {
+  const items = [{ to: "/", icon: LayoutGrid, label: "Overview" }];
+
+  if (hasAvailableFeature(user, FEATURE_KEYS.POS)) {
+    items.push({
+      to: "/counter",
+      icon: MonitorSmartphone,
+      label: "Counter POS",
+    });
+    items.push({
+      to: "/orders",
+      icon: ClipboardList,
+      label: "Live Orders",
+      badge: true,
+    });
+  }
+
+  if (hasAvailableFeature(user, FEATURE_KEYS.MENU)) {
+    items.push({ to: "/menu", icon: BookOpen, label: "Menu Catalog" });
+  }
+
+  if (hasAvailableFeature(user, FEATURE_KEYS.ANALYSIS)) {
+    items.push({ to: "/analysis", icon: BarChart3, label: "Analysis" });
+  }
+
+  if (
+    hasAvailableFeature(user, FEATURE_KEYS.PAYMENTS) ||
+    hasAvailableFeature(user, FEATURE_KEYS.BILLING)
+  ) {
+    items.push({ to: "/payment", icon: Wallet, label: "Payment" });
+  }
+
+  if (hasAvailableFeature(user, FEATURE_KEYS.OFFERS)) {
+    items.push({ to: "/offer", icon: Tag, label: "Offers" });
+  }
+
+  if (hasAvailableFeature(user, FEATURE_KEYS.QR_TABLE)) {
+    items.push({
+      to: "/table-monitor",
+      icon: Grid2x2,
+      label: "Table Monitor",
+    });
+  }
+
+  items.push({ to: "/profile", icon: UserRound, label: "Profile" });
+
+  if (canManageStaff) {
+    items.push({ to: "/staff", icon: Users, label: "Staff & Captains" });
+  }
+
+  if (showRoomsManagement) {
+    items.push({ to: "/rooms", icon: BedDouble, label: "Rooms" });
+  }
+  if (showBookingManagement) {
+    items.push({ to: "/bookings", icon: CalendarCheck2, label: "Bookings" });
+  }
+  if (showRoomQrManagement) {
+    items.push({ to: "/room-qr", icon: QrCode, label: "Room QR" });
+  }
+  if (showRoomFolioManagement) {
+    items.push({ to: "/room-folios", icon: FileText, label: "Room Billing" });
+  }
+  if (showGuestManagement) {
+    items.push({ to: "/guests", icon: ContactRound, label: "Guests" });
+  }
+  if (showEventManagement) {
+    items.push({
+      to: "/events",
+      icon: CalendarDays,
+      label: "Event Management",
+    });
+  }
+
+  return items;
+}
+
 export default function Sidebar({ closeMobileSidebar }) {
   const { user } = useAuth();
   const restaurantId = user?.restaurantId?._id || user?.restaurantId || null;
   const isSuperAdmin = user?.role === "SUPERADMIN";
-  const canAccessSupply = ["OWNER", "MANAGER"].includes(user?.role);
+  const hotelOnlyPlan = !isSuperAdmin && isHotelOnlyPlan(user);
+  const canManageStaff = ["OWNER", "MANAGER"].includes(user?.role);
   const handleNavClick = useMemo(
     () => (closeMobileSidebar ? closeMobileSidebar : () => {}),
     [closeMobileSidebar],
@@ -74,7 +164,7 @@ export default function Sidebar({ closeMobileSidebar }) {
       );
       return res.data.data || [];
     },
-    enabled: Boolean(restaurantId) && !isSuperAdmin,
+    enabled: Boolean(restaurantId) && !isSuperAdmin && !hotelOnlyPlan,
     staleTime: 15_000,
     refetchOnWindowFocus: false,
     refetchInterval: 60_000,
@@ -93,33 +183,12 @@ export default function Sidebar({ closeMobileSidebar }) {
     Number.isFinite(new Date(expiry).getTime()) &&
     new Date(expiry).getTime() > Date.now();
 
-  const subscriptionPlan =
-    user?.subscriptionPlan || user?.restaurant?.subscriptionPlan || null;
-
-  const showEventManagement =
-    !isSuperAdmin &&
-    subscriptionActive &&
-    String(subscriptionPlan).toUpperCase() === "PRO";
-
-  // PLUS-only ROOM_MANAGEMENT (PRO must not receive Rooms access)
-  const showRoomsManagement =
-    !isSuperAdmin && hasRoomManagementAccess(user);
-
-  // PLUS-only GUEST_MANAGEMENT (PRO must not receive Guests access)
-  const showGuestManagement =
-    !isSuperAdmin && hasGuestManagementAccess(user);
-
-  // PLUS-only room booking (backend gates via ROOM_MANAGEMENT; PRO denied)
-  const showBookingManagement =
-    !isSuperAdmin && hasRoomBookingAccess(user);
-
-  // PLUS-only ROOM_QR_ORDERING (OWNER/MANAGER actions enforced on page)
-  const showRoomQrManagement =
-    !isSuperAdmin && hasRoomQrAccess(user);
-
-  // PLUS-only ROOM_FOLIO (PRO denied; role actions enforced on page)
-  const showRoomFolioManagement =
-    !isSuperAdmin && hasRoomFolioAccess(user);
+  const showEventManagement = !isSuperAdmin && hasEventManagementAccess(user);
+  const showRoomsManagement = !isSuperAdmin && hasRoomManagementAccess(user);
+  const showGuestManagement = !isSuperAdmin && hasGuestManagementAccess(user);
+  const showBookingManagement = !isSuperAdmin && hasRoomBookingAccess(user);
+  const showRoomQrManagement = !isSuperAdmin && hasRoomQrAccess(user);
+  const showRoomFolioManagement = !isSuperAdmin && hasRoomFolioAccess(user);
 
   const navItems = isSuperAdmin
     ? [
@@ -134,84 +203,31 @@ export default function Sidebar({ closeMobileSidebar }) {
           label: "Supply Management",
         },
       ]
-    : [
-        ...NAV_ITEMS,
-        // ...(canAccessSupply
-        //   ? [
-        //       {
-        //         to: "/supply",
-        //         icon: ShoppingBasket,
-        //         label: "Supply",
-        //       },
-        //     ]
-        //   : []),
-        ...(showRoomsManagement
-          ? [
-              {
-                to: "/rooms",
-                icon: BedDouble,
-                label: "Rooms",
-              },
-            ]
-          : []),
-        ...(showBookingManagement
-          ? [
-              {
-                to: "/bookings",
-                icon: CalendarCheck2,
-                label: "Bookings",
-              },
-            ]
-          : []),
-        ...(showRoomQrManagement
-          ? [
-              {
-                to: "/room-qr",
-                icon: QrCode,
-                label: "Room QR",
-              },
-            ]
-          : []),
-        ...(showRoomFolioManagement
-          ? [
-              {
-                to: "/room-folios",
-                icon: FileText,
-                label: "Room Billing",
-              },
-            ]
-          : []),
-        ...(showGuestManagement
-          ? [
-              {
-                to: "/guests",
-                icon: ContactRound,
-                label: "Guests",
-              },
-            ]
-          : []),
-        ...(showEventManagement
-          ? [
-              {
-                to: "/events",
-                icon: CalendarDays,
-                label: "Event Management",
-              },
-            ]
-          : []),
-      ];
+    : hotelOnlyPlan
+      ? [
+          ...HOTEL_ONLY_NAV_ITEMS,
+          ...(canManageStaff
+            ? [{ to: "/staff", icon: Users, label: "Staff" }]
+            : []),
+        ]
+      : buildRestaurantNavItems(user, {
+          showRoomsManagement,
+          showBookingManagement,
+          showRoomQrManagement,
+          showRoomFolioManagement,
+          showGuestManagement,
+          showEventManagement,
+          canManageStaff,
+        });
+
   return (
     <aside className="flex h-full w-full flex-col overflow-hidden border-r border-[var(--border)] bg-white font-sans text-[var(--text-secondary)] select-none">
       <div className="flex items-center gap-3 px-6 pb-4 pt-6">
         <img
-          src="/ChotuGTT__1_-removebg-preview.png"
-          alt="ChotuGTT Logo"
-          className="h-7 w-7"
+          src="/Clean Transserve Brand Logo.svg"
+          alt="Transserve"
+          className="h-20 w-75"
         />
-        <p className="text-[26px] font-black tracking-tight leading-none">
-          <span className="text-[var(--text-primary)]">Chotu</span>
-          <span className="text-[var(--secondary)]">GTT</span>
-        </p>
       </div>
 
       <nav className="no-scrollbar min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3 pb-3">
@@ -264,21 +280,6 @@ export default function Sidebar({ closeMobileSidebar }) {
       {!isSuperAdmin && (
         <div className="px-3 pb-3">
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-3.5">
-            {/* <div className="flex items-center gap-2.5">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--secondary-light)] text-[var(--secondary)]">
-                <Crown size={15} />
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-black leading-none">
-                  <span className="text-[var(--text-primary)]">Chotu</span>
-                  <span className="text-[var(--secondary)]">GTT</span>
-                </p>
-                <p className="mt-1 text-[10px] font-medium text-[var(--text-muted)]">
-                  Restaurant Management
-                </p>
-              </div>
-            </div> */}
-
             <div className="mt-3 flex items-start gap-2">
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--secondary-light)] text-[var(--secondary)]">
                 <Crown size={15} />
