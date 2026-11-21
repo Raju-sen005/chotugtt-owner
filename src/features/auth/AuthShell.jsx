@@ -1,7 +1,7 @@
 // import { ChefHat } from "lucide-react";
 
 export const authInputClass =
-  "w-full rounded-xl border border-[var(--border)] bg-white px-3.5 py-3 text-sm font-medium text-[var(--text-primary)] outline-none transition placeholder:text-[var(--text-disabled)] focus:border-[var(--primary)] focus:ring-4 focus:ring-[rgba(244,63,94,0.12)]";
+  "gtt-input w-full px-3.5 py-3 text-sm font-medium outline-none transition placeholder:text-[var(--text-disabled)]";
 
 export function AuthField({ label, hint, children }) {
   return (
@@ -28,33 +28,29 @@ export default function AuthShell({
 }) {
   return (
     <div className="min-h-dvh bg-[var(--background)] font-sans lg:grid lg:grid-cols-12">
-      <aside className="relative overflow-hidden bg-slate-950 text-white lg:col-span-5 lg:flex lg:min-h-dvh lg:flex-col lg:justify-between">
+      <aside className="relative overflow-hidden bg-[var(--brand-navy)] text-white lg:col-span-5 lg:flex lg:min-h-dvh lg:flex-col lg:justify-between">
         <div className="pointer-events-none absolute inset-0 gtt-gradient-brand opacity-90" />
         <div className="pointer-events-none absolute -right-16 top-8 h-56 w-56 rounded-full bg-white/10 blur-3xl" />
         <div className="pointer-events-none absolute bottom-0 left-0 h-40 w-40 rounded-full bg-[var(--secondary)]/20 blur-3xl" />
 
         <div className="relative px-5 py-4 sm:px-8 lg:px-10 lg:pt-12">
           <div className="flex items-center gap-3">
-            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white text-[var(--primary)] shadow-sm">
-              {/* <ChefHat size={22} strokeWidth={2.25} /> */}
+            <span className="flex h-11 w-11 items-center justify-center rounded-[14px] bg-white shadow-sm">
               <img
-                src="/Untitled.svg"
-                alt="Transserve"
-                className="h-7 w-7"
+                src="/brand/Vibrant_Transserve_Gradient_Logo-removebg-preview.png"
+                alt=""
+                className="h-7 w-7 object-contain"
               />
             </span>
             <div className="leading-tight">
-              {/* <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/70">
-                Hospitality
-              </p> */}
-              <p className="text-lg font-black tracking-tight text-white">
+              <p className="font-display text-lg font-bold tracking-tight text-white">
                 Transserve
               </p>
             </div>
           </div>
 
           <div className="mt-12 hidden max-w-sm lg:block">
-            <h2 className="text-3xl font-black leading-tight">{panelTitle}</h2>
+            <h2 className="font-display text-3xl font-bold leading-tight">{panelTitle}</h2>
             <ul className="mt-6 space-y-3">
               {panelPoints.map((point) => (
                 <li
@@ -76,8 +72,8 @@ export default function AuthShell({
 
       <main className="flex items-start justify-center px-4 py-6 sm:px-6 lg:col-span-7 lg:items-center lg:py-10">
         <div className={`mx-auto w-full ${wide ? "max-w-xl" : "max-w-md"}`}>
-          <div className="rounded-3xl border border-[var(--border)] bg-white p-5 shadow-[var(--shadow-card)] sm:p-8">
-            <h1 className="text-2xl font-black tracking-tight text-[var(--text-primary)]">
+          <div className="rounded-[18px] border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-card)] sm:p-8">
+            <h1 className="font-display text-2xl font-bold tracking-tight text-[var(--text-primary)]">
               {title}
             </h1>
             {subtitle ? (

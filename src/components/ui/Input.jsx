@@ -7,7 +7,7 @@ export default function Input({ label, error, className = "", ...props }) {
         </label>
       )}
       <input
-        className={`w-full rounded-xl border border-[var(--border)] bg-white px-4 py-2.5 text-sm text-[var(--text-primary)] transition-all placeholder:text-[var(--text-disabled)] focus:border-[var(--primary)] focus:outline-none focus:ring-4 focus:ring-[rgba(244,63,94,0.12)] ${
+        className={`gtt-input w-full px-4 py-2.5 text-sm transition-all placeholder:text-[var(--text-disabled)] ${
           error
             ? "border-[var(--danger)] focus:border-[var(--danger)] focus:ring-[rgba(239,68,68,0.12)]"
             : ""

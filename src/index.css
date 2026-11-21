@@ -3,30 +3,50 @@
 /*
 |--------------------------------------------------------------------------
 | Transserve Brand Color System — single source of truth
-| Rose #F00078 → Pink #FF315A → Orange #FF9500
+| Aligned with landing: Pink #FF315A · Rose #F00078 · Orange #FF9500 · Navy #101B35
+| Status colors keep their semantic meaning (not remapped to pink).
 |--------------------------------------------------------------------------
 */
 
 :root {
-  --primary: #f00078;
-  --primary-dark: #d10068;
+  /* Official brand */
+  --brand-primary: #ff315a;
+  --brand-rose: #f00078;
+  --brand-orange: #ff9500;
+  --brand-navy: #101b35;
+  --brand-gradient: linear-gradient(
+    135deg,
+    #f00078 0%,
+    #ff315a 50%,
+    #ff9500 100%
+  );
+
+  /* Interactive aliases (existing components use --primary*) */
+  --primary: #ff315a;
+  --primary-dark: #f00078;
   --primary-light: #fff0f7;
 
   --secondary: #ff9500;
   --secondary-light: #fff7ed;
 
-  --background: #ffffff;
+  /* Surfaces — neutrals consistent with landing soft UI */
+  --background: #f5f6f8;
   --surface: #ffffff;
-  --surface-muted: #f8fafc;
+  --surface-muted: #f5f6f8;
+  --hover-bg: #fff0f7;
 
+  /* Text */
   --text-primary: #101b35;
   --text-secondary: #626b7c;
-  --text-muted: #626b7c;
+  --text-muted: #8b93a7;
   --text-disabled: #94a3b8;
 
-  --border: #e2e8f0;
+  /* Borders & focus */
+  --border: #e6e9ef;
   --border-strong: #cbd5e1;
+  --focus-ring: rgba(255, 49, 90, 0.16);
 
+  /* Status — preserve meaning */
   --success: #10b981;
   --warning: #f59e0b;
   --info: #3b82f6;
@@ -40,35 +60,46 @@
   --purple: #8b5cf6;
   --cyan: #06b6d4;
 
+  /* Elevation & radii (component guidelines) */
   --shadow-card: 0 4px 20px rgba(16, 27, 53, 0.06);
-  --gradient-brand: linear-gradient(135deg, #f00078 0%, #ff315a 50%, #ff9500 100%);
+  --shadow-soft: 0 2px 8px rgba(16, 27, 53, 0.04);
+  --radius-button: 14px;
+  --radius-card: 18px;
+  --control-height: 48px;
+
+  --gradient-brand: var(--brand-gradient);
 }
 
 /*
 |--------------------------------------------------------------------------
 | Tailwind v4 theme tokens
-| Map rose scale to Transserve primary so existing rose-* classes stay on-brand.
+| Map rose/red scales to brand so existing rose-* / red-* UI stays on-brand
+| for accents — while emerald/amber stay for success/warning.
 |--------------------------------------------------------------------------
 */
 
 @theme {
-  --color-brand: #f00078;
-  --color-brand-dark: #d10068;
+  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
+    "Segoe UI Emoji";
+  --font-display: "Sora", ui-sans-serif, system-ui, sans-serif;
+
+  --color-brand: #ff315a;
+  --color-brand-dark: #f00078;
   --color-brand-light: #fff0f7;
   --color-accent: #ff9500;
   --color-accent-light: #fff7ed;
-  --color-page: #ffffff;
+  --color-page: #f5f6f8;
   --color-surface: #ffffff;
-  --color-surface-muted: #f8fafc;
+  --color-surface-muted: #f5f6f8;
   --color-ink: #101b35;
   --color-ink-secondary: #626b7c;
-  --color-ink-muted: #626b7c;
-  --color-line: #e2e8f0;
+  --color-ink-muted: #8b93a7;
+  --color-line: #e6e9ef;
   --color-line-strong: #cbd5e1;
   --color-success: #10b981;
   --color-warning: #f59e0b;
   --color-info: #3b82f6;
-  --color-preparing: #f97316;
+  --color-preparing: #ff9500;
   --color-danger: #ef4444;
   --color-veg: #16a34a;
   --color-nonveg: #dc2626;
@@ -124,41 +155,87 @@ html {
 body {
   margin: 0;
   overflow-x: hidden;
+  font-family: var(--font-sans);
   background: var(--background);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display);
+}
+
+/* Shared surfaces */
 .gtt-card {
   background: var(--surface);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-card);
-  border-radius: 1rem;
+  border-radius: var(--radius-card);
 }
 
 .gtt-btn-primary {
-  background: var(--primary);
+  background-image: var(--brand-gradient);
+  background-color: var(--primary);
   color: #ffffff;
-  transition: background-color 150ms ease, transform 150ms ease, opacity 150ms ease;
+  min-height: var(--control-height);
+  border-radius: var(--radius-button);
+  transition: filter 150ms ease, transform 150ms ease, opacity 150ms ease;
 }
 
 .gtt-btn-primary:hover:not(:disabled) {
-  background: var(--primary-dark);
+  filter: brightness(0.96);
 }
 
 .gtt-btn-primary:active:not(:disabled) {
   transform: scale(0.99);
 }
 
+.gtt-btn-primary:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 4px var(--focus-ring);
+}
+
+.gtt-btn-secondary {
+  background: var(--surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border);
+  min-height: var(--control-height);
+  border-radius: var(--radius-button);
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+
+.gtt-btn-secondary:hover:not(:disabled) {
+  background: var(--surface-muted);
+  border-color: var(--border-strong);
+}
+
 .gtt-gradient-brand {
-  background-image: var(--gradient-brand);
+  background-image: var(--brand-gradient);
+}
+
+.gtt-input {
+  min-height: var(--control-height);
+  border-radius: var(--radius-button);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-primary);
 }
 
 .gtt-input:focus {
   border-color: var(--primary);
-  box-shadow: 0 0 0 4px rgba(240, 0, 120, 0.12);
+  box-shadow: 0 0 0 4px var(--focus-ring);
   outline: none;
+}
+
+.gtt-kpi-value {
+  font-family: var(--font-display);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
 }
 
 @media print {

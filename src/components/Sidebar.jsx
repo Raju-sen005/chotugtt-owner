@@ -221,12 +221,12 @@ export default function Sidebar({ closeMobileSidebar }) {
         });
 
   return (
-    <aside className="flex h-full w-full flex-col overflow-hidden border-r border-[var(--border)] bg-white font-sans text-[var(--text-secondary)] select-none">
-      <div className="flex items-center gap-3 px-6 pb-4 pt-6">
+    <aside className="flex h-full w-full flex-col overflow-hidden border-r border-[var(--border)] bg-[var(--surface)] font-sans text-[var(--text-secondary)] select-none">
+      <div className="flex items-center px-5 pb-4 pt-5">
         <img
-          src="/Clean Transserve Brand Logo.svg"
+          src="/brand/transserve-logo-nav.svg"
           alt="Transserve"
-          className="h-20 w-75"
+          className="h-11 w-auto max-w-[200px] object-contain object-left"
         />
       </div>
 
@@ -238,10 +238,10 @@ export default function Sidebar({ closeMobileSidebar }) {
             end={to === "/"}
             onClick={handleNavClick}
             className={({ isActive }) =>
-              `relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors ${
+              `relative flex items-center gap-3 rounded-[14px] px-3 py-2.5 text-sm font-medium transition-colors ${
                 isActive
-                  ? "bg-[var(--primary-light)] text-[var(--primary-dark)]"
-                  : "text-[#475569] hover:bg-[var(--primary-light)] hover:text-[var(--primary-dark)]"
+                  ? "bg-[var(--primary-light)] text-[var(--brand-navy)]"
+                  : "text-[var(--text-secondary)] hover:bg-[var(--hover-bg)] hover:text-[var(--brand-navy)]"
               }`
             }
           >
@@ -259,15 +259,9 @@ export default function Sidebar({ closeMobileSidebar }) {
                       : "text-[var(--text-muted)]"
                   }
                 />
-                <span className="flex-1">{label}</span>
+                <span className="flex-1 text-[var(--brand-navy)]">{label}</span>
                 {badge && liveOrders.length > 0 && (
-                  <span
-                    className={`flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-black ${
-                      isActive
-                        ? "bg-[var(--primary)] text-white"
-                        : "bg-[var(--primary)] text-white"
-                    }`}
-                  >
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--primary)] px-1.5 text-[10px] font-bold text-white">
                     {liveOrders.length > 99 ? "99+" : liveOrders.length}
                   </span>
                 )}
@@ -279,7 +273,7 @@ export default function Sidebar({ closeMobileSidebar }) {
 
       {!isSuperAdmin && (
         <div className="px-3 pb-3">
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)] p-3.5">
+          <div className="rounded-[18px] border border-[var(--border)] bg-[var(--surface-muted)] p-3.5">
             <div className="mt-3 flex items-start gap-2">
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--secondary-light)] text-[var(--secondary)]">
                 <Crown size={15} />
@@ -315,7 +309,7 @@ export default function Sidebar({ closeMobileSidebar }) {
             <Link
               to="/subscription-checkout"
               onClick={handleNavClick}
-              className="mt-3 flex w-full items-center justify-center rounded-xl bg-[var(--primary)] py-2 text-xs font-bold text-white transition hover:bg-[var(--primary-dark)]"
+              className="gtt-btn-primary mt-3 flex w-full items-center justify-center py-2.5 text-xs font-bold text-white"
             >
               Manage Plan
             </Link>

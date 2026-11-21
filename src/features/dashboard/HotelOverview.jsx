@@ -78,7 +78,7 @@ export default function HotelOverview() {
         <p className="text-sm font-medium text-[var(--text-muted)]">
           {greetingFor(new Date())}
         </p>
-        <h1 className="mt-1 text-2xl font-black tracking-tight text-[var(--text-primary)]">
+        <h1 className="font-display mt-1 text-2xl font-bold tracking-tight text-[var(--text-primary)]">
           Hotel Overview
         </h1>
         <p className="mt-1 text-sm text-[var(--text-secondary)]">
@@ -88,27 +88,27 @@ export default function HotelOverview() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-3">
-        <div className="rounded-2xl border border-[var(--border)] bg-white p-4">
+        <div className="gtt-card p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
             Rooms
           </p>
-          <p className="mt-2 text-3xl font-black text-[var(--text-primary)]">
+          <p className="gtt-kpi-value mt-2 text-3xl">
             {loading ? "—" : stats.roomCount}
           </p>
         </div>
-        <div className="rounded-2xl border border-[var(--border)] bg-white p-4">
+        <div className="gtt-card p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
             Active stays
           </p>
-          <p className="mt-2 text-3xl font-black text-[var(--text-primary)]">
+          <p className="gtt-kpi-value mt-2 text-3xl">
             {loading ? "—" : stats.activeBookings}
           </p>
         </div>
-        <div className="rounded-2xl border border-[var(--border)] bg-white p-4">
+        <div className="gtt-card p-4">
           <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
             Bookings
           </p>
-          <p className="mt-2 text-3xl font-black text-[var(--text-primary)]">
+          <p className="gtt-kpi-value mt-2 text-3xl">
             {loading ? "—" : stats.totalBookings}
           </p>
         </div>
@@ -123,7 +123,7 @@ export default function HotelOverview() {
             <Link
               key={to}
               to={to}
-              className="flex items-center gap-3 rounded-2xl border border-[var(--border)] bg-white px-4 py-3 text-sm font-semibold text-[var(--text-primary)] transition hover:border-[var(--primary)] hover:bg-[var(--primary-light)]"
+              className="flex items-center gap-3 rounded-[18px] border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm font-semibold text-[var(--text-primary)] shadow-[var(--shadow-soft)] transition hover:border-[var(--primary)] hover:bg-[var(--hover-bg)]"
             >
               <Icon size={18} className="text-[var(--primary)]" />
               {label}

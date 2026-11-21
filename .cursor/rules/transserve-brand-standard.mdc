@@ -1,0 +1,44 @@
+---
+description: Mandatory Transserve brand design standard for all UI work
+alwaysApply: true
+---
+
+# Transserve Brand Design Standard (Mandatory)
+
+One official identity across Landing, Restaurant/Hotel/Resort Admin, Super Admin, auth, and future modules.
+
+## Official tokens
+
+- Primary `#FF315A` · Rose `#F00078` · Orange `#FF9500` · Navy `#101B35`
+- Gradient: `linear-gradient(135deg, #F00078 0%, #FF315A 50%, #FF9500 100%)`
+- Fonts: **Sora** 600–800 (headings/display) · **Manrope** 400–800 (body/nav/UI)
+- Buttons: min-height **48px**, radius **14px** · Cards: radius **18px**
+
+## Before any UI task
+
+1. Inspect centralized tokens/shared components first (`src/index.css`, `TRANSERVE_ADMIN_DESIGN_TOKENS.md`, `.gtt-*` / `ui/*`).
+2. Prefer CSS variables / `@theme` tokens over hardcoded colors/fonts.
+3. Reuse shared Button, Input, Modal, AuthShell, Sidebar patterns.
+4. Use official SVG/PNG assets under `public/brand/` — never redraw or alter artwork.
+5. Use the brand gradient selectively (primary CTAs, restrained heroes) — not everywhere.
+
+## Hard rules
+
+- Do not invent alternate brand colors, fonts, or logos without approval.
+- Keep dashboards professional and readable; preserve accessible contrast and responsive layouts.
+- Layouts may differ by product (restaurant/hotel/resort), but brand identity must stay consistent.
+- Visual work only: do not change APIs, auth, permissions, tenant isolation, entitlements, or expose unauthorized modules.
+- Do not deploy or modify production data without explicit approval.
+
+## Examples
+
+```css
+/* ✅ */
+background: var(--brand-gradient);
+color: var(--brand-navy);
+border-radius: var(--radius-card);
+
+/* ❌ */
+background: #7C3AED;
+font-family: Inter, sans-serif;
+```

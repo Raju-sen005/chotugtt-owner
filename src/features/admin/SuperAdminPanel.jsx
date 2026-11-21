@@ -1691,7 +1691,7 @@ export default function SuperAdminPanel() {
           >
             <div className="flex h-16 items-center gap-3 border-b border-white/10 px-5">
               <img
-                src="/Untitled.svg"
+                src="/brand/Vibrant_Transserve_Gradient_Logo-removebg-preview.png"
                 alt="Transserve"
                 className="h-8 w-8"
               />

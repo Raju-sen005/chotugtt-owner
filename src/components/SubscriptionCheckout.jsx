@@ -849,7 +849,7 @@ export default function SubscriptionCheckout() {
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white text-[var(--primary)] shadow-sm">
               {/* <ChefHat size={20} strokeWidth={2.25} /> */}
               <img
-                src="/Untitled.svg"
+                src="/brand/Vibrant_Transserve_Gradient_Logo-removebg-preview.png"
                 alt="Transserve Logo"
                 className="h-6 w-6"
               />

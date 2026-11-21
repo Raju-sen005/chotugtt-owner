@@ -106,7 +106,7 @@ export default function RegistrationSuccess() {
       <div className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center px-4 py-12 sm:px-6">
         <div className="mb-8 flex items-center gap-3">
           <img
-            src="/Untitled.svg"
+            src="/brand/Vibrant_Transserve_Gradient_Logo-removebg-preview.png"
             alt="Transserve"
             className="h-11 w-11"
           />
