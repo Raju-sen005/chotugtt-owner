@@ -256,7 +256,7 @@ export default function ForgotPassword() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--primary)] py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--primary-dark)] disabled:cursor-not-allowed disabled:opacity-70"
+            className="gtt-btn-primary flex w-full items-center justify-center gap-2 py-3.5 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isSubmitting ? "Sending code..." : "Send verification code"}
           </button>
@@ -295,7 +295,7 @@ export default function ForgotPassword() {
           <button
             type="submit"
             disabled={isSubmitting || otp.length !== 6}
-            className="flex w-full items-center justify-center rounded-xl bg-[var(--primary)] py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--primary-dark)] disabled:cursor-not-allowed disabled:opacity-70"
+            className="gtt-btn-primary flex w-full items-center justify-center gap-2 py-3.5 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isSubmitting ? "Verifying..." : "Verify code"}
           </button>
@@ -390,7 +390,7 @@ export default function ForgotPassword() {
               !confirmPassword ||
               newPassword !== confirmPassword
             }
-            className="flex w-full items-center justify-center rounded-xl bg-[var(--primary)] py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--primary-dark)] disabled:cursor-not-allowed disabled:opacity-70"
+            className="gtt-btn-primary flex w-full items-center justify-center gap-2 py-3.5 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-70"
           >
             {isSubmitting ? "Updating password..." : "Reset password"}
           </button>
@@ -421,7 +421,7 @@ export default function ForgotPassword() {
           <button
             type="button"
             onClick={() => navigate("/login", { replace: true })}
-            className="flex w-full items-center justify-center rounded-xl bg-[var(--primary)] py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--primary-dark)]"
+            className="gtt-btn-primary flex w-full items-center justify-center gap-2 py-3.5 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-70"
           >
             Go to sign in
           </button>

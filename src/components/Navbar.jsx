@@ -355,10 +355,10 @@ export default function Navbar() {
 
       <div className="flex items-center gap-2 sm:gap-4 shrink-0">
         <div className="hidden xs:flex sm:flex items-center gap-1.5 sm:gap-2 text-right">
-          <p className="hidden sm:block text-sm font-semibold text-slate-800 truncate max-w-[120px]">
+          <p className="hidden sm:block text-sm font-semibold text-[var(--brand-navy)] truncate max-w-[120px]">
             {user?.name}
           </p>
-          <span className="text-[9px] sm:text-[10px] bg-red-50 text-red-600 font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wide whitespace-nowrap">
+          <span className="text-[9px] sm:text-[10px] bg-[var(--primary-light)] text-[var(--primary-dark)] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wide whitespace-nowrap">
             {user?.role}
           </span>
         </div>
@@ -371,7 +371,7 @@ export default function Navbar() {
                 setIsNotificationOpen((open) => !open);
                 if (!isNotificationOpen) fetchNotifications();
               }}
-              className="relative p-2 rounded-lg text-slate-500 hover:text-[var(--primary)] hover:bg-[var(--primary-light)] transition-all cursor-pointer"
+              className="relative p-2 rounded-[14px] text-[var(--text-secondary)] hover:text-[var(--primary)] hover:bg-[var(--hover-bg)] transition-all cursor-pointer"
               title="Notifications"
               aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`}
               aria-expanded={isNotificationOpen}
@@ -385,10 +385,10 @@ export default function Navbar() {
             </button>
 
             {isNotificationOpen && (
-              <div className="absolute right-0 top-full mt-2 w-[min(360px,calc(100vw-24px))] max-h-[min(520px,calc(100vh-100px))] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl z-50">
-                <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-100">
+              <div className="absolute right-0 top-full mt-2 w-[min(360px,calc(100vw-24px))] max-h-[min(520px,calc(100vh-100px))] overflow-hidden rounded-[18px] border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)] z-50">
+                <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-[var(--border)]">
                   <div>
-                    <h3 className="text-sm font-bold text-slate-900">
+                    <h3 className="font-display text-sm font-bold text-[var(--brand-navy)]">
                       Notifications
                     </h3>
                     <p className="text-xs text-slate-500">

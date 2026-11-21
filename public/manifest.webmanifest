@@ -5,12 +5,12 @@
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FFFFFF",
-  "theme_color": "#F00078",
+  "theme_color": "#FF315A",
   "icons": [
     {
-      "src": "/Untitled.svg",
+      "src": "/brand/Vibrant_Transserve_Gradient_Logo-removebg-preview.png",
       "sizes": "any",
-      "type": "image/svg+xml",
+      "type": "image/png",
       "purpose": "any"
     },
     {

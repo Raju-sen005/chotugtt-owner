@@ -216,10 +216,10 @@ export default function MerchantLayout() {
           className="
             sticky
             top-0
-            bg-white
+            bg-[var(--surface)]/95
             backdrop-blur-md
             border-b
-            border-slate-200/60
+            border-[var(--border)]
             z-20
             px-4
             lg:px-8
@@ -241,17 +241,18 @@ export default function MerchantLayout() {
               className="
                 lg:hidden
                 p-2
-                text-slate-600
-                hover:bg-slate-100
-                rounded-xl
+                text-[var(--text-secondary)]
+                hover:bg-[var(--hover-bg)]
+                rounded-[14px]
                 cursor-pointer
               "
+              aria-label="Open navigation"
             >
               <Menu size={20} />
             </button>
 
-            <p className="text-base font-black tracking-tight text-slate-900 lg:hidden">
-              Chotu<span className="text-[var(--secondary)]">GTT</span>
+            <p className="font-display text-base font-bold tracking-tight text-[var(--brand-navy)] lg:hidden">
+              Transserve
             </p>
           </div>
 

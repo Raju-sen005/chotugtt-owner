@@ -222,7 +222,7 @@ export default function RegisterTenant({ onSwitchToLogin }) {
           <button
             type="button"
             onClick={onSwitchToLogin}
-            className="w-full rounded-xl bg-[var(--primary)] py-3.5 text-sm font-bold text-white transition hover:bg-[var(--primary-dark)]"
+            className="gtt-btn-primary w-full py-3.5 text-sm font-bold"
           >
             Proceed to sign in
           </button>
@@ -407,7 +407,7 @@ export default function RegisterTenant({ onSwitchToLogin }) {
         <button
           type="submit"
           disabled={isRegistering || !isFormValid}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--primary)] py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--primary-dark)] disabled:cursor-not-allowed disabled:opacity-70"
+          className="gtt-btn-primary flex w-full items-center justify-center gap-2 py-3.5 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-70"
         >
           {isRegistering ? (
             <>

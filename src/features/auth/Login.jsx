@@ -161,7 +161,7 @@ export default function Login({ onSwitchToSignup }) {
         <button
           type="submit"
           disabled={isLoggingIn}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-[var(--primary)] py-3.5 text-sm font-bold text-white shadow-sm transition hover:bg-[var(--primary-dark)] disabled:cursor-not-allowed disabled:opacity-70"
+          className="gtt-btn-primary flex w-full items-center justify-center gap-2 py-3.5 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-70"
         >
           {isLoggingIn ? (
             <>

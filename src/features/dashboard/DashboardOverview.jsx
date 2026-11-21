@@ -222,28 +222,28 @@ export default function DashboardOverview() {
 
   return (
     <div className="space-y-5 font-sans text-slate-800">
-      <section className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-rose-500 via-rose-500 to-orange-400 px-6 py-7 sm:px-8 text-white shadow-sm">
+      <section className="relative overflow-hidden rounded-[18px] gtt-gradient-brand px-6 py-7 sm:px-8 text-white shadow-[var(--shadow-soft)]">
         <div className="absolute -right-8 -top-10 h-48 w-48 rounded-full bg-white/10" />
-        <div className="absolute right-24 bottom-0 h-28 w-28 rounded-full bg-orange-300/40" />
+        <div className="absolute right-24 bottom-0 h-28 w-28 rounded-full bg-white/10" />
         <div className="relative flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-sm font-semibold text-white/90">
               {greetingFor(now)},
             </p>
-            <h1 className="mt-1 text-3xl sm:text-4xl font-black tracking-tight">
-              {displayName}! <span aria-hidden="true">👋</span>
+            <h1 className="font-display mt-1 text-3xl sm:text-4xl font-bold tracking-tight">
+              {displayName}!
             </h1>
             <p className="mt-2 text-sm text-white/85">
               Here's what's happening in your restaurant today.
             </p>
           </div>
-          <div className="self-start rounded-2xl bg-white px-4 py-3 text-slate-700 shadow-sm">
-            <div className="flex items-center gap-2 text-sm font-bold">
-              <span className="text-rose-500">▣</span>
+          <div className="self-start rounded-[14px] bg-white px-4 py-3 text-[var(--text-secondary)] shadow-sm">
+            <div className="flex items-center gap-2 text-sm font-bold text-[var(--brand-navy)]">
+              <span className="text-[var(--primary)]">▣</span>
               {dateLabel}
             </div>
-            <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-emerald-600">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+            <p className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-[var(--success)]">
+              <span className="h-1.5 w-1.5 rounded-full bg-[var(--success)]" />
               Today
             </p>
           </div>
@@ -256,15 +256,15 @@ export default function DashboardOverview() {
           return (
             <article
               key={stat.title}
-              className="rounded-3xl border border-slate-100 bg-white p-5 shadow-sm"
+              className="gtt-card p-5"
             >
               <div className="flex items-start justify-between gap-3">
-                <div className={`rounded-2xl p-3 ${stat.iconWrap}`}>
+                <div className={`rounded-[14px] p-3 ${stat.iconWrap}`}>
                   <Icon size={18} />
                 </div>
               </div>
-              <p className="mt-4 text-sm font-medium text-slate-500">{stat.title}</p>
-              <p className="mt-1 text-3xl font-black tracking-tight text-slate-900">
+              <p className="mt-4 text-sm font-medium text-[var(--text-muted)]">{stat.title}</p>
+              <p className="gtt-kpi-value mt-1 text-3xl">
                 {stat.value}
               </p>
               <div className="mt-4 flex items-end justify-between">
@@ -277,7 +277,7 @@ export default function DashboardOverview() {
       </section>
 
       <section className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <article className="xl:col-span-2 rounded-3xl border border-slate-100 bg-white p-5 sm:p-6 shadow-sm">
+        <article className="gtt-card xl:col-span-2 p-5 sm:p-6">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="text-lg font-black text-slate-900">Sales Trend</h2>
             <div className="flex items-center gap-1 rounded-full bg-slate-50 p-1">
@@ -341,7 +341,7 @@ export default function DashboardOverview() {
           </div>
         </article>
 
-        <article className="rounded-3xl border border-slate-100 bg-white p-5 sm:p-6 shadow-sm">
+        <article className="gtt-card p-5 sm:p-6">
           <div className="flex items-center justify-between">
             <h2 className="flex items-center gap-2 text-lg font-black text-slate-900">
               <Crown size={16} className="text-amber-500" />
@@ -379,7 +379,7 @@ export default function DashboardOverview() {
       </section>
 
       <section className="grid grid-cols-1 xl:grid-cols-3 gap-4">
-        <article className="xl:col-span-2 rounded-3xl border border-slate-100 bg-white p-5 sm:p-6 shadow-sm">
+        <article className="gtt-card xl:col-span-2 p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-lg font-black text-slate-900">
               Recent Live Orders{" "}
@@ -447,7 +447,7 @@ export default function DashboardOverview() {
           </div>
         </article>
 
-        <article className="rounded-3xl border border-slate-100 bg-white p-5 sm:p-6 shadow-sm">
+        <article className="gtt-card p-5 sm:p-6">
           <h2 className="text-lg font-black text-slate-900">System Infrastructure Pulse</h2>
           <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
             {[
